@@ -70,6 +70,25 @@ double binned_p_cm(double k, double a, int nl, int use_linear_ps);
 
 double get_area(double z);
 
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+// SETUP
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+// Cocoa: we try to avoid reading of files in the cosmolike_core code 
+// Cocoa: (reading is done in the C++/python interface)
+
+void setup_SDSS_P_lambda_obs_given_true_lambda(int* io_nz, double** io_z, int* io_nlambda, 
+double** io_lambda, double** io_tau, double** io_mu, double** io_sigma, double** io_fmask, 
+double** io_fprj, int io);
+
+void setup_SDSS_P_true_lambda_given_mass(int* io_nintrinsic_sigma,  double** io_intrinsic_sigma, 
+int* io_natsrgm, double** io_atsrgm, double** io_alpha, double** io_sigma, int io);
+
+void setup_get_area(int* io_nz, double** io_z, double** io_A, int io);
+
 #ifdef __cplusplus
 }
 #endif

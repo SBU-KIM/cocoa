@@ -9,6 +9,14 @@ extern "C" {
 #define CHAR_MAX_SIZE 1024
 #define MAX_SIZE_ARRAYS 10
 
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+//  DEFINE STRUCTS
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+
 typedef struct
 {
   int Ncl;
@@ -78,6 +86,8 @@ typedef struct
   
   double cluster_zmax[MAX_SIZE_ARRAYS];
   double cluster_zmin[MAX_SIZE_ARRAYS];
+
+  int** external_selection_cg_clustering;
 } tomopara;
 
 typedef struct
@@ -93,6 +103,9 @@ typedef struct
   double clustering_zdistrpar_zmax;
   int clustering_histogram_zbins;
   char clustering_REDSHIFT_FILE[CHAR_MAX_SIZE];
+
+  int clusters_photoz;
+  char clusters_REDSHIFT_FILE[CHAR_MAX_SIZE];
 } redshiftpara;
 
 typedef struct
@@ -115,9 +128,6 @@ typedef struct
   double b[MAX_SIZE_ARRAYS];      // linear galaxy bias paramter in clustering bin i
   double b2[MAX_SIZE_ARRAYS];     // quadratic bias parameter for redshift bin i
   double bs2[MAX_SIZE_ARRAYS];    // leading order tidal bias for redshift bin i
-  double rcorr[MAX_SIZE_ARRAYS];
-  double cg[MAX_SIZE_ARRAYS];
-  double n_hod[MAX_SIZE_ARRAYS];
   double b_mag[MAX_SIZE_ARRAYS];  // amplitude of magnification bias, b_mag[i] = 5*s[i]+beta[i]-2
   B1_model b1_function;
 } galpara;
@@ -129,17 +139,14 @@ typedef struct
 
 typedef struct
 { // parameters for power spectrum passed to FASTPT
-  // general specifiers
   double k_min;
   double k_max;
   int N;
   int N_per_dec;
-  // parameters for table of bias terms
-  double **tab_AB;
-  int N_AB;
-  // parameters for table of IA terms
-  double **tab_IA;
-  int N_IA;
+  double **tab_AB; // parameters for table of bias terms
+  int N_AB;        // parameters for table of bias terms
+  double **tab_IA; // parameters for table of IA terms
+  int N_IA;        // parameters for table of IA terms
 } FPTpara;
 
 typedef struct
@@ -177,14 +184,20 @@ typedef struct
   // Variables for the 4x2pt+N (see: 2008.10757 & 2010.01138)
   int N_cluster_MOR;
   double cluster_MOR[MAX_SIZE_ARRAYS];
+  
   int N_cluster_selection;
   double cluster_selection[MAX_SIZE_ARRAYS];
 } nuisancepara;
 
 typedef struct
 {
+  int bias_model;                 // from ClusterAnalysisChoice
+  int hmf_model;                  // from ClusterAnalysisChoice
+  int nonlinear_bias;             // from ClusterAnalysisChoice
+
   double N200_min;
   double N200_max;
+
   int N200_Nbin;
   double N_min[MAX_SIZE_ARRAYS];
   double N_max[MAX_SIZE_ARRAYS];
@@ -215,9 +228,72 @@ typedef struct
   char pathLensRecNoise[CHAR_MAX_SIZE]; // path to precomputed noise on reconstructed kappa
 } Cmb;
 
+typedef struct 
+{
+  double a_min;
+  double k_min_cH0;
+  double k_max_cH0;
+  double M_min;
+  double M_max;
+  double P_2_s_min;
+  double P_2_s_max;
+  int LMIN_tab;      // Cosmo2D
+  int LMAX;          // Cosmo2D
+  int LMAX_NOLIMBER; // Cosmo2D
+} lim;
+
+typedef struct 
+{
+  int N_a;
+  int N_k_lin;
+  int N_k_nlin;
+  int N_ell;
+  int N_theta;
+  int N_thetaH;
+  int N_S2;
+  int N_DS;
+  int N_ell_TATT;    // Cosmo2D
+  int NL_Nell_block; // Cosmo2D - NL = NonLimber
+  int NL_Nchi;       // Cosmo2D - NL = NonLimber
+} Ntab;
+
+typedef struct 
+{
+  double xmin;
+  double xmax;
+  double Pmin;
+  double Pmax;
+  double dPmin;
+  double dPmax;
+} bin_avg;
+
+typedef struct 
+{
+  int tinker_bias_ncosmo;
+  int tinker_bias_nparam;
+  int tinker_bias_nsamp;
+  int tinker_bias_nparam_redshift;
+  int tinker_bias_extrapolation_cut_in;
+  int tinker_bias_extrapolation_cut_out;
+  int tinker_hmf_ncosmo;
+  int tinker_hmf_nparam;
+  int tinker_hmf_nsamp;
+  int tinker_hmf_nparam_redshift;
+  int tinker_hmf_extrapolation_cut_in;
+  int tinker_hmf_extrapolation_cut_out;
+} TinkerEmuParam;
+
 double bgal_z(double z, int nz);
 
 double b1_per_bin(double z, int nz);
+
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+//  EXPORT STRUCTS 
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
 
 extern likepara like;
 
@@ -243,7 +319,47 @@ extern barypara bary;
 
 extern Cmb cmb;
 
+extern lim limits;
+
+extern Ntab Ntable;
+
+export TinkerEmuParam tinkerEmuParam;
+
+
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+//  RESET STRUCTS 
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+
+void reset_like_struct();
+void reset_cosmology_struct();
+void reset_tomo_struct();
+void reset_gbias_struct();
+void reset_nuisance_struct();
+void reset_survey_struct();
+void reset_pdeltaparams_struct();
+void reset_redshift_struct();
+void reset_cmb_struct();
+void reset_cluster_struct();
 void reset_bary_struct();
+
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+// UPDATE STRUCTS
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+//  ----------------------------------------------------------------------------------
+
+void update_cosmopara(cosmopara* C);
+
+void update_galpara(galpara* G);
+
+void update_nuisance(nuisancepara* N);
+
 
 #ifdef __cplusplus
 }

@@ -1282,19 +1282,22 @@ double Pdelta(double io_kNL, double io_a) {
   return out_PK;
 }
 
-// calculating the angular diameter distance f_K
-// BS01 2.4, 2.30: f_K is a radial function that, depending on the curvature of
-// the Universe, is a trigonometric, linear, or hyperbolic function of chi
-double f_K(double chi) {
-  double K, K_h, f;
-  K = (cosmology.Omega_m + cosmology.Omega_v - 1.);
-  if (K > precision.medium) { // open
-    K_h = sqrt(K); // K in units H0/c see BS eq. 2.30
+double f_K(double chi) 
+{
+  double f;
+  const double K = (cosmology.Omega_m + cosmology.Omega_v - 1.);
+  if (K > 1e-3) 
+  { // open
+    const double K_h = sqrt(K); // K in units H0/c see BS eq. 2.30
     f = 1. / K_h * sin(K_h * chi);
-  } else if (K < -precision.medium) { // closed
-    K_h = sqrt(-K);
+  } 
+  else if (K < -1e-3) 
+  { // closed
+    const double K_h = sqrt(-K);
     f = 1. / K_h * sinh(K_h * chi);
-  } else { // flat
+  } 
+  else 
+  { // flat
     f = chi;
   }
   return f;

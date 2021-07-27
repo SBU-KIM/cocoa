@@ -12,15 +12,13 @@ extern "C" {
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 
-double amin_source(int i);
+double amin_source(const int ni);
 
-double amax_source(int i);
+double amax_source(const int ni);
 
-double amax_source_IA(int i);
+double amin_lens(const int ni);
 
-double amin_lens(int i);
-
-double amax_lens(int i);
+double amax_lens(const int ni);
 
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
@@ -69,7 +67,8 @@ int ZCCL1(int Nbin); // find z1 bin of tomo combination (cluster-cluster cluster
 
 int ZCCL2(int Nbin); // find z2 bin of tomo combination (cluster-cluster clustering)
 
-int N_CCL(int z1, int z2); // find tomo bin number tomography combination (cluster-cluster clustering)
+// find tomo bin number tomography combination (cluster-cluster clustering)
+int N_CCL(int z1, int z2); 
 
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
@@ -104,6 +103,22 @@ double bias_zphot_clustering(double z, int nz); // compute photo-z bias
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
+// cluster routines (for redshift distributions, including photo-zs * (optional))
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+
+//return pf(z,j) based on redshift file with structure z[i] nz[0][i]..nz[tomo.clustering_Nbin-1][i]
+double pf_cluster_histo_n(double z, void* params); 
+
+double pz_cluster(double zz, int nz, int nN); // int_zmin^zmax dz_obs p(z_obs|z_true)
+
+// simplfied selection function, disregards evolution of N-M relation+mass function within z bin
+double zdistr_cluster(int nz,  double z, double chi, double hoverh0) ;
+
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
 // routines calculating the number of source and lens galaxies per bin
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
@@ -127,15 +142,19 @@ double zmean_source(int j); // mean true redshift of source galaxies in tomograp
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 
-
 double g_cmb(double a); // lens efficiency for CMB lensing
 
 double g_tomo(double a, int zbin); // lens efficiency of source galaxies in tomography bin zbin
 
 double g2_tomo(double a, int zbin); // lens efficiency of source galaxies in tomography bin zbin
 
-// lens efficiency of *lens* galaxies in tomography bin zbin - used for magnification calculations
+// lens efficiency of *lens* galaxies in tomography bin zbin
+// used in magnification calculations
 double g_lens(double a, int zbin);
+
+// lens efficiency of *lens* cluster in tomography bin nz, lambda bin nl
+// used in magnification calculations
+double g_lens_cluster(double a, int nz, int nl) // for *lens* tomography bin zbin
 
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
@@ -146,17 +165,6 @@ double g_lens(double a, int zbin);
 // ---------------------------------------------------------------------------------------
 
 double ggl_efficiency(int zl, int zs);
-
-// ---------------------------------------------------------------------------------------
-// ---------------------------------------------------------------------------------------
-// ---------------------------------------------------------------------------------------
-// SELECTION FUNCTION (Cluster)
-// ---------------------------------------------------------------------------------------
-// ---------------------------------------------------------------------------------------
-// ---------------------------------------------------------------------------------------
-
-// simplfied selection function, disregards evolution of N-M relation+mass function within z bin
-double zdistr_cluster(int nz,  double z, double chi, double hoverh0) ;
 
 
 #ifdef __cplusplus

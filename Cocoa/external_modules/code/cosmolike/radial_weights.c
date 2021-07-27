@@ -74,6 +74,32 @@ double W_mag(double a, double fK, int nz)
   return wmag;
 }
 
+double W_mag_cluster(double a, double fK, int nz, int nl)
+{
+  if(!(a>0) || !(a<1)) 
+  {
+    log_fatal("a>0 and a<1 not true");
+    exit(1);
+  }
+  if(nz < -1 || nz > tomo.cluster_Nbin - 1) 
+  {
+    log_fatal("invalid bin input ni = %d (max %d)", nz, tomo.cluster_Nbin);
+    exit(1);
+  }
+  if(nl < 0 || nl > Cluster.N200_Nbin - 1) 
+  {
+    log_fatal("invalid bin input ni = %d (max %d)", nl, Cluster.N200_Nbin);
+    exit(1);
+  } 
+  
+  double wmag = (1.5 * cosmology.Omega_m * fK / a)  * g_lens_cluster(a, nz, nl);
+  if(cosmology.MGSigma != 0.)
+  {
+    wmag *= (1.0 + MG_Sigma(a));
+  }
+  return wmag;
+}
+
 double W_gal(double a, int nz, double chi, double hoverh0) 
 {
   if(!(a>0) || !(a<1)) 

@@ -42,7 +42,6 @@ double *coeff_A_ar, int Nterms, double *Pout, double *k, double *Pin, int Nk)
     }
   }
 
-
   for(int i = 0; i < Nterms; i++) 
   {
     free(Fy[i]);

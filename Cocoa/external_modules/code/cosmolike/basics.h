@@ -7,81 +7,20 @@
 extern "C" {
 #endif
 
-#define NR_END 1
-#define FREE_ARG char *
-#define EXIT_MISSING_FILE(ein, purpose, filename)                              \
-  if (!ein) {                                                                  \
-    fprintf(stderr, "Could not find %s file %s\n", purpose, filename);         \
-    exit(1);                                                                   \
-  }
+double fmin(const double a, const double b);
 
-static double darg __attribute__((unused)), maxarg1 __attribute__((unused)),
-    maxarg2 __attribute__((unused));
+double fmax(const double a, const double b);
 
-#define FMAX(a, b)                                                             \
-  (maxarg1 = (a), maxarg2 = (b), (maxarg1) > (maxarg2) ? (maxarg1) : (maxarg2))
-#define FMIN(a, b)                                                             \
-  (maxarg1 = (a), maxarg2 = (b), (maxarg1) < (maxarg2) ? (maxarg1) : (maxarg2))
+bin_avg set_bin_average(int i_theta, int j_L);
 
-typedef struct 
-{
-  double pi;
-  double pi_sqr;
-  double twopi;
-  double ln2;
-  double arcmin;
-  double lightspeed;
-} con;
+double int_gsl_integrate_high_precision(double (*func)(double, void*),
+  void* arg, double a, double b, double* error, int niter);
 
-typedef struct 
-{
-  double low;
-  double medium;
-  double high;
-  double insane;
-} pre;
+double int_gsl_integrate_medium_precision(double (*func)(double, void*),
+  void* arg, double a, double b, double* error, int niter);
 
-typedef struct {
-  double a_min;
-  double k_min_cH0;
-  double k_max_cH0;
-  double M_min;
-  double M_max;
-  double P_2_s_min;
-  double P_2_s_max;
-  int LMIN_tab;      // Cosmo2D
-  int LMAX;          // Cosmo2D
-  int LMAX_NOLIMBER; // Cosmo2D
-} lim;
-
-typedef struct {
-  int N_a;
-  int N_k_lin;
-  int N_k_nlin;
-  int N_ell;
-  int N_theta;
-  int N_thetaH;
-  int N_S2;
-  int N_DS;
-  int N_ell_TATT; // Cosmo2D
-} Ntab;
-
-extern con constants;
-
-extern pre precision;
-
-extern lim limits;
-
-extern Ntab Ntable;
-
-double int_gsl_integrate_high_precision(double (*func)(double, void *),
-  void *arg, double a, double b, double *error, int niter);
-
-double int_gsl_integrate_medium_precision(double (*func)(double, void *),
-  void *arg, double a, double b, double *error, int niter);
-
-double int_gsl_integrate_low_precision(double (*func)(double, void *),
-  void *arg, double a, double b, double *error, int niter);
+double int_gsl_integrate_low_precision(double (*func)(double, void*),
+  void* arg, double a, double b, double* error, int niter);
 
 double interpol2d(double **f, int nx, double ax, double bx, double dx, double x,
   int ny, double ay, double by, double dy, double y, double lower, double upper);
@@ -89,26 +28,14 @@ double interpol2d(double **f, int nx, double ax, double bx, double dx, double x,
 double interpol2d_fitslope(double **f, int nx, double ax, double bx, double dx,
   double x, int ny, double ay, double by, double dy, double y, double lower);
 
-double interpol(double *f, int n, double a, double b, double dx, double x,
+double interpol(double* f, int n, double a, double b, double dx, double x, 
   double lower, double upper);
 
-double interpol_fitslope(double *f, int n, double a, double b, double dx,
-  double x, double lower);
+double interpol_fitslope(double* f, int n, double a, double b, double dx, double x, double lower);
 
-void free_double_vector(double *v, long nl, long nh);
+int line_count(char* filename);
 
-double *create_double_vector(long nl, long nh);
-
-void free_double_matrix(double **m, long nrl, long nrh, long ncl, long nch);
-
-double **create_double_matrix(long nrl, long nrh, long ncl, long nch);
-
-int line_count(char *filename);
-
-void error(char *s);
-
-void hankel_kernel_FT(double x, fftw_complex *res, double *arg,
-int argc __attribute__((unused)));
+void hankel_kernel_FT(double x, fftw_complex* res, double* arg, int argc __attribute__((unused)));
 
 void cdgamma(fftw_complex x, fftw_complex *res);
 

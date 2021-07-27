@@ -4,9 +4,9 @@
 #include <gsl/gsl_math.h>
 #include "utils.h"
 
-double complex gamma_lanczos_cfft(double complex z) {
-/* Lanczos coefficients for g = 7 */
-	static double p[] = {
+double complex gamma_lanczos_cfft(double complex z) 
+{ // Lanczos coefficients for g = 7 
+	const double p[] = {
 		0.99999999999980993227684700473478,
 		676.520368121885098567009190444019,
 		-1259.13921672240287047156078755283,
@@ -17,7 +17,10 @@ double complex gamma_lanczos_cfft(double complex z) {
 		9.984369578019570859563e-6,
 		1.50563273514931155834e-7};
 
-	if(creal(z) < 0.5) {return M_PI / (csin(M_PI*z)*gamma_lanczos_cfft(1. - z));}
+	if(creal(z) < 0.5) 
+	{
+		return M_PI / (csin(M_PI*z)*gamma_lanczos_cfft(1. - z));
+	}
 	z -= 1;
 	double complex x = p[0];
 	for(int n = 1; n < 9; n++){ x += p[n] / (z + (double)(n));}
@@ -26,9 +29,9 @@ double complex gamma_lanczos_cfft(double complex z) {
 	return sqrt(2*M_PI) * cpow(t, z+0.5) * cexp(-t) * x;
 }
 
-double complex lngamma_lanczos_cfft(double complex z) {
-/* Lanczos coefficients for g = 7 */
-	static double p[] = {
+double complex lngamma_lanczos_cfft(double complex z) 
+{ // Lanczos coefficients for g = 7 
+	const double p[] = {
 		0.99999999999980993227684700473478,
 		676.520368121885098567009190444019,
 		-1259.13921672240287047156078755283,
@@ -39,12 +42,16 @@ double complex lngamma_lanczos_cfft(double complex z) {
 		9.984369578019570859563e-6,
 		1.50563273514931155834e-7};
 
-	if(creal(z) < 0.5) {return clog(M_PI) - clog(csin(M_PI*z)) - lngamma_lanczos_cfft(1. - z);}
+	if(creal(z) < 0.5) {
+		return clog(M_PI) - clog(csin(M_PI*z)) - lngamma_lanczos_cfft(1. - z);
+	}
 	z -= 1;
 	double complex x = p[0];
-	for(int n = 1; n < 9; n++){ x += p[n] / (z + (double)(n));}
-
-	double complex t = z + 7.5;
+	for(int n = 1; n < 9; n++) 
+	{ 
+		x += p[n] / (z + (double)(n));
+	}
+	const double complex t = z + 7.5;
 	return log(2*M_PI) /2.  + (z+0.5)*clog(t) -t + clog(x);
 }
 
@@ -55,9 +62,7 @@ Calculate g_l = exp( zln2 + lngamma( (l+nu)/2 + I*eta/2 ) - lngamma( (3+l-nu)/2 
 	double complex z;
 	for(i=0; i<N; i++) {
 		z = nu+I*eta[i];
-		// gl[i] = cexp(z*log(2.) + clog(gamma_lanczos((l+z)/2.) ) - clog(gamma_lanczos((3.+l-z)/2.)));
 		gl[i] = cexp(z*log(2.) + lngamma_lanczos_cfft((l+z)/2.) - lngamma_lanczos_cfft((3.+l-z)/2.) );		
-		// if(isnan(gl[i])) {printf("nan at l,nu,eta, = %lf %lg %lg %lg %lg\n", l,nu, eta[i], gamma_lanczos((l+z)/2.),gamma_lanczos((3.+l-z)/2.));exit(0);}
 	}
 }
 

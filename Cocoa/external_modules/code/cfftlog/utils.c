@@ -48,7 +48,8 @@ double lngamma_lanczos_real_cfft(double z) {
 }
 
 
-void extrap_log_linear_cfft(double *fk, int N_origin, int N_extra, double *large_fk) {
+void extrap_log_linear_cfft(double *fk, int N_origin, int N_extra, double *large_fk) 
+{
 	double dln_left, dln_right;
 	int i;
 
@@ -81,13 +82,3 @@ void extrap_log_linear_cfft(double *fk, int N_origin, int N_extra, double *large
 		}
 	}
 }
-
-
-// void resample_fourier_gauss(double *k, double *fk, config *config, double *k_sample, double *fk_sample) {
-// 	long i;
-// 	double dlnk = log(k[sizeof(k)-1]/k[0]) / (config->Nk_sample-1.);
-// 	for(i=0; i<config->Nk_sample; i++) {
-// 		k_sample[i] = k[0] * exp(i*dlnk);
-// 		fk_sample[i] = 
-// 	}
-// }
