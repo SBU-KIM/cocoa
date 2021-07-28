@@ -704,7 +704,6 @@ double w_gammat_cluster_tomo_flatsky(double theta, int nl, int ni, int nj, int l
         table[j][k] = tab[j][0][k];
       }
     }
-
     for (int j=0; j<NSIZE; j++)
     {
       fftw_free(flP[j]);
@@ -720,7 +719,6 @@ double w_gammat_cluster_tomo_flatsky(double theta, int nl, int ni, int nj, int l
     free(kernel);
     free(plan);
     free(tab);
-
     update_galpara(&G);
     update_cosmopara(&C);
     update_nuisance(&N);
@@ -2238,16 +2236,17 @@ void C_cg_tomo(int L, int nl, int ni, int nj, double* Cl, double dev, double tol
 
 double int_projected_average_number_counts(double a, void* params)
 {
-  double* ar = (double*) params;   
-
   if(!(a>0)) 
   {
     log_fatal("a > 0 not true");
     exit(1);
   }
+
+  double* ar = (double*) params;   
   const double z = 1./a-1 ;
   const int nl = (int) ar[0];
   const int interpolate_survey_area = (int) ar[1];
+  
   const double norm = interpolate_survey_area > 0 ? get_area(z) : survey.area;  
   struct chis chidchi = chi_all(a);  
   const double fK = f_K(chidchi.chi);

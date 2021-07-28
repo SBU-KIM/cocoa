@@ -67,7 +67,7 @@ double radius(const double m)
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 
-double sigma2_integrand(double x, void* params) // inner integral
+double int_for_sigma2(double x, void* params) // inner integral
 { // refactored FT of spherical top-hat to avoid numerica divergence of 1/x
   double* ar = (double*) params;
   const double k = x/ar[0];
@@ -95,27 +95,24 @@ double sigma2(const double M)
   const double dm = (lnmmax - lnmmin)/Ntable.N_S2;
   const double lnM = log(M);
 
+  const double min = 0;
+  const double max = 14.1;
+
   if (table_S2 == 0) 
   {
     table_S2 = (double*) malloc(sizeof(double)*Ntable.N_S2);
   } 
   if (recompute_cosmo3D(C)) 
   {
-    const double min = 0;
-    const double max = 14.1;
     {
-      const int i = 0;
-      double ar[1];
-      ar[0] = radius(exp(lnmmin + i*dm));
-      table_S2[i] = log(int_gsl_integrate_medium_precision(sigma2_integrand, (void*) ar, min, max, 
-        NULL, GSL_WORKSPACE_SIZE));
+      double ar[1] {radius(exp(lnmmin))};
+      int_for_sigma2(min, (void*) ar); // init
     }
     #pragma omp parallel for
-    for (int i=1; i<Ntable.N_S2; i++) 
+    for (int i=0; i<Ntable.N_S2; i++) 
     {
-      double ar[1];
-      ar[0] = radius(exp(lnmmin + i*dm));
-      table_S2[i] = log(int_gsl_integrate_medium_precision(sigma2_integrand, (void*) ar, min, max, 
+      double ar[1] {radius(exp(lnmmin + i*dm))};
+      table_S2[i] = log(int_gsl_integrate_medium_precision(int_for_sigma2, (void*) ar, min, max, 
         NULL, GSL_WORKSPACE_SIZE));
     }
     update_cosmopara(&C);
@@ -134,7 +131,18 @@ double nu(const double M, const double a)
   return delta_c(a)/(sqrt(sigma2(M))*growfac(a));
 }
 
-double nulogm_a1(double lnM, void* params) 
+double nuv2(const double M, const double a, const double growfac) 
+{
+  static int init = 1;
+  if ((cosmology.Omega_nu > 0) && init) 
+  {
+    log_fatal("halo.c does not support cosmologies with massive neutrinos");
+    init = 0;
+  }
+  return delta_c(a)/(sqrt(sigma2(M))*growfac);
+}
+
+double int_for_dlognudlogm(double lnM, void* params __attribute__((unused))) 
 {
   return log(nu(exp(lnM), 1.0));
 }
@@ -159,7 +167,7 @@ double dlognudlogm(const double M)
       const int i = 0;
       double result, abserr;
       gsl_function F;
-      F.function = &nulogm_a1;
+      F.function = &int_for_dlognudlogm;
       F.params = 0;
 
       const double lnM_tmp = lnmmin + i*dm;
@@ -177,7 +185,7 @@ double dlognudlogm(const double M)
     {
       double result, abserr;
       gsl_function F;
-      F.function = &nulogm_a1;
+      F.function = &int_for_dlognudlogm;
       F.params = 0;
 
       const double lnM_tmp = lnmmin + i*dm;
@@ -236,9 +244,9 @@ double B1_nu(const double n, const double a)
          B * pow(n, b) + C * pow(n, c);
 }
 
-// normalization for redshift evolution of mass function (Eq. (8) in Tinker et al. 2010), enforcing
-// mass to be unbiased on average
-double mass_norm_integrand(double n, void *params) 
+// normalization for redshift evolution of mass function (Eq. (8) in
+// Tinker et al. 2010), enforcing mass to be unbiased on average
+double int_for_mass_norm(double n, void *params) 
 { // inner integral
   double* ar = (double*) params;
   const double a = ar[0];
@@ -248,48 +256,39 @@ double mass_norm_integrand(double n, void *params)
 double mass_norm(const double a) 
 {
   static cosmopara C;
-  static double* table_BN;
+  static double* table;
   
   const double amin = limits.a_min;
   const double amax = 1.;
   const double da = (amax - amin) / (Ntable.N_a - 1.);
+  
+  const double min = 0.0;
+  const double max = 10.0;
 
-  if (table_BN == 0) 
+  if (table == 0) 
   {
-    table_BN = (double*) malloc(sizeof(double)*Ntable.N_a);
+    table = (double*) malloc(sizeof(double)*Ntable.N_a);
   }
   if (recompute_cosmo3D(C)) 
   {
-    const double min = 0.0;
-    const double max = 10.0;
     {
-      const int i = 0;
-
-      double ar[1];
-      ar[0] = amin + i*da;
-      
-      table_BN[i] = int_gsl_integrate_medium_precision(mass_norm_integrand, (void*) ar, min, 
-        max, NULL, GSL_WORKSPACE_SIZE);
+      double ar[1] = {amin}; 
+      int_for_mass_norm(min, (void*) ar); // init
     }
     #pragma omp parallel for
-    for (int i=1; i<Ntable.N_a; i++) 
+    for (int i=0; i<Ntable.N_a; i++) 
     {
-      double ar[1];
-      ar[0] = amin + i*da;
-      
-      table_BN[i] = int_gsl_integrate_medium_precision(mass_norm_integrand, (void*) ar, min, 
+      double ar[1] = {amin + i*da};      
+      table[i] = int_gsl_integrate_medium_precision(int_for_mass_norm, (void*) ar, min, 
         max, NULL, GSL_WORKSPACE_SIZE);
     }
     update_cosmopara(&C);
   }
-
-  return interpol(table_BN, Ntable.N_a, amin, amax, da, fmin(a, amax-da), 1.0, 1.0);
+  return interpol(table, Ntable.N_a, amin, amax, da, fmin(a, amax-da), 1.0, 1.0);
 }
 
-// also correct bias for to halo mass cuts (so that large-scale 2-h matches PT results at all zs)
-
-double bias_norm_integrand(double n, void* params) 
-{
+double int_for_bias_norm(double n, void* params) 
+{ // correct bias for to halo mass cuts (so large-scale 2-h matches PT results at all zs)
   double* ar = (double*) params;
   double a = ar[0];
   return B1_nu(n, a) * f_tinker(n, a);
@@ -298,41 +297,35 @@ double bias_norm_integrand(double n, void* params)
 double bias_norm(const double a) 
 {
   static cosmopara C;
-  static double* table_BN;
+  static double* table;
 
+  const int na = Ntable.N_a;
   const double amin = limits.a_min; 
   const double amax = 1.;
-  const double da = (amax - amin) / (Ntable.N_a - 1.);
+  const double da = (amax - amin) / (na - 1.);
 
-  if (table_BN == 0) 
+  if (table == 0) 
   {
-    table_BN = (double*) malloc(sizeof(double)*Ntable.N_a);
-
+    table = (double*) malloc(sizeof(double)*Ntable.N_a);
   }
   if (recompute_cosmo3D(C)) 
   { 
     {
-      const int i = 0;
-      double ar[1];
-      ar[0] = amin + i*da;
-      
-      table_BN[i] = int_gsl_integrate_medium_precision(bias_norm_integrand, (void*) ar, 
-        nu(limits.M_min, amin + i*da), nu(limits.M_max, amin + i*da), NULL, GSL_WORKSPACE_SIZE);
-    } 
+      double ar[1] = {amin}; 
+      int_for_bias_norm(limits.M_min, (void*) ar); // init 
+      nu(limits.M_min, amin); // init
+    }
     #pragma omp parallel for
-    for (int i=1; i<Ntable.N_a-1; i++) 
+    for (int i=0; i<na-1; i++) 
     {
-      double ar[1];
-      ar[0] = amin + i*da;
-      
-      table_BN[i] = int_gsl_integrate_medium_precision(bias_norm_integrand, (void*) ar, 
+      double ar[1] = {amin + i*da};      
+      table[i] = int_gsl_integrate_medium_precision(int_for_bias_norm, (void*) ar, 
         nu(limits.M_min, amin + i*da), nu(limits.M_max, amin + i*da), NULL, GSL_WORKSPACE_SIZE);
     }
-    table_BN[Ntable.N_a-1] = 1.;
-    
+    table[na - 1] = 1.0;
     update_cosmopara(&C);
   }
-  return interpol(table_BN, Ntable.N_a, amin, amax, da, fmin(a, amax - da), 1.0, 1.0);
+  return interpol(table, na, amin, amax, da, fmin(a, amax - da), 1.0, 1.0);
 }
 
 double massfunc(const double m, const double a) 
@@ -358,33 +351,13 @@ double B1_normalized(const double m, const double a)
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 
-double conc(const double m, const double a) // mass-concentration relation
-{ // Bhattacharya et al. 2013, Delta = 200 rho_{mean} (Table 2)
-  return 9.0 * pow(nu(m, a), -0.29)*pow(growfac(a), 1.15); 
+double conc(const double m, const double a) 
+{ // mass-concentration relation: Bhattacharya et al. 2013, Delta = 200 rho_{mean} (Table 2)
+  const double g = growfac(a);
+  return 9.0*pow(nuv2(m, a, g), -0.29)*pow(g, 1.15); 
 }
 
-double int_rho_nfw(double r, void* params) 
-{ // Fourier kernel * NFW profile, integrand for u_nfw
-  double* ar = (double*) params;
-  
-  const double k = ar[0];
-  const double c = ar[3];
-  const double rv = ar[4];
-  const double rs = rv / c;
-  
-  return r * sinl(k * r) / k * pow(rs, -3.) * 1. /
-         (log(1. + c) - c / (1. + c)) / (r / rs) * pow(1 + r / rs, -2.);
-}
-
-double u_nfw(const double c, const double k, const double m, const double a) 
-{ // FFT density of NFW profile, truncated at r_Delta, through direct integration use this routine
-  // in inner I[0-1]j and modify int_rho_nfw to work with different halo profiles
-  double ar[5] = {k, m, a, c, r_Delta(m, a)};
-  return 
-    int_gsl_integrate_medium_precision(int_rho_nfw, (void*) ar, 0, ar[4], NULL, GSL_WORKSPACE_SIZE);
-}
-
-double u_nfw_c(const double c, const double k, const double m,const double a) 
+double u_nfw_c(const double c, const double k, const double m, const double a) 
 { // analytic FT of NFW profile, from Cooray & Sheth 01
   const double x = k * r_Delta(m, a) / c;
   const double xu = (1. + c) * x;
@@ -431,56 +404,62 @@ double u_nfw_c(const double c, const double k, const double m,const double a)
     (log(1. + c) - c/(1. + c));
 }
 
-double inner_I0j(double logm, void* params) 
+
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// matter power spectrum
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+
+double int_for_I02(double logm, void* params) 
 {
   double* ar = (double*) params;
   const int j = (int) ar[5];
-  const double a = ar[6];
+  const double a = ar[0];
+  const double k1 = ar[1];
+  const double k2 = ar[2];
   const double m = exp(logm);
-  const double c = conc(m, a);
-
-  long double u = 1.0;
-  for (int l=0; l<j; l++) 
-  {
-    u = u * u_nfw_c(c, ar[l], m, a);
-  }
-  return massfunc(m, a) * m * pow(m/(cosmology.rho_crit * cosmology.Omega_m), j) * u;
+  const double c = conc_noiterp(m, a);
+  const double u = u_nfw_c(c, k1, m, a)*u_nfw_c(c, k2, m, a);
+  const double tmp = m/(cosmology.rho_crit * cosmology.Omega_m);
+  return massfunc(m, a) * m * tmp * tmp * u;
 }
 
-double I0j(const int j, const double k1, const double k2,const double k3, const double k4, 
-const double a) 
+double I02_noiterp(const double k1, const double k2, const double a) 
 {
-  double ar[7] = {k1, k2, k3, k4, 0., (double)j, a};
-  return int_gsl_integrate_medium_precision(inner_I0j, (void*) ar, log(limits.M_min),
+  double ar[2] = {a, k1, k2};
+  return int_gsl_integrate_medium_precision(int_for_I02, (void*) ar, log(limits.M_min),
     log(limits.M_max), NULL, GSL_WORKSPACE_SIZE);
 }
 
-double inner_I1j(double logm, void *para) 
+double int_for_I11(double logm, void* params) 
 {
-  const double* ar = (double *)para;
+  const double* ar = (double*) params;  
+  const double a = ar[0];
+  const double k = ar[1];
   const double m = exp(logm);
-
-  const double a = ar[6];
   const double c = conc(m, a);
-  const int j = (int) ar[5];
-  
-  long double u = 1.0;
-  for (int l = 0; l < j; l++) 
-  {
-    u = u * u_nfw_c(c, ar[l], m, a);
-  }
-
-  return massfunc(m, a) * m * pow(m / (cosmology.rho_crit * cosmology.Omega_m), (double) j) * u *
-    B1_normalized(m, a);
+  const double u = u_nfw_c(c, k, m, a);
+  return massfunc(m, a) * m * m * u * B1_normalized(m, a) / (cosmology.rho_crit * cosmology.Omega_m);
 }
 
-double I_11(const double k, const double a) 
+double I11_noiterp(const double k, const double a) 
+{ 
+   double ar[2] = {a, k};
+   return int_gsl_integrate_medium_precision(int_for_I11, (void*) ar, log(limits.M_min), 
+    log(limits.M_max), NULL, GSL_WORKSPACE_SIZE);
+}
+
+double I11(const double k, const double a) 
 { // look-up table for I11 integral
   static cosmopara C;
   static double** table_I1 = 0;
 
   const double amin = limits.a_min;
-  const double amax = 1.;
+  const double amax = 1.0;
   const double da = (amax - amin) / (Ntable.N_a);
   const double logkmin = log(limits.k_min_cH0);
   const double logkmax = log(limits.k_max_cH0);
@@ -491,81 +470,51 @@ double I_11(const double k, const double a)
     table_I1 = (double**) malloc(sizeof(double*)*Ntable.N_a);
     for(int i=0; i<Ntable.N_a;i++)
     {
-      table_I1[i] =  (double*) malloc(sizeof(double)*Ntable.N_k_nlin);
+      table_I1[i] = (double*) malloc(sizeof(double)*Ntable.N_k_nlin);
     }
   }
   if (recompute_cosmo3D(C)) 
-  { // extend this by halo model parameters if these become part of the model
+  {
     {
       const int i = 0;
       {
         const int j = 0;
-        double ar[7];
-        ar[0] = exp(logkmin + j*dk);
-        ar[5] = 1.0;
-        ar[6] = fmin(amin + i*da, 0.999);
-
-        table_I1[i][j] = log(int_gsl_integrate_medium_precision(inner_I1j, (void*) ar, 
-          log(limits.M_min), log(limits.M_max), NULL, GSL_WORKSPACE_SIZE));
+        table_I1[i][j] = I_11_noiterp(exp(logkmin + j*dk), fmin(amin + i*da, 0.999));
       }
       #pragma omp parallel for
       for (int j=1; j<Ntable.N_k_nlin; j++) 
       {
-        double ar[7];
-        ar[0] = exp(logkmin + j*dk);
-        ar[5] = 1.0;
-        ar[6] = fmin(amin + i*da, 0.999);
-
-        table_I1[i][j] = log(int_gsl_integrate_medium_precision(inner_I1j, (void*) ar, 
-          log(limits.M_min), log(limits.M_max), NULL, GSL_WORKSPACE_SIZE));
+        table_I1[i][j] = I_11_noiterp(exp(logkmin + j*dk), fmin(amin + i*da, 0.999));
       }
     }
-    #pragma omp parallel for
+    #pragma omp parallel for collapse(2)
     for (int i=1; i<Ntable.N_a; i++) 
     {
       for (int j=0; j<Ntable.N_k_nlin; j++) 
       {
-        double ar[7];
-        ar[0] = exp(logkmin + j*dk);
-        ar[5] = 1.0;
-        ar[6] = fmin(amin + i*da, 0.999);
-
-        table_I1[i][j] = log(int_gsl_integrate_medium_precision(inner_I1j, (void*) ar, 
-          log(limits.M_min), log(limits.M_max), NULL, GSL_WORKSPACE_SIZE));
+        table_I1[i][j] = I_11_noiterp(exp(logkmin + j*dk), fmin(amin + i*da, 0.999));
       }
     }
     update_cosmopara(&C);
   }
-
-  const double tmp = fmin(a, amax - 1.1 * da); // to avoid interpolation errors near z=0
+  const double tmp = fmin(a, amax - 1.1 * da); // to avoid interpolation errors near z = 0
   return exp(interpol2d(table_I1, Ntable.N_a, amin, amax, da, tmp, Ntable.N_k_nlin, 
     logkmin, logkmax, dk, log(k), 1.0, 1.0));
 }
 
-double I1j(const int j, const double k1, const double k2, const double k3, const double a) 
-{
-  if (j == 1) 
-  {
-    return I_11(k1, a);
-  }
-  double ar[7] = {k1, k2, k3, 0., 0., (double)j, a};
-  return int_gsl_integrate_medium_precision(inner_I1j, (void*) ar, log(limits.M_min),
-    log(limits.M_max), NULL, GSL_WORKSPACE_SIZE);
-}
-
-double p_1h(const double k, const double a) 
+double p_mm_1h_noiterp(const double k, const double a) 
 { // 1Halo Terms
-  return I0j(2, k, k, 0., 0., a); 
+  return I02_noiterp(k, k, a); 
 }
 
-double p_2h(const double k, const double a) 
+double p_mm_2h_noiterp(const double k, const double a) 
 { // 2Halo Terms
-  return pow(I_11(k, a), 2.0) * p_lin(k, a); 
+  const double tmp = I11_noiterp(k, a);
+  return tmp * tmp * p_lin(k, a); 
 }
 
-
-double Pdelta_halo(double k, double a) 
-{ // Look-up table for halomodel matter power spectrum
+double p_mm_halomodel(const double k, const double a)
+{ 
   static cosmopara C;
   static double** table_P_NL = 0;
 
@@ -579,7 +528,7 @@ double Pdelta_halo(double k, double a)
     table_P_NL = (double**) malloc(sizeof(double*)*Ntable.N_a);
     for(int i=0; i<Ntable.N_a;i++)
     {
-      table_P_NL[i] =  (double*) malloc(sizeof(double)*Ntable.N_k_nlin);
+      table_P_NL[i] = (double*) malloc(sizeof(double)*Ntable.N_k_nlin);
     } 
   }
   if (recompute_cosmo3D(C)) 
@@ -589,26 +538,28 @@ double Pdelta_halo(double k, double a)
       const double aa = limits.a_min + i*da > 0.999 ? .999 : limits.a_min + i*da;
       {
         const int j = 0;
-        table_P_NL[i][j] = log(p_1h(exp(logkmin + j*dk), aa) + p_2h(exp(logkmin + j*dk), aa));
+        const double kk = exp(logkmin + j*dk);
+        table_P_NL[i][j] = log(p_mm_1h_noiterp(kk, aa) + p_mm_2h_noiterp(kk, aa));
       }
       #pragma omp parallel for
       for (int j=1; j<Ntable.N_k_nlin; j++) 
       {
-        table_P_NL[i][j] = log(p_1h(exp(logkmin + j*dk), aa) + p_2h(exp(logkmin + j*dk), aa));
+        const double kk = exp(logkmin + j*dk);
+        table_P_NL[i][j] = log(p_mm_1h_noiterp(kk, aa) + p_mm_2h_noiterp(kk, aa));
       }
     }
-    #pragma omp parallel for
+    #pragma omp parallel for collapse(2)
     for (int i=1; i<Ntable.N_a; i++) 
-    {
-      const double aa = limits.a_min + i*da > 0.999 ? .999 : limits.a_min + i*da;
+    { 
       for (int j=0; j<Ntable.N_k_nlin; j++) 
       {
-        table_P_NL[i][j] = log(p_1h(exp(logkmin + j*dk), aa) + p_2h(exp(logkmin + j*dk), aa));
+        const double aa = limits.a_min + i*da > 0.999 ? .999 : limits.a_min + i*da;
+        const double kk = exp(logkmin + j*dk);
+        table_P_NL[i][j] = log(p_mm_1h_noiterp(kk, aa) + p_mm_2h_noiterp(kk, aa));
       }
     }
     update_cosmopara(&C);
   }
-
   return exp(interpol2d(table_P_NL, Ntable.N_a, limits.a_min, 1.0, da, a, Ntable.N_k_nlin, logkmin, 
     logkmax, dk, log(k), 0.0, 0.0));
 }
@@ -631,23 +582,25 @@ double n_s_cmv(double a)
 double int_for_ngmatched(double logm, void* params) 
 {
   double* ar = (double*) params;
-  return massfunc(exp(logm), ar[0]) * exp(logm);
+  const double a = ar[0];
+  const double m = exp(logm);
+  return massfunc(m, a) * m;
 }
 
 double int_for_b_ngmatched(double logm, void* params) 
 {
   double* ar = (double*) params;
-  return massfunc(exp(logm), ar[0]) * B1(exp(logm), ar[0]) * exp(logm);
+  const double a = ar[0];
+  return massfunc(m, a) * m * B1(exp(logm), a);
 }
 
 double b_ngmatched(double a, double n_cmv) 
 {
-  double ar[1];
-  ar[0] = a;
-
+  double ar[1] = {a};
   const double dm = 0.1;
   
   double mlim = log(5.e+14);
+  
   double n = int_gsl_integrate_medium_precision(int_for_ngmatched, (void*) ar, mlim, 
     log(limits.M_max), NULL, GSL_WORKSPACE_SIZE);
   
@@ -662,27 +615,21 @@ double b_ngmatched(double a, double n_cmv)
     log(limits.M_max), NULL, GSL_WORKSPACE_SIZE) /n;
 }
 
-double b_source(double a) 
-{ // lookup table for b1 of source galaxies
+double b_source(double a) // lookup table for b1 of source galaxies
+{ 
   static double* table_b;
-  static double ngal = 0, mag_lim = 0.;
-
+  
   const double amin = limits.a_min;
   const double amax = 1. / (1. + redshift.shear_zdistrpar_zmin);
   const double da = (amax - amin) / (1. * Ntable.N_a);
-
+  const double ngal = survey.n_gal;
+  const double mag_lim = survey.m_lim;
+  
   if (table_b == 0) 
-  {
-    table_b = (double*) malloc(sizeof(double)*Ntable.N_a);
-  }
-  if (mag_lim != survey.m_lim || ngal != survey.n_gal) 
   { // if survey/redshift distribution changes, hopefully one of these will change too uncertainty
     // in abundance matching is larger than change with cosmology, so save time and don't 
     // recompute if only cosmology changes
-
-    ngal = survey.n_gal;
-    mag_lim = survey.m_lim;
-
+    table_b = (double*) malloc(sizeof(double)*Ntable.N_a);
     {
       const int i = 0;
       table_b[i] = b_ngmatched(amin + i*da, n_s_cmv(amin + i*da));
@@ -693,6 +640,5 @@ double b_source(double a)
       table_b[i] = b_ngmatched(amin + i*da, n_s_cmv(amin + i*da));
     }
   }
-
   return interpol(table_b, Ntable.N_a, amin, amax, da, a, 1.0, 1.0);
 }

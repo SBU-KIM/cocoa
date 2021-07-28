@@ -182,25 +182,25 @@ typedef struct
   double bias_zphot_clustering[MAX_SIZE_ARRAYS];
   
   // Variables for the 4x2pt+N (see: 2008.10757 & 2010.01138)
-  int N_cluster_MOR;
   double cluster_MOR[MAX_SIZE_ARRAYS];
-  
-  int N_cluster_selection;
   double cluster_selection[MAX_SIZE_ARRAYS];
 } nuisancepara;
 
 typedef struct
 {
-  int bias_model;                 // from ClusterAnalysisChoice
-  int hmf_model;                  // from ClusterAnalysisChoice
-  int nonlinear_bias;             // from ClusterAnalysisChoice
+  int bias_model;                 // Bias model
+  int hmf_model;                  // HMF model 
+  int nonlinear_bias;             // Do we include nonlinear bias in cluster analysis?
 
-  double N200_min;
-  double N200_max;
+  int N_MOR;                      // Mass observable relation (number of nuisance params)
+  int N_SF;                       // selection function (number of nuisance params)
 
-  int N200_Nbin;
-  double N_min[MAX_SIZE_ARRAYS];
-  double N_max[MAX_SIZE_ARRAYS];
+  double N200_min;                // global lambda_obs_min (observed richness)
+  double N200_max;                // global lambda_obs_max (observed richness)
+
+  int N200_Nbin;                  // number of cluster bins in lambda_obs (observed richness)
+  double N_min[MAX_SIZE_ARRAYS];  // lambda_obs_min in each bin in lambda_obs (observed richness)
+  double N_max[MAX_SIZE_ARRAYS];  // lambda_obs_max in each bin in lambda_obs (observed richness)
   
   int lbin;
   double l_min;

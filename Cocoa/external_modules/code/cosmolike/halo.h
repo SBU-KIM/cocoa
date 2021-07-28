@@ -37,6 +37,7 @@ double radius(const double m) ;
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
+
 double sigma2(const double M);
 
 // ---------------------------------------------------------------------------
@@ -52,22 +53,19 @@ double conc(const double m, const double a); // mass-concentration relation
 // Analytic expression for FT of NFW density profile
 double u_nfw_c(const double c, const double k, const double m,const double a);
 
-// FT of NFW density profile, truncated at r_Delta, direct integration
-double u_nfw(const double c, const double k, const double m, const double a);
-
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
-// halo model matter power spectrum, bispectrum, trispectrum
+// matter power spectrum
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 
-double p_1h(double k, double a);
+double p_mm_1h_noiterp(const double k, const double a);
 
-double p_2h(double k, double a);
+double p_mm_2h_noiterp(const double k, const double a);
 
-double Pdelta_halo(double k, double a);
+double p_mm_halomodel(const double k, const double a);
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------

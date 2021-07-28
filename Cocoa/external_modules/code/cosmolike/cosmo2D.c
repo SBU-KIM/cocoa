@@ -394,7 +394,7 @@ double w_gammat_tomo(int nt, int ni, int nj, int limber)
     }
     if(limber == 1)
     {
-      C_gs_tomo_limber(limits.LMIN_tab, ZL(0), ZS(0)); // init the function
+      C_gs_tomo_limber(limits.LMIN_tab, ZL(0), ZS(0)); // init static vars
       #pragma omp parallel for collapse(2)
       for (int nz=0; nz<NSIZE; nz++)
       {
@@ -403,7 +403,7 @@ double w_gammat_tomo(int nt, int ni, int nj, int limber)
           const int ZLNZ = ZL(nz);
           const int ZSNZ = ZS(nz);
           Cl[nz][l] = (l < limits.LMIN_tab + 1) ?
-           C_gs_tomo_limber_nointerp((double) l, ZLNZ, ZSNZ, use_linear_ps_limber) :
+           C_gs_tomo_limber_nointerp((double) l, ZLNZ, ZSNZ, use_linear_ps_limber, 0) :
            Cl[nz][l] = C_gs_tomo_limber((double) l, ZLNZ, ZSNZ);
         }
       }
@@ -557,7 +557,7 @@ double w_gg_tomo(int nt, int ni, int nj, int limber)
     }
     if(limber == 1)
     {
-      C_gg_tomo_limber(limits.LMIN_tab, 0, 0); // init the function
+      C_gg_tomo_limber(limits.LMIN_tab, 0, 0); // init static vars
       #pragma omp parallel for collapse(2)
       for (int nz=0; nz<NSIZE; nz++)
       {
@@ -567,7 +567,7 @@ double w_gg_tomo(int nt, int ni, int nj, int limber)
           const int Z1 = nz; // cross redshift bin not supported so not using ZCL1(k)
           const int Z2 = nz; // cross redshift bin not supported so not using ZCL2(k)
           Cl[q][l] = (l < limits.LMIN_tab + 1) ?
-            C_gg_tomo_limber_nointerp((double) l, Z1, Z2, use_linear_ps_limber) :
+            C_gg_tomo_limber_nointerp((double) l, Z1, Z2, use_linear_ps_limber, 0) :
             C_gg_tomo_limber((double) l, Z1, Z2);
         }
       }
@@ -1202,7 +1202,7 @@ double w_gammat_tomo_flatsky(double theta, int ni, int nj, int limber)
           free(Cl_NL);
           free(ll);
         }
-        C_gs_tomo_limber(limits.LMIN_tab, ZL(0), ZS(0)); // init the function
+        C_gs_tomo_limber(limits.LMIN_tab, ZL(0), ZS(0)); // init static vars
         #pragma omp parallel for collapse(2)
         for (int k=0; k<NSIZE; k++)
         {
@@ -1214,7 +1214,7 @@ double w_gammat_tomo_flatsky(double theta, int ni, int nj, int limber)
             if (limber == 1 || (limber != 1 && l > limits.LMAX_NOLIMBER - 1))
             {
               lP[q][p] = (l > limits.LMIN_tab) ? l*C_gs_tomo_limber(l, ZLNZ, ZSNZ) :
-                l*C_gs_tomo_limber_nointerp(l, ZLNZ, ZSNZ, use_linear_ps_limber);
+                l*C_gs_tomo_limber_nointerp(l, ZLNZ, ZSNZ, use_linear_ps_limber, 0);
             }
             else
             {
@@ -1464,7 +1464,7 @@ double w_gg_tomo_flatsky(double theta, int ni, int nj, int limber)
           free(ll);
         } 
 
-        C_gg_tomo_limber(limits.LMIN_tab, 0, 0); // init the function
+        C_gg_tomo_limber(limits.LMIN_tab, 0, 0); // init static vars
         #pragma omp parallel for collapse(2)
         for (int k=0; k<NSIZE; k++) 
         { 
@@ -1476,7 +1476,7 @@ double w_gg_tomo_flatsky(double theta, int ni, int nj, int limber)
             if (limber == 1 || (limber != 1 && l > limits.LMAX_NOLIMBER - 1))
             {
               lP[k][p] = (l > limits.LMIN_tab) ? l*C_gg_tomo_limber(l, ZCL1, ZCL2) :
-                l*C_gg_tomo_limber_nointerp(l, ZCL1, ZCL2, use_linear_ps_limber);
+                l*C_gg_tomo_limber_nointerp(l, ZCL1, ZCL2, use_linear_ps_limber, 0);
             }
             else
             {
@@ -2929,7 +2929,8 @@ double int_for_C_gs_tomo_limber_withb2(double a, void* params)
     (chidchi.dchida/(fK*fK))*(ell_prefactor2/(ell*ell));
 }
 
-double C_gs_tomo_limber_nointerp(double l, int nl, int ns, int use_linear_ps)
+double C_gs_tomo_limber_nointerp(double l, int nl, int ns, int use_linear_ps, 
+int init_static_vars_only)
 {
   if(nl < -1 || nl > tomo.clustering_Nbin -1 || ns < -1 || ns > tomo.shear_Nbin -1)
   {
@@ -2938,87 +2939,55 @@ double C_gs_tomo_limber_nointerp(double l, int nl, int ns, int use_linear_ps)
   }
 
   double array[4] = {(double) nl, (double) ns, l, use_linear_ps};
+  double result;
 
-  switch(like.IA)
-  { // different IA might require different integrator precision
-    case 0:
+  if(like.IA == 0 || like.IA == 1 || like.IA == 3 || like.IA == 4)
+  {
+    if (gbias.b2[nl] && use_linear_ps == 0)
     {
-      if (gbias.b2[nl] && use_linear_ps == 0)
+      if (init_static_vars_only == 1)
       {
-        return int_gsl_integrate_low_precision(int_for_C_gs_tomo_limber_withb2, (void*) array,
+        result = int_for_C_gs_tomo_limber_withb2(amin_lens(nl), (void*) array);
+      }
+      else
+      {
+        result = int_gsl_integrate_low_precision(int_for_C_gs_tomo_limber_withb2, (void*) array,
           amin_lens(nl), 0.99999, NULL, GSL_WORKSPACE_SIZE);
       }
-      return int_gsl_integrate_medium_precision(int_for_C_gs_tomo_limber, (void*) array,
+    }
+    if (init_static_vars_only == 1)
+    {
+      result = int_for_C_gs_tomo_limber(amin_lens(nl), (void*) array);
+    }
+    else
+    {
+      result = int_gsl_integrate_medium_precision(int_for_C_gs_tomo_limber, (void*) array,
         amin_lens(nl), 0.99999, NULL, GSL_WORKSPACE_SIZE);
-
-      break;
     }
-    case 1:
-    {
-     if (gbias.b2[nl] && use_linear_ps == 0)
-      {
-        return int_gsl_integrate_medium_precision(int_for_C_gs_tomo_limber_withb2, (void*) array,
-          amin_lens(nl), 0.99999, NULL, GSL_WORKSPACE_SIZE);
-      }
-      return int_gsl_integrate_low_precision(int_for_C_gs_tomo_limber, (void*) array,
-        amin_lens(nl), 0.99999, NULL, GSL_WORKSPACE_SIZE);
-
-      break;
-    }
-    case 3:
-    {
-      if (gbias.b2[nl] && use_linear_ps == 0)
-      {
-        return int_gsl_integrate_medium_precision(int_for_C_gs_tomo_limber_withb2, (void*) array,
-          amin_lens(nl), 0.99999, NULL, GSL_WORKSPACE_SIZE);
-      }
-      return int_gsl_integrate_low_precision(int_for_C_gs_tomo_limber, (void*) array,
-        amin_lens(nl), 0.99999, NULL, GSL_WORKSPACE_SIZE);
-
-      break;
-    }
-    case 4:
-    {
-      if (gbias.b2[nl] && use_linear_ps == 0)
-      {
-        return int_gsl_integrate_medium_precision(int_for_C_gs_tomo_limber_withb2, (void*) array,
-          amin_lens(nl), 0.99999, NULL, GSL_WORKSPACE_SIZE);
-      }
-      return int_gsl_integrate_low_precision(int_for_C_gs_tomo_limber, (void*) array, 
-        amin_lens(nl), 0.9999, NULL,GSL_WORKSPACE_SIZE);
-
-      break;
-    }
-    case 5:
-    {
-      if(use_linear_ps == 1)
-      {
-        log_fatal("use linear power spectrum option not implemented with TATT");
-        exit(1);
-      }
-      return int_gsl_integrate_low_precision(int_for_C_gs_tomo_limber_TATT,
-        (void*) array, amin_lens(nl), 0.9999, NULL, GSL_WORKSPACE_SIZE
-      );
-
-      break;
-    }
-    case 6:
-    {
-      if(use_linear_ps == 1)
-      {
-        log_fatal("use linear power spectrum option not implemented with TATT");
-        exit(1);
-      }
-
-      return int_gsl_integrate_low_precision(int_for_C_gs_tomo_limber_TATT, (void*) array,
-        amin_lens(nl), 0.9999, NULL, GSL_WORKSPACE_SIZE);
-
-      break;
-    }
-    default:
-      log_fatal("like.IA = %d not supported", like.IA);
-      exit(1);
   }
+  else if (like.IA == 5 || like.IA == 6)
+  {
+    if(use_linear_ps == 1)
+    {
+      log_fatal("use linear power spectrum option not implemented with TATT");
+      exit(1);
+    }
+    if (init_static_vars_only == 1)
+    {
+      result = int_for_C_gs_tomo_limber_TATT(amin_lens(nl), (void*) array);
+    }
+    else
+    {
+      result = int_gsl_integrate_low_precision(int_for_C_gs_tomo_limber_TATT,
+        (void*) array, amin_lens(nl), 0.9999, NULL, GSL_WORKSPACE_SIZE);
+    }
+  }
+  else
+  {
+    log_fatal("like.IA = %d not supported", like.IA);
+    exit(1);
+  }
+  return result;
 }
 
 double C_gs_tomo_limber(double l, int ni, int nj)
@@ -3055,41 +3024,9 @@ double C_gs_tomo_limber(double l, int ni, int nj)
   {
     if (like.IA == 5 || like.IA == 6) // TATT MODELING
     { 
-      {
-        const int k = 0;
-        const int ZLNZ = ZL(k);
-        const int ZSNZ = ZS(k);
-        sig[k] = 1.;
-        osc[k] = 0;
-        if (C_gs_tomo_limber_nointerp(500., ZLNZ, ZSNZ, use_linear_ps_limber) < 0)
-        {
-          sig[k] = -1.;
-        }
-        #pragma omp parallel for
-        for (int i=0; i<nell; i++)
-        {
-          const double lnl = lnlmin + i*dlnl;
-          const double l = exp(lnl);
-          table[k][i] = C_gs_tomo_limber_nointerp(l, ZLNZ, ZSNZ, use_linear_ps_limber);
-        } 
-        for (int i=0; i<nell; i++)
-        {
-          if (table[k][i] * sig[k] < 0.)
-          {
-            osc[k] = 1;
-          }
-        }
-        if (osc[k] == 0)
-        {
-          #pragma omp parallel for
-          for (int i=0; i<nell; i++)
-          {
-            table[k][i] = log(sig[k] * table[k][i]);
-          }
-        }
-      }
+      C_gs_tomo_limber_nointerp(lnlmin, ZL(0), ZS(0), use_linear_ps_limber, 1); // init static vars
       #pragma omp parallel for collapse(2)
-      for (int k=1; k<NSIZE; k++)
+      for (int k=0; k<NSIZE; k++)
       {
         for (int i=0; i<nell; i++)
         {
@@ -3097,17 +3034,17 @@ double C_gs_tomo_limber(double l, int ni, int nj)
           const int ZSNZ = ZS(k);
           const double lnl = lnlmin + i*dlnl;
           const double l = exp(lnl);
-          table[k][i] = C_gs_tomo_limber_nointerp(l, ZLNZ, ZSNZ, use_linear_ps_limber);
+          table[k][i] = C_gs_tomo_limber_nointerp(l, ZLNZ, ZSNZ, use_linear_ps_limber, 0);
         }
       }
       #pragma omp parallel for
-      for (int k=1; k<NSIZE; k++)
+      for (int k=0; k<NSIZE; k++)
       {
         const int ZLNZ = ZL(k);
         const int ZSNZ = ZS(k);
         sig[k] = 1.;
         osc[k] = 0;
-        if (C_gs_tomo_limber_nointerp(500., ZLNZ, ZSNZ, use_linear_ps_limber) < 0)
+        if (C_gs_tomo_limber_nointerp(500., ZLNZ, ZSNZ, use_linear_ps_limber, 0) < 0)
         {
           sig[k] = -1.;
         }
@@ -3129,26 +3066,9 @@ double C_gs_tomo_limber(double l, int ni, int nj)
     }
     else
     {
-      {
-        const int k = 0;
-        const int ZLNZ = ZL(k);
-        const int ZSNZ = ZS(k);
-        {
-          int i = 0;
-          const double lnl = lnlmin + i*dlnl;
-          const double l = exp(lnl);
-          table[k][i] = log(C_gs_tomo_limber_nointerp(l, ZLNZ, ZSNZ, use_linear_ps_limber));
-        }
-        #pragma omp parallel for
-        for (int i=1; i<nell; i++)
-        {
-          const double lnl = lnlmin + i*dlnl;
-          const double l = exp(lnl);
-          table[k][i] = log(C_gs_tomo_limber_nointerp(l, ZLNZ, ZSNZ, use_linear_ps_limber));
-        }
-      }
+      C_gs_tomo_limber_nointerp(lnlmin, ZL(0), ZS(0), use_linear_ps_limber, 1); // init static vars
       #pragma omp parallel for collapse(2)
-      for (int k=1; k<NSIZE; k++)
+      for (int k=0; k<NSIZE; k++)
       {
         for (int i=0; i<nell; i++)
         {
@@ -3156,7 +3076,7 @@ double C_gs_tomo_limber(double l, int ni, int nj)
           const int ZSNZ = ZS(k);
           const double lnl = lnlmin + i*dlnl;
           const double l = exp(lnl);
-          table[k][i] = log(C_gs_tomo_limber_nointerp(l, ZLNZ, ZSNZ, use_linear_ps_limber));
+          table[k][i] = log(C_gs_tomo_limber_nointerp(l, ZLNZ, ZSNZ, use_linear_ps_limber, 0));
         }
       }
     }
@@ -3314,8 +3234,10 @@ double int_for_C_gg_tomo_limber_withb2(double a, void* params)
   return (linear_part + non_linear_part)*(chidchi.dchida/(fK*fK));
 }
 
-double C_gg_tomo_limber_nointerp(double l, int ni, int nj, int use_linear_ps)
-{ // WARNING: C_gg beyond linear bias for cross-tomography bins not yet supported
+ // WARNING: C_gg beyond linear bias for cross-tomography bins not yet supported
+double C_gg_tomo_limber_nointerp(double l, int ni, int nj, int use_linear_ps,
+int init_static_vars_only)
+{
   if(ni < -1 || ni > tomo.clustering_Nbin -1 || nj < -1 || nj > tomo.clustering_Nbin -1)
   {
     log_fatal("invalid bin input (ni, nj) = (%d, %d)", ni, nj);
@@ -3328,22 +3250,31 @@ double C_gg_tomo_limber_nointerp(double l, int ni, int nj, int use_linear_ps)
   {
     if (ni != nj)
     {
-      return int_gsl_integrate_low_precision(int_for_C_gg_tomo_limber, (void*) array,
-        fmax(amin_lens(ni), amin_lens(nj)), fmin(amax_lens(ni), amax_lens(nj)), NULL,
-        GSL_WORKSPACE_SIZE);
+      log_fatal(
+        "cross-tomography (ni, nj) = (%d, %d) bins not supported beyond linear bias", ni, nj);
+      exit(1);
     }
-    return int_gsl_integrate_low_precision(int_for_C_gg_tomo_limber_withb2, (void*) array,
-      amin_lens(ni), amax_lens(ni), NULL, GSL_WORKSPACE_SIZE);
+    if (init_static_vars_only == 1)
+    {
+      return int_for_C_gg_tomo_limber_withb2(amin_lens(ni), (void*) array);
+    }
+    else
+    {
+      return int_gsl_integrate_low_precision(int_for_C_gg_tomo_limber_withb2, (void*) array,
+        amin_lens(ni), amax_lens(ni), NULL, GSL_WORKSPACE_SIZE);
+    }
   }
   else
   {
-    if (ni == nj)
+    if (init_static_vars_only == 1)
     {
-      return int_gsl_integrate_medium_precision(int_for_C_gg_tomo_limber, (void*) array,
-        amin_lens(ni), 0.999999, NULL, GSL_WORKSPACE_SIZE);
+      return int_for_C_gg_tomo_limber(amin_lens(nj), (void*) array);
     }
-    return int_gsl_integrate_low_precision(int_for_C_gg_tomo_limber, (void*) array,
-      amin_lens(nj), 0.99999, NULL, GSL_WORKSPACE_SIZE); // zi<=zj
+    else
+    {
+      return int_gsl_integrate_low_precision(int_for_C_gg_tomo_limber, (void*) array,
+        amin_lens(nj), 0.99999, NULL, GSL_WORKSPACE_SIZE);
+    }
   }
 }
 
@@ -3376,42 +3307,9 @@ double C_gg_tomo_limber(double l, int ni, int nj) // cross redshift bin not supp
   }
   if (recompute_gg(C, G, N))
   {
-    {
-      const int k = 0;
-      const int ZCL1 = k; // cross redshift bin not supported so not using ZCL1(k)
-      const int ZCL2 = k; // cross redshift bin not supported so not using ZCL2(k)
-      {
-        const int p = 0;
-        const double lnl = lnlmin + p*dlnl;
-        const double l = exp(lnl);
-        const double result = C_gg_tomo_limber_nointerp(l, ZCL1, ZCL2, use_linear_ps_limber);
-        if (result <= 0)
-        {
-          table[k][p] = -100;
-        }
-        else
-        {
-          table[k][p] = log(result);
-        }
-      }
-      #pragma omp parallel for
-      for(int p=1; p<nell; p++)
-      {
-        const double lnl = lnlmin + p*dlnl;
-        const double l = exp(lnl);
-        const double result = C_gg_tomo_limber_nointerp(l, ZCL1, ZCL2, use_linear_ps_limber);
-        if (result <= 0)
-        {
-          table[k][p] = -100;
-        }
-        else
-        {
-          table[k][p] = log(result);
-        }
-      }
-    }
+    C_gg_tomo_limber_nointerp(lnlmin, 0, 0, use_linear_ps_limber, 1) // init static vars only
     #pragma omp parallel for collapse(2)
-    for (int k=1; k<NSIZE; k++)  
+    for (int k=0; k<NSIZE; k++)  
     {
       for(int p=0; p<nell; p++)
       {
@@ -3419,8 +3317,7 @@ double C_gg_tomo_limber(double l, int ni, int nj) // cross redshift bin not supp
         const int ZCL2 = k; // cross redshift bin not supported so not using ZCL2(k)
         const double lnl = lnlmin + p*dlnl;
         const double l = exp(lnl);
-        const double result = C_gg_tomo_limber_nointerp(l, ZCL1, ZCL2, 
-          use_linear_ps_limber);
+        const double result = C_gg_tomo_limber_nointerp(l, ZCL1, ZCL2, use_linear_ps_limber, 0);
         if (result <= 0)
         {
           table[k][p] = -100;
@@ -3857,6 +3754,7 @@ double C_ks_tomo_limber(double l, int ni)
         table[k][i] = C_ks_tomo_limber_nointerp(exp(lnl), k, use_linear_ps_limber);
       }
     }
+    
     for (int k=1; k<NSIZE; k++)
     {
       sig[k] = 1.;
@@ -3947,9 +3845,8 @@ double int_for_C_kk_limber(double a, void* params)
 
 double C_kk_limber_nointerp(double l, int use_linear_ps)
 {
-  double array[2] = {l, (double) use_linear_ps};
-
-  return int_gsl_integrate_medium_precision(int_for_C_kk_limber, (void*) array,
+  double ar[2] = {l, (double) use_linear_ps};
+  return int_gsl_integrate_medium_precision(int_for_C_kk_limber, (void*) ar,
     limits.a_min*(1.+1.e-5), 1.-1.e-5, NULL, GSL_WORKSPACE_SIZE);
 }
 
@@ -4273,8 +4170,8 @@ void C_cl_tomo(int L, int ni, int nj, double* Cl, double dev, double tol)
         cl_temp += (ni == nj) ? Fk1[i][j]*Fk1[i][j]*k1cH03*PK : Fk1[i][j]*Fk2[i][j]*k1cH03*PK;
       }
       Cl[ell_ar[i]] = cl_temp * dlnk * 2.0 / M_PI +
-         C_gg_tomo_limber_nointerp((double) ell_ar[i], ni, nj, use_linear_ps_limber)
-        -C_gg_tomo_limber_nointerp((double) ell_ar[i], ni, nj, 1);
+         C_gg_tomo_limber_nointerp((double) ell_ar[i], ni, nj, use_linear_ps_limber, 0)
+        -C_gg_tomo_limber_nointerp((double) ell_ar[i], ni, nj, 1, 0);
     }
     #pragma omp parallel for
     for (int i=1; i<Nell_block; i++)
@@ -4288,8 +4185,8 @@ void C_cl_tomo(int L, int ni, int nj, double* Cl, double dev, double tol)
         cl_temp += (ni == nj) ? Fk1[i][j]*Fk1[i][j]*k1cH03*PK : Fk1[i][j]*Fk2[i][j]*k1cH03*PK;
       }
       Cl[ell_ar[i]] = cl_temp * dlnk * 2. / M_PI +
-         C_gg_tomo_limber_nointerp((double) ell_ar[i], ni, nj, use_linear_ps_limber)
-        -C_gg_tomo_limber_nointerp((double) ell_ar[i], ni, nj, 1);
+         C_gg_tomo_limber_nointerp((double) ell_ar[i], ni, nj, use_linear_ps_limber, 0)
+        -C_gg_tomo_limber_nointerp((double) ell_ar[i], ni, nj, 1, 0);
     }
 
     i_block++;
@@ -4299,7 +4196,7 @@ void C_cl_tomo(int L, int ni, int nj, double* Cl, double dev, double tol)
       break;
     }
     L = i_block * Nell_block - 1;
-    dev = Cl[L]/C_gg_tomo_limber_nointerp((double) L, ni, nj, use_linear_ps_limber) - 1;
+    dev = Cl[L]/C_gg_tomo_limber_nointerp((double) L, ni, nj, use_linear_ps_limber, 0) - 1;
   }
   L++;
   
@@ -4308,7 +4205,7 @@ void C_cl_tomo(int L, int ni, int nj, double* Cl, double dev, double tol)
   for (int l=L; l<limits.LMAX_NOLIMBER; l++)
   {
     Cl[l] = (l<limits.LMIN_tab) ? 
-      C_gg_tomo_limber_nointerp((double) l, ni, nj, use_linear_ps_limber) :
+      C_gg_tomo_limber_nointerp((double) l, ni, nj, use_linear_ps_limber, 0) :
       C_gg_tomo_limber((double) l, ni, nj);
   }
 }
@@ -4570,8 +4467,8 @@ void C_gl_tomo(int L, int nl, int ns, double* Cl, double dev, double tolerance)
         cl_temp += Fk1[i][j]*Fk2[i][j]*k1_cH0*k1_cH0*k1_cH0*p_lin(k1_cH0, 1.0);
       }
       Cl[ell_ar[i]] = cl_temp * dlnk * 2./M_PI +
-        C_gs_tomo_limber_nointerp((double) ell_ar[i], nl, ns, use_linear_ps_limber)
-       -C_gs_tomo_limber_nointerp((double) ell_ar[i], nl, ns, 1);
+        C_gs_tomo_limber_nointerp((double) ell_ar[i], nl, ns, use_linear_ps_limber, 0)
+       -C_gs_tomo_limber_nointerp((double) ell_ar[i], nl, ns, 1, 0);
     }
     #pragma omp parallel for
     for(int i=1; i<Nell_block; i++)
@@ -4583,8 +4480,8 @@ void C_gl_tomo(int L, int nl, int ns, double* Cl, double dev, double tolerance)
         cl_temp += Fk1[i][j]*Fk2[i][j]*k1_cH0*k1_cH0*k1_cH0*p_lin(k1_cH0, 1.0);
       }
       Cl[ell_ar[i]] = cl_temp * dlnk * 2./M_PI +
-        C_gs_tomo_limber_nointerp((double) ell_ar[i], nl, ns, use_linear_ps_limber)
-       -C_gs_tomo_limber_nointerp((double) ell_ar[i], nl, ns, 1);
+        C_gs_tomo_limber_nointerp((double) ell_ar[i], nl, ns, use_linear_ps_limber, 0)
+       -C_gs_tomo_limber_nointerp((double) ell_ar[i], nl, ns, 1, 0);
     }
 
     i_block++;
@@ -4596,7 +4493,7 @@ void C_gl_tomo(int L, int nl, int ns, double* Cl, double dev, double tolerance)
 
     L = i_block*Nell_block -1 ;
     dev =
-    Cl[L]/C_gs_tomo_limber_nointerp((double) L, nl, ns, use_linear_ps_limber)-1;
+    Cl[L]/C_gs_tomo_limber_nointerp((double) L, nl, ns, use_linear_ps_limber, 0)-1;
   }
   L++;
 
