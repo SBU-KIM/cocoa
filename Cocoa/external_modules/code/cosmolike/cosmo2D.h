@@ -83,38 +83,53 @@ void C_cl_tomo(int L, int ni, int nj, double* Cl, double dev, double tolerance);
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 
-double C_ss_tomo_TATT_EE_limber_nointerp(double l, int ni, int nj); // IA=(5||6)
-double C_ss_tomo_TATT_BB_limber_nointerp(double l, int ni, int nj); // IA=(5||6)
+double C_ss_tomo_TATT_EE_limber_nointerp(double l, int ni, int nj, 
+int init_static_vars_only); // IA=(5||6)
+
 double C_ss_tomo_TATT_EE_limber(double l, int ni, int nj); // IA=(5||6)
+
+double C_ss_tomo_TATT_BB_limber_nointerp(double l, int ni, int nj, 
+int init_static_vars_only); // IA=(5||6)
+
 double C_ss_tomo_TATT_BB_limber(double l, int ni, int nj); // IA=(5||6)
+
 
 double C_ss_tomo_limber_nointerp(double l, int ni, int nj, int use_linear_ps, 
 int init_static_vars_only);
+
 double C_ss_tomo_limber(double l, int ni, int nj); // IA=(0||3||4)
+
 
 // works with IA=(0||3||4||5||6)
 double C_gs_tomo_limber_nointerp(double l, int ni, int nj, int use_linear_ps, 
 int init_static_vars_only);
+
 double C_gs_tomo_limber(double l, int ni, int nj);
 
 // ----------------------------------------------------------------------------
 // All functions below can run w/ like.IA=0 || like.IA=3 || like.IA=4
 // ----------------------------------------------------------------------------
 
-// WARNING: C_gg beyond linear bias for cross-tomography bins not yet supported
 double C_gg_tomo_limber_nointerp(double l, int ni, int nj, int use_linear_ps, 
 int init_static_vars_only);
+
 double C_gg_tomo_limber(double l, int ni, int nj);
+
 
 double C_gk_tomo_limber_nointerp(double l, int nl, int use_linear_ps, 
 int init_static_vars_only);
+
 double C_gk_tomo_limber(double l, int ni);
+
 
 double C_ks_tomo_limber_nointerp(double l, int ns, int use_linear_ps, 
 int init_static_vars_only);
+
 double C_ks_tomo_limber(double l, int ni);
 
+
 double C_kk_limber_nointerp(double l, int use_linear_ps, int init_static_vars_only);
+
 double C_kk_limber(double l);
 
 #ifdef __cplusplus
