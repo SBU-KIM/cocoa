@@ -17,36 +17,60 @@ extern "C" {
 //  ----------------------------------------------------------------------------------
 //  ----------------------------------------------------------------------------------
 
-typedef struct
+typedef struct 
 {
-  int Ncl;
-  int Ntheta;
-  int Ncos;
-  int Ndata;
-  double lmin;
-  double lmax;
-  double vtmax;
-  double vtmin;
-  double* ell;
-  double* theta;
-  double cosmax;
-  double Rmin_bias;
-  double Rmin_shear;
-  double lmax_shear;
-  double lmax_kappacmb;
-  int IA;
-  int bias;
-  int shear_shear;
-  int shear_pos;
-  int pos_pos;
-  int gk;
-  int kk;
-  int ks;
-  int clusterN;
-  int clusterWL;
-  int clusterCG;
-  int clusterCC;
-} likepara;
+  double a_min;
+  double k_min_cH0;
+  double k_max_cH0;
+  double M_min;
+  double M_max;
+  double P_2_s_min;
+  double P_2_s_max;
+  int LMIN_tab;      // Cosmo2D
+  int LMAX;          // Cosmo2D
+  int LMAX_NOLIMBER; // Cosmo2D
+} lim;
+
+typedef struct 
+{
+  int N_a;          
+  int N_k_lin;
+  int N_k_nlin;
+  int N_ell;
+  int N_theta;
+  int N_thetaH;
+  int N_S2;
+  int N_DS;
+  int N_ell_TATT;         // Cosmo2D
+  int NL_Nell_block;      // Cosmo2D - NL = NonLimber
+  int NL_Nchi;            // Cosmo2D - NL = NonLimber
+  int N_a_halo_exclusion, // N_a for binned_p_cc_incl_halo_exclusion (cluster_util.c)
+  int N_k_halo_exclusion, // N_k for binned_p_cc_incl_halo_exclusion (cluster_util.c)
+  int N_R_halo_exclusion,
+  int N_halo_exclusion    // N for 3D Hankel Transform for Halo Exclusion (pk_to_xi and xi_to_pk) 
+} Ntab;
+
+typedef struct 
+{
+  double xmin;
+  double xmax;
+  double Pmin;
+  double Pmax;
+  double dPmin;
+  double dPmax;
+} bin_avg;
+
+typedef struct
+{ // parameters for power spectrum passed to FASTPT
+  double k_min;
+  double k_max;
+  int N;
+  int N_per_dec;
+  double** tab_AB; // parameters for table of bias terms
+  int N_AB;        // parameters for table of bias terms
+  double** tab_IA; // parameters for table of IA terms
+  int N_IA;        // parameters for table of IA terms
+} FPTpara;
 
 typedef struct
 {
@@ -110,44 +134,24 @@ typedef struct
 
 typedef struct
 {
-  double area;                    // survey_area in deg^2.
-  double n_gal;                   // galaxy density per arcmin^2
-  double sigma_e;                 // rms inrinsic ellipticity noise
-  double area_conversion_factor;  // factor from deg^2 to radian^2:
-  double n_gal_conversion_factor; // factor from n_gal/arcmin^2 to n_gal/radian^2:
-  double n_lens;                  // lens galaxy density per arcmin^2
-  double m_lim;
-  char name[CHAR_MAX_SIZE];
-  double ggl_overlap_cut;
-} sur;
+  int bias_model;                 // Bias model
+  int hmf_model;                  // HMF model 
+  int nonlinear_bias;             // Do we include nonlinear bias in cluster analysis?
 
-typedef double (*B1_model)(double z, int nz);
+  int N_MOR;                      // Mass observable relation (number of nuisance params)
+  int N_SF;                       // selection function (number of nuisance params)
 
-typedef struct
-{
-  double b[MAX_SIZE_ARRAYS];      // linear galaxy bias paramter in clustering bin i
-  double b2[MAX_SIZE_ARRAYS];     // quadratic bias parameter for redshift bin i
-  double bs2[MAX_SIZE_ARRAYS];    // leading order tidal bias for redshift bin i
-  double b_mag[MAX_SIZE_ARRAYS];  // amplitude of magnification bias, b_mag[i] = 5*s[i]+beta[i]-2
-  B1_model b1_function;
-} galpara;
+  int halo_exclusion_model,
+  double delta_exclusion,  // delta for exclusion radius (halo_exclusion) according to Baldauf 2013
 
-typedef struct
-{
-  char runmode[CHAR_MAX_SIZE];
-} pdeltapara;
-
-typedef struct
-{ // parameters for power spectrum passed to FASTPT
-  double k_min;
-  double k_max;
-  int N;
-  int N_per_dec;
-  double **tab_AB; // parameters for table of bias terms
-  int N_AB;        // parameters for table of bias terms
-  double **tab_IA; // parameters for table of IA terms
-  int N_IA;        // parameters for table of IA terms
-} FPTpara;
+  int N200_Nbin;                  // number of cluster bins in lambda_obs (observed richness)
+  double N200_min;                // global lambda_obs_min (observed richness)
+  double N200_max;                // global lambda_obs_max (observed richness)
+  double N_min[MAX_SIZE_ARRAYS];  // lambda_obs_min in each bin in lambda_obs (observed richness)
+  double N_max[MAX_SIZE_ARRAYS];  // lambda_obs_max in each bin in lambda_obs (observed richness)
+  
+  char model[CHAR_MAX_SIZE];
+} clusterpara;
 
 typedef struct
 {
@@ -188,25 +192,70 @@ typedef struct
 
 typedef struct
 {
-  int bias_model;                 // Bias model
-  int hmf_model;                  // HMF model 
-  int nonlinear_bias;             // Do we include nonlinear bias in cluster analysis?
+  double area;                    // survey_area in deg^2.
+  double n_gal;                   // galaxy density per arcmin^2
+  double sigma_e;                 // rms inrinsic ellipticity noise
+  double area_conversion_factor;  // factor from deg^2 to radian^2:
+  double n_gal_conversion_factor; // factor from n_gal/arcmin^2 to n_gal/radian^2:
+  double n_lens;                  // lens galaxy density per arcmin^2
+  double m_lim;
+  char name[CHAR_MAX_SIZE];
+  double ggl_overlap_cut;
+} sur;
 
-  int N_MOR;                      // Mass observable relation (number of nuisance params)
-  int N_SF;                       // selection function (number of nuisance params)
+typedef struct
+{
+  int Ncl;
+  int Ntheta;
+  int Ncos;
+  int Ndata;
+  int cluster_lbin;
+  double cluster_lmin;
+  double cluster_lmax;
+  double lmin;
+  double lmax;
+  double vtmax;
+  double vtmin;
+  double* ell;
+  double* theta;
+  double cosmax;
+  double Rmin_bias;
+  double Rmin_shear;
+  double lmax_shear;
+  double lmax_kappacmb;
+  int IA;
+  int bias;
+  int shear_shear;
+  int shear_pos;
+  int pos_pos;
+  int gk;
+  int kk;
+  int ks;
+  int clusterN;
+  int clusterWL;
+  int clusterCG;
+  int clusterCC;
+} likepara;
 
-  double N200_min;                // global lambda_obs_min (observed richness)
-  double N200_max;                // global lambda_obs_max (observed richness)
 
-  int N200_Nbin;                  // number of cluster bins in lambda_obs (observed richness)
-  double N_min[MAX_SIZE_ARRAYS];  // lambda_obs_min in each bin in lambda_obs (observed richness)
-  double N_max[MAX_SIZE_ARRAYS];  // lambda_obs_max in each bin in lambda_obs (observed richness)
-  
-  int lbin;
-  double l_min;
-  double l_max;
-  char model[CHAR_MAX_SIZE];
-} clusterpara;
+
+typedef struct
+{
+  double b[MAX_SIZE_ARRAYS];      // linear galaxy bias paramter in clustering bin i
+  double b2[MAX_SIZE_ARRAYS];     // quadratic bias parameter for redshift bin i
+  double bs2[MAX_SIZE_ARRAYS];    // leading order tidal bias for redshift bin i
+  double b_mag[MAX_SIZE_ARRAYS];  // amplitude of magnification bias, b_mag[i] = 5*s[i]+beta[i]-2
+  B1_model b1_function;
+} galpara;
+
+typedef double (*B1_model)(double z, int nz);
+
+typedef struct
+{
+  char runmode[CHAR_MAX_SIZE];
+} pdeltapara;
+
+
 
 typedef struct
 {
@@ -227,45 +276,6 @@ typedef struct
   double sensitivity; // white noise level in muK*rad
   char pathLensRecNoise[CHAR_MAX_SIZE]; // path to precomputed noise on reconstructed kappa
 } Cmb;
-
-typedef struct 
-{
-  double a_min;
-  double k_min_cH0;
-  double k_max_cH0;
-  double M_min;
-  double M_max;
-  double P_2_s_min;
-  double P_2_s_max;
-  int LMIN_tab;      // Cosmo2D
-  int LMAX;          // Cosmo2D
-  int LMAX_NOLIMBER; // Cosmo2D
-} lim;
-
-typedef struct 
-{
-  int N_a;
-  int N_k_lin;
-  int N_k_nlin;
-  int N_ell;
-  int N_theta;
-  int N_thetaH;
-  int N_S2;
-  int N_DS;
-  int N_ell_TATT;    // Cosmo2D
-  int NL_Nell_block; // Cosmo2D - NL = NonLimber
-  int NL_Nchi;       // Cosmo2D - NL = NonLimber
-} Ntab;
-
-typedef struct 
-{
-  double xmin;
-  double xmax;
-  double Pmin;
-  double Pmax;
-  double dPmin;
-  double dPmax;
-} bin_avg;
 
 typedef struct 
 {
@@ -307,7 +317,7 @@ extern sur survey;
 
 extern galpara gbias;
 
-extern clusterpara Cluster;
+extern clusterpara;
 
 extern pdeltapara pdeltaparams;
 

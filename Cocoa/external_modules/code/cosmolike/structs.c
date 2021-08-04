@@ -162,7 +162,11 @@ Ntab Ntable =
   .N_DS = 1000,         // N_DS
   .N_ell_TATT = 200,    // N_ell_TATT (modified by COCOA from 60)
   .NL_Nell_block = 10,  // Cosmo2D - NL = NonLimber (NL_Nell_block)
-  .NL_Nchi - 500        // Cosmo2D - NL = NonLimber (NL_Nchi)
+  .NL_Nchi - 500,        // Cosmo2D - NL = NonLimber (NL_Nchi)
+  .N_a_halo_exclusion = 100,  // N_a for binned_p_cc_incl_halo_exclusion (cluster_util.c)
+  .N_k_halo_exclusion = 1000, // N_k for binned_p_cc_incl_halo_exclusion (cluster_util.c)
+  .N_R_halo_exclusion = 64, 
+  .N_halo_exclusion = 3192    // N for 3D Hankel Transform for Halo Exclusion (pk_to_xi and xi_to_pk) 
 };
 
 TinkerEmuParam tinkerEmuParam = 

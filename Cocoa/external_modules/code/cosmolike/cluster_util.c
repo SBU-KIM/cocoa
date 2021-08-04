@@ -30,10 +30,16 @@ static int INTERPOLATE_SURVEY_AREA = 1;
 static int ASSUME_CONSTANT_LAMBD_HALO_EXCLUSION = 1;
 
 static int GSL_WORKSPACE_SIZE = 250;
+static int binned_P_lambda_obs_given_M_size_z_table = 10;
+static int binned_P_lambda_obs_given_M_size_M_table = 50;
+static int binned_p_cm_size_a_table = 30;
+
 static double M_PIVOT = 5E14; //Msun/h
 static double log_M_min = 12.0;
 static double log_M_max = 15.9; 
 static double LOG10_E = 0.4342944819;
+static double binned_P_lambda_obs_given_M_zmin_table = 0.20;
+static double binned_P_lambda_obs_given_M_zmax_table = 0.80;
 
 static int has_b2_galaxies()
 {
@@ -48,16 +54,10 @@ static int has_b2_galaxies()
   return res 
 }
 
-static int binned_P_lambda_obs_given_M_size_z_table = 10;
-static int binned_P_lambda_obs_given_M_size_M_table = 50;
-static double binned_P_lambda_obs_given_M_zmin_table = 0.20;
-static double binned_P_lambda_obs_given_M_zmax_table = 0.80;
-static int binned_p_cm_size_a_table = 30;
-
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
-// BUZZARD
+// BUZZARD binned_P_lambda_obs_given_M
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
@@ -98,7 +98,7 @@ double buzzard_binned_P_lambda_obs_given_M_nointerp(int nl, double M, double z)
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
-// SDSS
+// SDSS binned_P_lambda_obs_given_M
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
@@ -930,7 +930,7 @@ double B1_x_BSF(double M, double a)
   double B1;
   if (Cluster.bias_model == 0) 
   {
-    B1 = B1(mass,a);
+    B1 = B1(mass, a);
   } 
   else if (Cluster.bias_model == 1) 
   {
@@ -1314,8 +1314,8 @@ double binned_average_number_counts(int nl, double z)
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
-
 // nl{1,2} = lambda_obs bins, n{i,j} = cluster redshift bins
+
 double binned_p_cc(double k, double a, int nl1, int nl2, int use_linear_ps)
 { // binned in lambda_obs (nl1, nl2 = lambda_obs bin (cluster 1 and 2))
   if(!(a>0) || !(a<1)) 
@@ -1358,45 +1358,573 @@ double binned_p_cc(double k, double a, int nl1, int nl2, int use_linear_ps)
   }
 }
 
-double int_for_int_for_binned_p_cc_incl_halo_exclusion(double lnM, void* params)
+double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* params)
 {
-  double* ar = (double*) params; //n_lambda, z
+  static cosmopara C;
+  static nuisancepara N;
+  static double****** table = 0;
+
+  const int N_k = Ntable.N_k_halo_exclusion;
+  const double ln_k_min = log(1E-2); 
+  const double ln_k_max = log(3E6);
+  const double dlnk = (ln_k_max - ln_k_min)/((double) N_k - 1.0);
+  
+  const int N_a = Ntable.N_a_halo_exclusion;
+  const double amin = 1.0/(1.0 + tomo.cluster_zmax[tomo.cluster_Nbin - 1]);
+  const double amax = 1.0/(1.0 + tomo.cluster_zmin[0]) + 0.01;
+  const double da = (amax - amin)/((double) N_a - 1.0);
+
+  const int N_k_hankel = ?;
+  const double ln_k_min_hankel = log(5.0E-4);
+  const double ln_k_max_hankel = log(1.0E8);
+  const double dlnk_hankel = (ln_k_max_hankel - ln_k_min_hankel)/((double) N_k_hankel - 1.0);
+  
+  const int N_lnM = ?;
+  const double ln_lnM_min = 
+  const double ln_lnM_max =
+  const double dlnlnM = (ln_lnM_max - ln_lnM_min)/((double) N_lnM - 1.0);
+
+  if(table == 0)
+  {
+    table2 = (double******) malloc(sizeof(double*****)*Cluster.N200_Nbin);
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {          
+      table2[i] = (double*****) malloc(sizeof(double****)*Cluster.N200_Nbin);
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        table2[i][j] = (double****) malloc(sizeof(double***)*N_a);
+        for (int k=0; k<N_a; k++) 
+        { 
+          table[i][j][k] = (double***) malloc(sizeof(double**)*N_k);
+          for (int p=0; p<N_k; p++) 
+          {
+            table[i][j][k][p] = (double**) malloc(sizeof(double*)*N_lnM);
+            for (int l=0; l<N_lnM; l++) 
+            {
+              table[i][j][k][p][l] = (double*) malloc(sizeof(double)*N_lnM);
+            }
+          } 
+        }
+      }
+    }
+  }
+  if (recompute_clusters(C, N))
+  { 
+    // ---------------------------------------------------------------------------------------------
+    // Step 0 - memory allocation (except for FFTW plans)
+    // ---------------------------------------------------------------------------------------------
+    typedef fftw_complex fftwZ;
+    double arg[2];
+    arg[0] = 0;     // bias
+    arg[1] = 0.5;   // order of Bessel function 
+    
+    fftw_plan***** plan   = (fftw_plan*****) malloc(sizeof(fftw_plan****)*Cluster.N200_Nbin);
+    fftw_plan***** plan1  = (fftw_plan*****) malloc(sizeof(fftw_plan****)*Cluster.N200_Nbin);
+    fftwZ****** f_lP      = (fftwZ******)    malloc(sizeof(fftwZ*****)*Cluster.N200_Nbin);
+    fftwZ****** conv      = (fftwZ******)    malloc(sizeof(fftwZ*****)*Cluster.N200_Nbin);
+    double****** lP       = (double******)   malloc(sizeof(double*****)*Cluster.N200_Nbin);
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      plan[i]   = (fftw_plan****) malloc(sizeof(fftw_plan***)*Cluster.N200_Nbin);
+      plan1[i]  = (fftw_plan****) malloc(sizeof(fftw_plan***)*Cluster.N200_Nbin);
+      f_lP[i]   = (fftwZ*****)    malloc(sizeof(fftwZ****)*Cluster.N200_Nbin);
+      conv[i]   = (fftwZ*****)    malloc(sizeof(fftwZ****)*Cluster.N200_Nbin);
+      lP[i]     = (double*****)   malloc(sizeof(double****)*Cluster.N200_Nbin);
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        plan[i][j]   = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_a);
+        plan1[i][j]  = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_a);
+        f_lP[i][j]   = (fftwZ****)    malloc(sizeof(fftwZ***)*N_a);
+        conv[i][j]   = (fftwZ****)    malloc(sizeof(fftwZ***)*N_a);
+        lP[i][j]     = (double****)   malloc(sizeof(double***)*N_a);
+        for (int k=0; k<N_a; k++) 
+        { 
+          plan[i][j][k]  = (fftw_plan**) malloc(sizeof(fftw_plan*)*N_lnM);
+          plan1[i][j][k] = (fftw_plan**) malloc(sizeof(fftw_plan*)*N_lnM);    
+          f_lP[i][j][k]  = (fftwZ***)    malloc(sizeof(fftwZ**)*N_lnM);
+          conv[i][j][k]  = (fftwZ***)    malloc(sizeof(fftwZ**)*N_lnM);
+          lP[i][j][k]    = (double***)   malloc(sizeof(double**)*N_lnM);
+          for (int p=0; p<N_lnM; p++) 
+          {
+            plan[i][j][k][p]  = (fftw_plan*) malloc(sizeof(fftw_plan)*N_lnM);
+            plan1[i][j][k][p] = (fftw_plan*) malloc(sizeof(fftw_plan)*N_lnM);
+            f_lP[i][j][k][p]  = (fftwZ**)    malloc(sizeof(fftwZ*)*N_lnM);
+            conv[i][j][k][p]  = (fftwZ**)    malloc(sizeof(fftwZ*)*N_lnM);
+            lP[i][j][k][p]    = (double**)   malloc(sizeof(double*)*N_lnM);
+            for (int l=0; l<N_lnM; l++) 
+            {
+              f_lP[i][j][k][p][l] = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
+              conv[i][j][k][p][l] = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
+              lP[i][j][k][p][l]   = fftw_malloc(N_k_hankel*sizeof(double));
+            }
+          }
+        }
+      }
+    }
+    // ---------------------------------------------------------------------------------------------
+    // STEP 1: - pk_to_xi
+    // ---------------------------------------------------------------------------------------------
+    weighted_B1(0, 1.0/amin - 1.0);     // init static vars
+    Pdelta(exp(ln_k_min_hankel), amin); // init static vars
+    #pragma omp parallel for collapse(6)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_lnM; p++) 
+          {
+            for (int l=0; l<N_lnM; l++) 
+            {
+              for (int q=0; q<N_k_hankel; q++) 
+              {
+                const double aa = amin + k*da;
+                const double zz = 1.0/aa - 1.0;
+                const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);
+                const double B1_1 = weighted_B1(i, zz);
+                const double B1_2 = (i == j) ? B1_1 : weighted_B1(j, zz);
+                lP[i][j][k][p][l][q] = kk*sqrt(kk)*Pdelta(kk, aa)*B1_1*B1_2;
+              }
+            }
+          }
+        }
+      }
+    }
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_lnM; p++) 
+          {
+            for (int l=0; l<N_lnM; l++) 
+            {
+              const int nsize = N_k_hankel;
+              plan[i][j][k][p][l]  = 
+                fftw_plan_dft_r2c_1d(nsize, lP[i][j][k][p][l], f_lP[i][j][k][p][l], FFTW_ESTIMATE);
+              plan1[i][j][k][p][l] = 
+                fftw_plan_dft_c2r_1d(nsize, conv[i][j][k][p][l], lP[i][j][k][p][l], FFTW_ESTIMATE);
+            }
+          }
+        }
+      }
+    }
+    #pragma omp parallel for collapse(5)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_lnM; p++) 
+          {
+            for (int l=0; l<N_lnM; l++) 
+            {
+              fftw_execute(plan[i][j][k][p][l]);
+            }
+          }
+        }
+      }
+    }
+    #pragma omp parallel for collapse(5)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        {
+          for (int p=0; p<N_lnM; p++) 
+          {
+            for (int l=0; l<N_lnM; l++) 
+            { 
+              for(int q=0; q<N_k_hankel/2+1; q++) 
+              {            
+                fftw_complex kernel;
+                hankel_kernel_FT_3D(2.0*M_PI*q/((double) N_k_hankel*dlnk_hankel), &kernel, arg, 2);
+                
+                conv[i][j][k][p][l][q][0] = 
+                  f_lP[i][j][k][p][l][q][0]*kernel[0] - f_lP[i][j][k][p][l][q][1]*kernel[1];
+                
+                conv[i][j][k][p][l][q][1] = 
+                  f_lP[i][j][k][p][l][q][1]*kernel[0] + f_lP[i][j][k][p][l][q][0]*kernel[1];
+              }
+
+              conv[i][j][k][p][l][0][1] = 0;            
+              conv[i][j][k][p][l][N_k_hankel/2][1] = 0;
+
+              fftw_execute(plan1[i][j][k][p][l]);
+
+              for (int q=0; q<N_k_hankel; q++) 
+              {
+                const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);    
+                const double rr = 1.0/kk;
+                lP[i][j][k][p][l][q] = 
+                  pow(2.0*M_PI*rr, -1.5)*lP[i][j][k][p][l][q]/((double) N_k_hankel); // XI
+              }
+            }
+          }
+        }
+      }
+    }
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        {
+          for (int p=0; p<N_lnM; p++) 
+          {
+            for (int l=0; l<N_lnM; l++) 
+            {  
+              fftw_destroy_plan(plan[i][j][k][p][l]);
+              fftw_destroy_plan(plan1[i][j][k]p][l]);
+            }
+          }
+        }
+      }
+    }
+    // ---------------------------------------------------------------------------------------------
+    // STEP 3: exclusion_filter
+    // ---------------------------------------------------------------------------------------------
+    #pragma omp parallel for collapse(4)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        {
+          for (int p=0; p<N_k_hankel; p++) 
+          {
+            const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);    
+            const double rr = 1.0/kk;
+            const double R = 1.5*pow(0.25*(Cluster.N_min[i] + Cluster.N_min[j] + 
+              Cluster.N_max[i] + Cluster.N_max[j])/100., 0.2)/cosmology.coverH0/aa;
+            
+            if (Cluster.halo_exclusion_model == 0)
+            {
+              if(rr < R) 
+              {
+                XI_HANKEL[i][j][k][p] = -1; 
+              } 
+            }
+            else if (Cluster.halo_exclusion_model == 1)
+            { // Baldauf 2013 eq. 43
+              if (R > 0) 
+              {
+                const double sigma = 0.0387;
+                const double xi = XI_HANKEL[i][j][k][p];
+                const double tmp = log(rr/R)/(M_SQRT2*sigma);
+                  
+                double tmp2;
+                int status = gsl_sf_erf_e(tmp, &tmp2);
+                if (status)
+                {
+                  log_fatal(gsl_strerror(status));
+                  exit(1);
+                }
+                
+                xi = 0.5*(1.0 + tmp2)*(xi + 1.0) - 1.0;
+              }
+            }
+            else // code to be executed if n doesn't match any cases
+            {  
+              log_fatal("excusion type : %d  not implemented", type); 
+              exit(1);
+            }
+          }
+        }
+      }
+    }
+    // ---------------------------------------------------------------------------------------------
+    // STEP 4: - xi_to_pk
+    // ---------------------------------------------------------------------------------------------
+    #pragma omp parallel for collapse(6)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_lnM; p++) 
+          {
+            for (int l=0; l<N_lnM; l++) 
+            {
+              for (int q=0; q<N_k_hankel; q++) 
+              {
+                const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);    
+                const double rr = 1.0/kk;
+                lP[i][j][k][p][l][q] = pow(rr, 1.5)*lP[i][j][k][p][l][q];
+              }
+            }
+          }
+        }
+      }
+    }
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_lnM; p++) 
+          {
+            for (int l=0; l<N_lnM; l++) 
+            {
+              const int nsize = N_k_hankel;
+              plan[i][j][k][p][l]  = 
+                fftw_plan_dft_r2c_1d(nsize, lP[i][j][k][p][l], f_lP[i][j][k][p][l], FFTW_ESTIMATE);
+              plan1[i][j][k][p][l] = 
+                fftw_plan_dft_c2r_1d(nsize, conv[i][j][k][p][l], lP[i][j][k][p][l], FFTW_ESTIMATE);
+            }
+          }
+        }
+      }
+    }
+    #pragma omp parallel for collapse(5)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_lnM; p++) 
+          {
+            for (int l=0; l<N_lnM; l++) 
+            {
+              fftw_execute(plan[i][j][k][p][l]);
+            }
+          }
+        }
+      }
+    }
+    #pragma omp parallel for collapse(5)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        {
+          for (int p=0; p<N_lnM; p++) 
+          {
+            for (int l=0; l<N_lnM; l++) 
+            { 
+              for(int q=0; q<N_k_hankel/2+1; q++) 
+              { // TODO: ok for dlnR < 0 in the denom? (original code is neg)
+                const double rr = 2.0*M_PI*q/((double) N_k_hankel*(-1.0*dlnk_hankel)); 
+
+                fftw_complex  kernel;
+                hankel_kernel_FT_3D(rr, &kernel, arg, 2);
+                
+                conv[i][j][k][p][l][q][0] = 
+                  f_lP[i][j][k][p][l][q][0]*kernel[0] - f_lP[i][j][k][p][l][q][1]*kernel[1];
+                
+                conv[i][j][k][p][l][q][1] = 
+                  f_lP[i][j][k][p][l][q][1]*kernel[0] + f_lP[i][j][k][p][l][q][0]*kernel[1];
+              }
+
+              conv[i][j][k][p][l][0][1] = 0;            
+              conv[i][j][k][p][l][N_k_hankel/2][1] = 0;
+
+              fftw_execute(plan[i][j][k][p][l]);
+
+              for (int q=0; q<N_k_hankel; q++) 
+              {
+                const double kk = exp(ln_k_min_hankel + q*dlnk_hankel); 
+                
+                lP[i][j][k][p][l][q] = 
+                  pow(2*M_PI*kk, -1.5)*lP[i][j][k][p][l][q]/((double) N_k_hankel);
+                
+                // normalization 
+                const double TwoPiCubed = 8*M_PI*M_PI*M_PI;
+                lP[i][j][k][p][l][q] *= TwoPiCubed;
+
+                // for interpolation
+                lP[i][j][k][p][l][q] = 
+                  log(kk*kk*kk*lP[i][j][k][p][l][q] + 1.0E5); // 1E5 avoid negs inside ln()
+              }
+            }
+          }
+        }
+      }
+    }
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_lnM; p++) 
+          {
+            for (int l=0; l<N_lnM; l++) 
+            { 
+              fftw_destroy_plan(plan[i][j][k][p][l]);
+              fftw_destroy_plan(plan1[i][j][k][p][l]);
+            }
+          }
+        }
+      }
+    }
+    // ---------------------------------------------------------------------------------------------
+    // Step 5 - Evaluate binned_p_cc_incl_halo_exclusion in the interpolation table
+    // ---------------------------------------------------------------------------------------------
+    B1_x_BSF(exp(ln_lnM_min), amin); // init static vars
+    {
+      double params_in[2] = {0, 1.0/amin - 1.0};
+      dndlnM_times_binned_P_lambda_obs_given_M(ln_lnM_min, (void*) params_in); // init static vars
+    }
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        {
+          for (int p=0; p<N_lnM; p++) 
+          {
+            for (int l=0; l<N_lnM; l++) 
+            {
+              for (int q=0; q<N_k; q++) 
+              {
+                const double aa = amin + k*da;
+                const double kk = exp(ln_k_min + q*dlnk);
+                
+                const double zz = 1.0/aa - 1.0;
+                const double lnM1 = ln_lnM_min + p*dlnlnM;
+                const double lnM2 = ln_lnM_min + l*dlnlnM;
+                const double M1 = exp(lnM1);  
+                const double M2 = exp(lnM2);
+
+                const double B1_1 = B1_x_BSF(M1, aa);
+                const double B1_2 = B1_x_BSF(M2, aa); 
+
+                const double tmp = 
+                  0.75/(M_PI*Cluster.delta_exclusion*cosmology.rho_crit*cosmology.Omega_m);
+                const double R1 = pow(M1*tmp, 1./3.);
+                const double R2 = pow(M2*tmp, 1./3.);
+                
+                // Cosmolike: This is to remove small oscilliating stuffs. It makes the integral faster
+                const double R = (kk*(0.5*(R1 + R2)) > 1) ? 0.0 : 0.5*(R1 + R2);
+
+                const double V_EXCL = 4.0*M_PI/3.*3*(sin(kk*R) - k*R*cos(kk*R))/(kk*kk*kk);
+                
+                // need to do the spline here
+                const double PK = (R == 0) ?  Pdelta(kk, aa)*B1_1*B1_2 :
+                  (pk_halo_with_exclusion_Rtab(k, R, a, 1., 1., 1) + V_EXCL)*B1_1*B1_2 - V_EXCL;
+
+                double res1;
+                {                
+                  double BS;
+                  if (Cluster.N_SF == 1) 
+                  {
+                    BS = nuisance.cluster_selection[0]; 
+                  }
+                  else if (Cluster.N_SF == 2)
+                  {
+                    BS = 
+                    nuisance.cluster_selection[0]*pow((M1/M_PIVOT), nuisance.cluster_selection[1]); 
+                  }
+                  else
+                  {
+                    log_fatal("Cluster selection bias model %i not implemented", Cluster.bias_model);
+                    exit(0); 
+                  }
+                  double params_in[2] = {i, zz};
+                  res1 = dndlnM_times_binned_P_lambda_obs_given_M(lnM1, (void*) params_in)*BS;
+                }
+                double res2;
+                {
+                  double BS;
+                  if (Cluster.N_SF == 1) 
+                  {
+                    BS = nuisance.cluster_selection[0]; 
+                  }
+                  else if (Cluster.N_SF == 2)
+                  {
+                    BS = 
+                    nuisance.cluster_selection[0]*pow((M2/M_PIVOT), nuisance.cluster_selection[1]); 
+                  }
+                  else
+                  {
+                    log_fatal("Cluster selection bias model %i not implemented", Cluster.bias_model);
+                    exit(0); 
+                  }
+                  double params_in[2] = {j, zz};
+                  res2 = dndlnM_times_binned_P_lambda_obs_given_M(lnM2, (void*) params_in)*BS;
+                }
+                table[i][j][k][q][p][l] = PK*res1*res2;
+                table[j][i][k][q][p][l] = table[i][j][k][q][p][l];
+              }
+            }
+          }
+        }
+      }
+    }
+    // ---------------------------------------------------------------------------------------------
+    // Step 6 - clean up
+    // ---------------------------------------------------------------------------------------------
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_lnM; p++) 
+          {
+            for (int l=0; l<N_lnM; l++) 
+            { 
+              fftw_free(f_lP[i][j][k][p][l]); 
+              fftw_free(conv[i][j][k][p][l]);  
+              fftw_free(lP[i][j][k][p][l]);
+            }
+            free(plan[i][j][k][p]);
+            free(plan1[i][j][k][p]);
+            free(f_lP[i][j][k][p]); 
+            free(conv[i][j][k][p]);  
+            free(lP[i][j][k][p]);
+          }
+          free(plan[i][j][k]);
+          free(plan1[i][j][k]);
+          free(f_lP[i][j][k]); 
+          free(conv[i][j][k]);  
+          free(lP[i][j][k]);
+        }
+        free(plan[i][j]);
+        free(plan1[i][j]);
+        free(f_lP[i][j]);
+        free(conv[i][j]);
+        free(lP[i][j]);
+      }
+      free(plan[i]);
+      free(plan1[i]);
+      free(f_lP[i]);
+      free(conv[i]);
+      free(lP[i]);
+    }
+    free(plan);
+    free(plan1);
+    free(f_lP);
+    free(conv);
+    free(lP);
+
+    update_cosmopara(&C);
+    update_nuisance(&N);
+  }
+  double* ar = (double*) params;
   const int nl1 = ar[0]; 
   const int nl2 = ar[1];
-  const double k = ar[2]; 
-  const double a = ar[3];
+  const int nk = ar[2]; 
+  const int na = ar[3];
   const double lnM1 = ar[4];
 
-  const double z = 1.0/a - 1.0;
-  const double M1 = exp(lnM1);  
-  const double M2 = exp(lnM);  
-
-  const double B1_1 = B1xBselection(M1, a);
-  const double B1_2 = B1xBselection(M2, a); 
-
-  const double tmp = 0.75/(M_PI*Ntable_cluster.delta_exclusion*cosmology.rho_crit*cosmology.Omega_m);
-  const double R1 = pow(M1*tmp, 1./3.);
-  const double R2 = pow(M2*tmp, 1./3.);
-  
-  // Cosmolike This is to remove all the small oscilliating stuffs. It makes the integral faster
-  const double R = (k*(0.5*(R1 + R2)) > 1) ? 0.0 : 0.5*(R1 + R2);
-
-  const double VexclWR = 4.0*M_PI/3.*3*(sin(k*R) - k*R*cos(k*R))/(k*k*k);
-  
-  const double PK = (R == 0) ?  Pdelta(k,a)*B1_1*B1_2 :
-    (pk_halo_with_exclusion_Rtab(k, R, a, 1., 1., 1) + VexclWR)*B1_1*B1_2 - VexclWR;
-
-  double res1;
+  if(nl1 < 0 || nl1 > Cluster.N200_Nbin -1 || nl2 < 0 || nl2 > Cluster.N200_Nbin -1)
   {
-    double params_in[2] = {nl1, z};
-    res1 = dndlnM_times_binned_P_lambda_obs_given_M(lnM1, params_in)*nuisance.cluster_selection[0];
+    log_fatal("invalid bin input (nl1, nl2) = (%d, %d)", nl1, nl2);
+    exit(1);
   }
-  double res2;
-  {
-    double params_in[2] = {nl2, z};
-    res2 = dndlnM_times_binned_P_lambda_obs_given_M(lnM, params_in)*nuisance.cluster_selection[0];
-  }
-  return PK*res1*res2;
+
+  return interpol2d(table[nl1][nl2][na][nk], N_lnM, ln_lnM_min, ln_lnM_max, dlnlnM, lnM, N_lnM, 
+    ln_lnM_min, ln_lnM_max, dlnlnM, lnM1, 1., 1.);
 }
 
 double int_for_binned_p_cc_incl_halo_exclusion(double lnM, void* params)
@@ -1404,24 +1932,36 @@ double int_for_binned_p_cc_incl_halo_exclusion(double lnM, void* params)
   double* ar = (double*) params;
   const int nl1 = ar[0]; 
   const int nl2 = ar[1];
-  const double k = ar[2]; 
-  const double a = ar[3];
+  const int nk = ar[2]; 
+  const int na = ar[3];
   const int init_static_vars_only = (int) ar[4];
   
   const double ln_M_min = log_M_min/LOG10_E; 
   const double ln_M_max = log_M_max/LOG10_E;
 
-  double params_in[5] = {nl1, nl2, k, a, lnM};
+  double params_in[5] = {nl1, nl2, nk, na, lnM};
   return (init_static_vars_only == 1) ? 
     int_for_int_for_binned_p_cc_incl_halo_exclusion(ln_M_min, (void*) params_in) :
     int_gsl_integrate_low_precision(int_for_int_for_binned_p_cc_incl_halo_exclusion, 
       (void*) params_in, ln_M_min, ln_M_max, NULL, GSL_WORKSPACE_SIZE); 
 }
 
-double binned_p_cc_incl_halo_exclusion_nointerp(double k, double a, int nl1, int nl2, 
-int init_static_vars_only)
+double binned_p_cc_incl_halo_exclusion_nointerp(int nl1, int nl2, int nk, int na, int init_static_vars_only)
 {
+  const int N_k = Ntable.N_k_halo_exclusion;
+  const double ln_k_min = log(1E-2); 
+  const double ln_k_max = log(3E6);
+  const double dlnk = (ln_k_max - ln_k_min)/((double) N_k - 1.0);
+  
+  const int N_a = Ntable.N_a_halo_exclusion;
+  const double amin = 1.0/(1.0 + tomo.cluster_zmax[tomo.cluster_Nbin - 1]);
+  const double amax = 1.0/(1.0 + tomo.cluster_zmin[0]) + 0.01;
+  const double da = (amax - amin)/((double) N_a - 1.0);
+
+  const double a = amin + na*da;
+  const double k = exp(ln_k_min + nk*dlnk);
   const double z = 1./a-1;
+
   const double ln_M_min = log_M_min/LOG10_E; 
   const double ln_M_max = log_M_max/LOG10_E; 
   
@@ -1442,103 +1982,98 @@ int init_static_vars_only)
         ln_M_min, ln_M_max, NULL, GSL_WORKSPACE_SIZE);  
   }
 
-  double params[5] = {nl1, nl2, k, a, init_static_vars_only};
+  double params[5] = {nl1, nl2, nk, na, init_static_vars_only};
   const double res = (init_static_vars_only == 1) ? 
     int_for_binned_p_cc_incl_halo_exclusion(ln_M_min, (void*) params) :
     int_gsl_integrate_low_precision(int_for_binned_p_cc_incl_halo_exclusion, (void*) params,
       ln_M_min, ln_M_max, NULL, GSL_WORKSPACE_SIZE);  
   
-  return (norm1*norm2 == 0) ? 0.0 : res/norm1/norm2;
+  return (norm1*norm2 == 0) ? 0.0 : res/(norm1*norm2);
 }
 
-double binned_p_cc_incl_halo_exclusion_with_constant_lambd_ninterp(double k, double a, int nl1, 
-int nl2)
-{  
-  const double z = 1./a-1;
-    
-  const double B1_1 = weighted_B1(nl1, z); 
-  
-  const double B1_2 = (nl1 == nl2) ? B1_1 : B1_2;
 
-  // RedMaPPer exclusion radius (Rykoff et al. 2014  eq4) in units coverH0 [change to comoving]
-  const double R = 1.5*pow(0.25*(Cluster.N_min[N_lambda1] + Cluster.N_min[N_lambda2] + 
-    Cluster.N_max[N_lambda1] + Cluster.N_max[N_lambda2])/100., 0.2)/cosmology.coverH0/a; 
-  
-  const double VexclWR = 4*M_PI*(sin(k*R) - k*R*cos(k*R))/pow(k, 3);
-  
-  const double cutoff =1.;
-  
-  double pk;
-  if(R == 0.)
-  {
-    pk = Pdelta(k,a)*B1_1*B1_2;
-  }
-  if (k*R > cutoff)
-  {    
-    const double PK_cutoff = Pdelta(cutoff/R, a)*B1_1*B1_2;
-    
-    const double VexclWR_cutoff = 4*M_PI*(sin(cutoff) - cutoff*cos(cutoff))/pow(cutoff/R, 3);
-    
-    double Pexclusion_cutoff = (pk_halo_with_exclusion(cutoff/R, R, a, 1, 1, 1)+VexclWR_cutoff)*
-      B1_1*B1_2 - VexclWRcutoff;
-    
-    const double k_cutoff = cutoff/R;
-    
-    pk = (Pdelta(k,a)*B1_1*B1_2 - VexclWR*(1 + (PK_cutoff - VexclWR_cutoff - Pexclusioncutoff)/VexclWR_cutoff))
-    pk *= pow((k/kcutoff), -0.7);
-  }
-  else
-  {
-    //Cosmolike: Check it out!! This is my cool trick!! 
-    pk = (pk_halo_with_exclusion(k, R, a, 1, 1, 1) + VexclWR)*B1_1*B1_2 - VexclWR; 
-  }
-  return pk;
-}
-
-double binned_p_cc_incl_halo_exclusion(double k, double a, int nl1, int nl2)
+double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, int nl1, int nl2)
 {
   static cosmopara C;
   static nuisancepara N;
   static double**** table = 0;
 
-  const int N_k = Ntable_cluster.N_k_exclusion_pk_for_cell;
+  const int N_k = Ntable.N_k_halo_exclusion;
   const double ln_k_min = log(1E-2); 
   const double ln_k_max = log(3E6);
   const double dlnk = (ln_k_max - ln_k_min)/((double) N_k - 1.0);
   
-  const int N_a = Ntable_cluster.N_a;
+  const int N_a = Ntable.N_a_halo_exclusion;
   const double amin = 1.0/(1.0 + tomo.cluster_zmax[tomo.cluster_Nbin - 1]);
   const double amax = 1.0/(1.0 + tomo.cluster_zmin[0]) + 0.01;
   const double da = (amax - amin)/((double) N_a - 1.0);
+
+  const int N_k_hankel = ?;
+  const double ln_k_min_hankel = log(5.0E-4);
+  const double ln_k_max_hankel = log(1.0E8);
+  const double dlnk_hankel = (ln_k_max_hankel - ln_k_min_hankel)/((double) N_k_hankel - 1.0);
 
   if(table == 0)
   {
     table = (double****) malloc(sizeof(double***)*Cluster.N200_Nbin);
     for(int i=0; i<Cluster.N200_Nbin; i++)
-    {
+    {          
       table[i] = (double***) malloc(sizeof(double**)*Cluster.N200_Nbin);
-      for(int j=0; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<Cluster.N200_Nbin; j++)
       {
-        table[i][j] = (double**) malloc(sizeof(double*)*N_k);
-        for(int k=0; k<N_k; k++)
-        {
-          table[i][j][k] = (double*) malloc(sizeof(double)*N_a);
+        table[i][j] = (double**) malloc(sizeof(double*)*N_a);
+        for (int k=0; k<N_a; k++) 
+        { 
+          table[i][j][k] = (double*) malloc(sizeof(double)*N_k);
         }
       }
     }
   }
   if (recompute_DESclusters(C, N))
   { 
-    if(ASSUME_CONSTANT_LAMBD_HALO_EXCLUSION == 1)
+    // ---------------------------------------------------------------------------------------------
+    // Step 1 - memory allocation (except for FFTW plans)
+    // ---------------------------------------------------------------------------------------------
+    typedef fftw_complex fftwZ;
+    
+    double arg[2];
+    arg[0] = 0;     // bias
+    arg[1] = 0.5;   // order of Bessel function  
+    
+    const double CO = 1.0; // cutoff = CO
+
+    fftw_plan*** plan     = (fftw_plan***) malloc(sizeof(fftw_plan**)*Cluster.N200_Nbin);
+    fftw_plan*** plan1    = (fftw_plan***) malloc(sizeof(fftw_plan**)*Cluster.N200_Nbin);
+    fftwZ**** f_lP        = (fftwZ****)    malloc(sizeof(fftwZ***)*Cluster.N200_Nbin);
+    fftwZ**** conv        = (fftwZ****)    malloc(sizeof(fftwZ***)*Cluster.N200_Nbin);
+    double**** lP         = (double****)   malloc(sizeof(double***)*Cluster.N200_Nbin);
+    for(int i=0; i<Cluster.N200_Nbin; i++)
     {
-      binned_p_cc_incl_halo_exclusion_with_constant_lambd_ninterp(kin, aa, i, j); // init static
-                                                                                  // vars only
+      plan[i]       = (fftw_plan**) malloc(sizeof(fftw_plan*)*Cluster.N200_Nbin);
+      plan1[i]      = (fftw_plan**) malloc(sizeof(fftw_plan*)*Cluster.N200_Nbin);    
+      f_lP[i]       = (fftwZ***)    malloc(sizeof(fftwZ**)*Cluster.N200_Nbin);
+      conv[i]       = (fftwZ***)    malloc(sizeof(fftwZ**)*Cluster.N200_Nbin);
+      lP[i]         = (double***)   malloc(sizeof(double**)*Cluster.N200_Nbin);
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        plan[i][j]       = (fftw_plan*) malloc(sizeof(fftw_plan)*N_a);
+        plan1[i][j]      = (fftw_plan*) malloc(sizeof(fftw_plan)*N_a);
+        f_lP[i][j]       = (fftwZ**)    malloc(sizeof(fftwZ*)*N_a);
+        conv[i][j]       = (fftwZ**)    malloc(sizeof(fftwZ*)*N_a);
+        lP[i][j]         = (double**)   malloc(sizeof(double*)*N_a);
+        for (int k=0; k<N_a; k++) 
+        { 
+          f_lP[i][j][k]  = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
+          conv[i][j][k]  = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
+          lP[i][j][k]    = fftw_malloc(N_k_hankel*sizeof(double));
+        }
+      }
     }
-    else
-    {
-      binned_p_cc_incl_halo_exclusion_nointerp(exp(logkmin), amin, 0, 0, 1); // init static 
-                                                                             // vars only
-    }
+    // ---------------------------------------------------------------------------------------------
+    // STEP 2: - pk_to_xi
+    // ---------------------------------------------------------------------------------------------
+    weighted_B1(0, 1.0/amin - 1.0);     // init static vars
+    Pdelta(exp(ln_k_min_hankel), amin); // init static vars
     #pragma omp parallel for collapse(4)
     for(int i=0; i<Cluster.N200_Nbin; i++)
     {
@@ -1546,25 +2081,323 @@ double binned_p_cc_incl_halo_exclusion(double k, double a, int nl1, int nl2)
       {
         for (int k=0; k<N_a; k++) 
         { 
-          for (int p=0; p<N_k; p++) 
-          { 
-            const double aa = (amin + k*da > 1.0) ? 1.0 : amin + k*da;
-            const double kk = exp(logkmin + p*dlnk);
-            if(ASSUME_CONSTANT_LAMBD_HALO_EXCLUSION == 1)
-            {
-              table_P_NL[i][j][k][p] = 
-                binned_p_cc_incl_halo_exclusion_with_constant_lambd_ninterp(kk, aa, i, j);
-            }
-            else 
-            {
-              table_P_NL[i][j][k][p] = binned_p_cc_incl_halo_exclusion_nointerp(kk, aa, i, j, 0);
-            }
-            table_P_NL[i][j][k][p] = log(kin*kin*kin*sqrt(aa)*table_P_NL[i][j][k][p]);
-            table_P_NL[j][i][k][p] = table_P_NL[i][j][k][p];
+          for (int p=0; p<N_k_hankel; p++) 
+          {
+            const double aa = amin + k*da;
+            const double zz = 1.0/aa - 1.0;
+            const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);
+            const double B1_1 = weighted_B1(i, zz);
+            const double B1_2 = (i == j) ? B1_1 : weighted_B1(j, zz);
+            lP[i][j][k][p] = kk*sqrt(kk)*Pdelta(kk, aa)*B1_1*B1_2;
           }
         }
       }
     }
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          const int nsize = N_k_hankel;
+          plan[i][j][k] = fftw_plan_dft_r2c_1d(nsize, lP[i][j][k], f_lP[i][j][k], FFTW_ESTIMATE);
+          plan1[i][j][k] = fftw_plan_dft_c2r_1d(nsize, conv[i][j][k], lP[i][j][k], FFTW_ESTIMATE);
+        }
+      }
+    }
+    #pragma omp parallel for collapse(3)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          fftw_execute(plan[i][j][k]);
+        }
+      }
+    }
+    #pragma omp parallel for collapse(3)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for(int p=0; p<N_k_hankel/2+1; p++) 
+          {            
+            fftw_complex  kernel;
+            hankel_kernel_FT_3D(2.0*M_PI*p/((double) N_k_hankel*dlnk_hankel), &kernel, arg, 2);
+            
+            conv[i][j][k][p][0] = f_lP[i][j][k][p][0]*kernel[0] - f_lP[i][j][k][p][1]*kernel[1];
+            conv[i][j][k][p][1] = f_lP[i][j][k][p][1]*kernel[0] + f_lP[i][j][k][p][0]*kernel[1];
+          }
+
+          conv[i][j][k][0][1] = 0;            
+          conv[i][j][k][N_k_hankel/2][1] = 0;
+
+          fftw_execute(plan1[i][j][k]);
+
+          for (int p=0; p<N_k_hankel; p++) 
+          {
+            const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);    
+            const double rr = 1.0/kk;
+            lP[i][j][k][p] = pow(2.0*M_PI*rr, -1.5)*lP[i][j][k][p]/((double) N_k_hankel); // XI
+          }
+        }
+      }
+    }
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          fftw_destroy_plan(plan[i][j][k]);
+          fftw_destroy_plan(plan1[i][j][k]);
+        }
+      }
+    }
+    // ---------------------------------------------------------------------------------------------
+    // STEP 3: exclusion_filter
+    // ---------------------------------------------------------------------------------------------
+    #pragma omp parallel for collapse(4)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        {
+          for (int p=0; p<N_k_hankel; p++) 
+          {
+            const double aa = amin + k*da;
+            const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);     
+            const double rr = 1.0/kk;
+            const double R = 1.5*pow(0.25*(Cluster.N_min[i] + Cluster.N_min[j] + 
+              Cluster.N_max[i] + Cluster.N_max[j])/100., 0.2)/cosmology.coverH0/aa;
+            
+            if (Cluster.halo_exclusion_model == 0)
+            {
+              if(rr < R) 
+              {
+                lP[i][j][k][p] = -1; 
+              } 
+            }
+            else if (Cluster.halo_exclusion_model == 1)
+            { // Baldauf 2013 eq. 43
+              if (R > 0) 
+              {
+                const double sigma = 0.0387;
+                const double tmp = log(rr/R)/(M_SQRT2*sigma);
+                  
+                double tmp2;
+                int status = gsl_sf_erf_e(tmp, &tmp2);
+                if (status)
+                {
+                  log_fatal(gsl_strerror(status));
+                  exit(1);
+                }
+
+                lP[i][j][k][p] = 0.5*(1.0 + tmp2)*(lP[i][j][k][p] + 1.0) - 1.0;
+              }
+            }
+            else // code to be executed if n doesn't match any cases
+            {  
+              log_fatal("excusion type : %d  not implemented", type); 
+              exit(1);
+            }
+          }
+        }
+      }
+    }
+    // ---------------------------------------------------------------------------------------------
+    // STEP 4: - xi_to_pk
+    // ---------------------------------------------------------------------------------------------
+    #pragma omp parallel for collapse(4)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_k_hankel; p++) 
+          { 
+            const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);    
+            const double rr = 1.0/kk;
+            lP[i][j][k][p] = rr*sqrt(rr)*lP[i][j][k][p];
+          }
+        }
+      }
+    }
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          const int nsize = N_k_hankel;
+          plan[i][j][k]  = fftw_plan_dft_r2c_1d(nsize, lP[i][j][k], f_lP[i][j][k], FFTW_ESTIMATE);
+          plan1[i][j][k] = fftw_plan_dft_c2r_1d(nsize, conv[i][j][k], lP[i][j][k], FFTW_ESTIMATE);
+        }
+      }
+    }
+    #pragma omp parallel for collapse(3)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        {      
+          fftw_execute(plan[i][j][k]);
+        }
+      }
+    }
+    #pragma omp parallel for collapse(3)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        {    
+          for(int p=0; p<N_k_hankel/2+1; p++) 
+          { // TODO: ok for dlnR < 0 in the denom? (original code is neg)
+            const double rr = 2.0*M_PI*p/((double) N_k_hankel*(-1.0*dlnk_hankel)); 
+
+            fftw_complex  kernel;
+            hankel_kernel_FT_3D(rr, &kernel, arg, 2);
+            
+            conv[i][j][k][p][0] = f_lP[i][j][k][p][0]*kernel[0] - f_lP[i][j][k][p][1]*kernel[1];
+            conv[i][j][k][p][1] = f_lP[i][j][k][p][1]*kernel[0] + f_lP[i][j][k][p][0]*kernel[1];
+          }
+
+          conv[i][j][k][0][1] = 0;            
+          conv[i][j][k][N_k_hankel/2][1] = 0;
+
+          fftw_execute(plan1[i][j][k]);
+
+          for (int p=0; p<N_k_hankel; p++) 
+          {
+            const double kk = exp(ln_k_min_hankel + p*dlnk_hankel); 
+            lP[i][j][k][p] = pow(2*M_PI*kk, -1.5)*lP[i][j][k][p]/((double) N_k_hankel);
+            
+            // normalization 
+            const double TwoPiCubed = 8*M_PI*M_PI*M_PI;
+            lP[i][j][k][p] *= TwoPiCubed;
+
+            // for interpolation
+            lP[i][j][k][p] = log(kk*kk*kk*lP[i][j][k][p] + 1.0E5); // 1E5 avoid negs inside ln()
+          }
+        }
+      }
+    }
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          fftw_destroy_plan(plan[i][j][k]);
+          fftw_destroy_plan(plan1[i][j][k]);
+        }
+      }
+    }
+    // ---------------------------------------------------------------------------------------------
+    // Step 5 - Evaluate binned_p_cc_incl_halo_exclusion in the interpolation table
+    // ---------------------------------------------------------------------------------------------
+    #pragma omp parallel for collapse(4)
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        {
+          for (int p=0; p<N_k; p++) 
+          {
+            const double aa = amin + k*da;
+            const double kk = exp(ln_k_min + p*dlnk);
+
+            const double B1_1 = weighted_B1(i, zz); 
+            const double B1_2 = (i == j) ? B1_1 : weighted_B1(j, zz);  
+            const double B1B2 = B1_1*B1_2;
+            const double PKB1B2 = Pdelta(kk, aa)*B1B2;
+
+            // RedMaPPer exclusion radius (comoving) (Rykoff et al. 2014  eq4) in units coverH0
+            const double R = 1.5*pow(0.25*(Cluster.N_min[i] + Cluster.N_min[j] + 
+                Cluster.N_max[i] + Cluster.N_max[j])/100., 0.2)/cosmology.coverH0/aa;
+
+            const double xx = kk*R;
+            const double V_EXCL = 4.0*M_PI*(sin(xx) - xx*cos(xx))/(kk*kk*kk);
+
+            if (xx > CO)
+            {
+              const double kk_CO = CO/R;
+
+              const double tmp = interpol(lP[i][j][k], N_k_hankel, ln_k_min_hankel, 
+                ln_k_max_hankel, dlnk_hankel, log(kk_CO), 1.0, 1.0);
+              const double PK_HALO_EXCL_CO = (exp(tmp) -1.0E5)/(kk_CO*kk_CO*kk_CO);
+
+              const double V_EXCL_CO =  4.0*M_PI*(sin(CO) - CO*cos(CO))/(kk_CO*kk_CO*kk_CO);
+
+              const double P_EXCL_CO = (PK_HALO_EXCL_CO + V_EXCL_CO)*B1B2 - V_EXCL_CO;
+
+              const double PKB1B2_CO =  Pdelta(kk_CO, aa)*B1B2;
+
+              const double ENV = pow(kk/kk_CO, -0.7);
+
+              table[i][j][k][p] = 
+                (PKB1B2 - V_EXCL*(1 + (PKB1B2_CO - V_EXCL_CO - P_EXCL_CO)/V_EXCL_CO))*ENV;
+            }
+            else if (R == 0.0)
+            {
+              table[i][j][k][p] = PKB1B2;
+            }
+            else
+            {
+              const double tmp = interpol(lP[i][j][k], N_k_hankel, ln_k_min_hankel, 
+                ln_k_max_hankel, dlnk_hankel, log(kk), 1.0, 1.0);
+              const double PK_HALO_EXCL = (exp(tmp) - 1.0E5)/(kk_CO*kk_CO*kk_CO);
+
+              table[i][j][k][p] = (PK_HALO_EXCL + V_EXCL)*B1B2 - V_EXCL;
+            }
+            
+            // for interpolation
+            table[i][j][k][p] =  log(kk*kk*kk*sqrt(aa)*table[i][j][k][p] + 1.E8); 
+            
+            table[j][i][k][p] =  table[i][j][k][p];
+          }
+        }
+      }
+    }
+    // ---------------------------------------------------------------------------------------------
+    // Step 6 - clean up
+    // ---------------------------------------------------------------------------------------------
+    for(int i=0; i<Cluster.N200_Nbin; i++)
+    {
+      for(int j=i; j<Cluster.N200_Nbin; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          fftw_free(f_lP[i][j][k]); 
+          fftw_free(conv[i][j][k]);  
+          fftw_free(lP[i][j][k]);   
+        }
+        free(plan[i][j]);
+        free(plan1[i][j]);
+        free(f_lP[i][j]);
+        free(conv[i][j]);
+        free(lP[i][j]);
+      }
+      free(plan[i]);
+      free(plan1[i]);
+      free(f_lP[i]);
+      free(conv[i]);
+      free(lP[i]);
+    }
+    free(plan);
+    free(plan1);
+    free(f_lP);
+    free(conv);
+    free(lP);
+
     update_cosmopara(&C);
     update_nuisance(&N);
   }
@@ -1580,9 +2413,9 @@ double binned_p_cc_incl_halo_exclusion(double k, double a, int nl1, int nl2)
     exit(1);
   }
   const double lnk = log(k);
-  const double val = interpol2d(table[nl1][nl2], N_a, amin, amax, da, a, N_k, ln_k_min, logkmax, 
-    ln_k_max, dlnk, 0., 0.);
-  return exp(val)/(k*k*k*sqrt(a));
+  const double val = 
+    interpol2d(RES[nl1][nl2], N_a, amin, amax, da, a, N_k, ln_k_min, ln_k_max, dlnk, lnk, 1., 1.);
+  return (exp(val)-1.E8)/(k*k*k*sqrt(a));
 }
 
 // ---------------------------------------------------------------------------------------
