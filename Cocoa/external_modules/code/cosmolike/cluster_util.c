@@ -28,18 +28,9 @@
 
 static int INTERPOLATE_SURVEY_AREA = 1;
 static int ASSUME_CONSTANT_LAMBD_HALO_EXCLUSION = 1;
-
 static int GSL_WORKSPACE_SIZE = 250;
-static int binned_P_lambda_obs_given_M_size_z_table = 10;
-static int binned_P_lambda_obs_given_M_size_M_table = 50;
-static int binned_p_cm_size_a_table = 30;
-
 static double M_PIVOT = 5E14; //Msun/h
-static double log_M_min = 12.0;
-static double log_M_max = 15.9; 
 static double LOG10_E = 0.4342944819;
-static double binned_P_lambda_obs_given_M_zmin_table = 0.20;
-static double binned_P_lambda_obs_given_M_zmax_table = 0.80;
 
 static int has_b2_galaxies()
 {
@@ -62,37 +53,46 @@ static int has_b2_galaxies()
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 
-double buzzard_P_lambda_obs_given_M_nointerp(double obs_lambda, void* params)
-{      
-  double* array = (double*) params;
-  
-  const double mass = array[0];
-  const double cluster_z = array[1];
+double buzzard_P_lambda_obs_given_M(const double obs_lambda, const double M, const double z)
+{        
   const double lnlm0 = nuisance.cluster_MOR[0]; 
   const double Alm = nuisance.cluster_MOR[1];
   const double sigma_lnlm_intrinsic = nuisance.cluster_MOR[2];
   const double Blm = nuisance.cluster_MOR[3];
+  
   const double Mpiv = M_PIVOT; //Msun/h
-  const double lnlm = lnlm0 + (Alm)*log(mass/Mpiv) + Blm*log((1+cluster_z)/1.45);
+  
+  const double lnlm = lnlm0 + (Alm)*log(M/Mpiv) + Blm*log((1 + z)/1.45);
+  
   const double sigma_total = (lnlm>0) ? 
     sqrt(sigma_lnlm_intrinsic*sigma_lnlm_intrinsic+(exp(lnlm)-1.)/exp(2*lnlm)) : 
     sqrt(sigma_lnlm_intrinsic*sigma_lnlm_intrinsic);
+  
   const double x = 1.0/2.0*(log(obs_lambda)-lnlm)*(log(obs_lambda)-lnlm)/pow(sigma_total,2.0);
   
   return exp(-x)/M_SQRTPI/M_SQRT2/sigma_total/obs_lambda;
 }
 
+static double buzzard_P_lambda_obs_given_M_wrapper(double obs_lambda, void* params)
+{      
+  double* ar = (double*) params;
+  const double M = ar[0];
+  const double z = ar[1];
+  return buzzard_P_lambda_obs_given_M(obs_lambda, M, z)
+}
+
 // \int_(bin_lambda_obs_min)^(bin_lambda_obs_max) \dlambda_obs P(\lambda_obs|M)
 // (see for example https://arxiv.org/pdf/1810.09456.pdf - eq3 qnd 6) 
-double buzzard_binned_P_lambda_obs_given_M_nointerp(int nl, double M, double z)
+double buzzard_binned_P_lambda_obs_given_M(const int nl, const double M, const double z, 
+  const int init_static_vars_only)
 {
   double params[2] = {M, z};
-
   const double bin_lambda_obs_min = Cluster.N_min[nl];
   const double bin_lambda_obs_max = Cluster.N_max[nl];
-
-  return int_gsl_integrate_medium_precision(buzzard_P_lambda_obs_given_M_nointerp,
-    (void*) params, bin_lambda_obs_min, bin_lambda_obs_max, NULL, 1000);
+  return (init_static_vars_only == 1) ? 
+    buzzard_P_lambda_obs_given_M_wrapper(bin_lambda_obs_min, (void*) params) :
+    int_gsl_integrate_medium_precision(buzzard_P_lambda_obs_given_M_wrapper,
+      (void*) params, bin_lambda_obs_min, bin_lambda_obs_max, NULL, GSL_WORKSPACE_SIZE);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -222,13 +222,11 @@ int* io_natsrgm, double** io_atsrgm, double** io_alpha, double** io_sigma, int i
   }
 }
 
-// SKEW-NORMAL APPROXIMATION eq B1 of https://arxiv.org/pdf/1810.09456.pdf
 double SDSS_P_true_lambda_given_mass(const double true_lambda, const double mass, const double z)
-{
+{ // SKEW-NORMAL APPROXIMATION eq B1 of https://arxiv.org/pdf/1810.09456.pdf
   static int first = 0;
   static gsl_spline2d* falpha = NULL; // skewness of the skew-normal distribution
   static gsl_spline2d* fsigma = NULL; // variance of the skew-normal distribution
-
   if(first == 0) 
   {
     first = 1;
@@ -271,34 +269,34 @@ double SDSS_P_true_lambda_given_mass(const double true_lambda, const double mass
       exit(1);
     }
 
-    // we don't want to guess the appropriate GSL z array ordering in z = f(x, y)
-    alpha = (double*) malloc(nintrinsic_sigma*natsrgm*sizeof(double));
-    sigma = (double*) malloc(nintrinsic_sigma*natsrgm*sizeof(double));
-    if (alpha == NULL || sigma == NULL)
-    {
-      log_fatal("fail allocation");
-      exit(1);
-    }
-    
-    for (int i=0; i<nintrinsic_sigma; i++) 
-    {
-      for (int j=0; j<natsrgm; j++) 
+    { // we don't want to guess the appropriate GSL z array ordering in z = f(x, y) BEGINS
+      alpha = (double*) malloc(nintrinsic_sigma*natsrgm*sizeof(double));
+      sigma = (double*) malloc(nintrinsic_sigma*natsrgm*sizeof(double));
+      if (alpha == NULL || sigma == NULL)
       {
-        int status = 0;
-        status = gsl_spline2d_set(falpha, alpha, i, j, (*tmp_alpha)[i*nintrinsic_sigma+j]);
-        if (status) 
+        log_fatal("fail allocation");
+        exit(1);
+      }
+      for (int i=0; i<nintrinsic_sigma; i++) 
+      {
+        for (int j=0; j<natsrgm; j++) 
         {
-          log_fatal(gsl_strerror(status));
-          exit(1);
-        }
-        status = gsl_spline2d_set(fsigma, sigma, i, j, (*tmp_sigma)[i*nintrinsic_sigma+j]);
-        if (status) 
-        {
-          log_fatal(gsl_strerror(status));
-          exit(1);
+          int status = 0;
+          status = gsl_spline2d_set(falpha, alpha, i, j, (*tmp_alpha)[i*nintrinsic_sigma+j]);
+          if (status) 
+          {
+            log_fatal(gsl_strerror(status));
+            exit(1);
+          }
+          status = gsl_spline2d_set(fsigma, sigma, i, j, (*tmp_sigma)[i*nintrinsic_sigma+j]);
+          if (status) 
+          {
+            log_fatal(gsl_strerror(status));
+            exit(1);
+          }
         }
       }
-    }
+    } // we don't want to guess the appropriate GSL z array ordering in z = f(x, y) ENDS
 
     int status = 0;
     status = gsl_spline2d_init(falpha, intrinsic_sigma[0], atsrgm[0], alpha, 
@@ -308,6 +306,7 @@ double SDSS_P_true_lambda_given_mass(const double true_lambda, const double mass
       log_fatal(gsl_strerror(status));
       exit(1);
     }
+    
     status = gsl_spline2d_init(fsigma, intrinsic_sigma[0], atsrgm[0], sigma, 
       nintrinsic_sigma, natsrgm);
     if (status) 
@@ -335,7 +334,7 @@ double SDSS_P_true_lambda_given_mass(const double true_lambda, const double mass
   
   // atsrgm = average true satellite richness given mass
   const double tmp = (mass - mass_min)/(mass_M1 - mass_min);
-  double atsrgm = pow(tmp, intrinsic_alpha)*pow(((1+z)/1.45), nuisance.cluster_MOR[4]); 
+  double atsrgm = pow(tmp, intrinsic_alpha)*pow(((1 + z)/1.45), nuisance.cluster_MOR[4]); 
   if (atsrgm > 160) 
   {
     atsrgm = 160;
@@ -346,14 +345,16 @@ double SDSS_P_true_lambda_given_mass(const double true_lambda, const double mass
   }
   
   int status = 0;
+
   double alpha = 0.0;
-  double sigma = 0.0;
   status = gsl_spline2d_eval_e(falpha, intrinsic_sigma, atsrgm, NULL, NULL, &alpha);
   if (status) 
   {
     log_fatal(gsl_strerror(status));
     exit(1);
   }
+
+  double sigma = 0.0;
   status = gsl_spline2d_eval_e(fsigma, intrinsic_sigma, atsrgm, NULL, NULL, &sigma);
   if (status) 
   {
@@ -362,8 +363,17 @@ double SDSS_P_true_lambda_given_mass(const double true_lambda, const double mass
   }
 
   const double x = 1.0/(M_SQRT2*abs(sigma));
-  const double result = exp(-(true_lambda-atsrgm)*(true_lambda-atsrgm)*x*x)*x/M_SQRTPI;
-  return result*gsl_sf_erfc(-alpha*(true_lambda-atsrgm)*x);
+  const double result = exp(-(true_lambda - atsrgm)*(true_lambda - atsrgm)*x*x)*x/M_SQRTPI;
+  
+  double result2;
+  status = gsl_sf_erfc_e(-alpha*(true_lambda - atsrgm)*x, &result2);
+  if (status) 
+  {
+    log_fatal(gsl_strerror(status));
+    exit(1);
+  }  
+  
+  return result*result2;
 }
 
 // Cocoa: we try to avoid reading of files in the cosmolike_core code 
@@ -421,15 +431,15 @@ double** io_fprj, int io)
       exit(1);
     }
 
-    z = (double*) malloc(nz*sizeof(double));
-    lambda = (double*) malloc(nlambda*sizeof(double));
-    tau = (double*) malloc(nz*nlambda*sizeof(double));
-    mu = (double*) malloc(nz*nlambda*sizeof(double));
-    sigma = (double*) malloc(nz*nlambda*sizeof(double));
-    fmask = (double*) malloc(nz*nlambda*sizeof(double));
-    fprj = (double*) malloc(nz*nlambda*sizeof(double));
-    if(z == NULL || lambda == NULL || tau == NULL || mu == NULL || sigma == NULL || 
-       fmask == NULL || fprj == NULL) 
+    z =       (double*) malloc(nz*sizeof(double));
+    lambda =  (double*) malloc(nlambda*sizeof(double));
+    tau =     (double*) malloc(nz*nlambda*sizeof(double));
+    mu =      (double*) malloc(nz*nlambda*sizeof(double));
+    sigma =   (double*) malloc(nz*nlambda*sizeof(double));
+    fmask =   (double*) malloc(nz*nlambda*sizeof(double));
+    fprj =    (double*) malloc(nz*nlambda*sizeof(double));
+    if (z == NULL || lambda == NULL || tau == NULL || mu == NULL || sigma == NULL || 
+      fmask == NULL || fprj == NULL) 
     {
       log_fatal("fail allocation");
       exit(1);
@@ -498,13 +508,14 @@ double** io_fprj, int io)
       (*io_fprj) = NULL;
     }
    
-    (*io_z) = (double*) malloc(nz*sizeof(double));
-    (*io_lambda) = (double*) malloc(nlambda*sizeof(double));
-    (*io_tau) = (double*) malloc(nz*nlambda*sizeof(double));
-    (*io_mu) = (double*) malloc(nz*nlambda*sizeof(double));
-    (*io_sigma) = (double*) malloc(nz*nlambda*sizeof(double));
-    (*io_fmask) = (double*) malloc(nz*nlambda*sizeof(double));
-    (*io_fprj) = (double*) malloc(nz*nlambda*sizeof(double));
+    (*io_z)       = (double*) malloc(nz*sizeof(double));
+    (*io_lambda)  = (double*) malloc(nlambda*sizeof(double));
+    (*io_tau)     = (double*) malloc(nz*nlambda*sizeof(double));
+    (*io_mu)      = (double*) malloc(nz*nlambda*sizeof(double));
+    (*io_sigma)   = (double*) malloc(nz*nlambda*sizeof(double));
+    (*io_fmask)   = (double*) malloc(nz*nlambda*sizeof(double));
+    (*io_fprj)    = (double*) malloc(nz*nlambda*sizeof(double));
+
     if((*io_z) == NULL || (*io_lambda) == NULL || (*io_tau) == NULL || (*io_mu) == NULL ||
        (*io_sigma) == NULL || (*io_fmask) == NULL || (*io_fprj) == NULL) 
     {
@@ -531,7 +542,8 @@ double** io_fprj, int io)
   }
 }
 
-double SDSS_P_lambda_obs_given_true_lambda(double observed_lambda, double true_lambda, double zz) 
+double SDSS_P_lambda_obs_given_true_lambda(const double observed_lambda, const double true_lambda, 
+const double zz) 
 {
   static int first = 0;
   static gsl_spline2d* ftau;
@@ -559,13 +571,13 @@ double SDSS_P_lambda_obs_given_true_lambda(double observed_lambda, double true_l
     double* fmask;
     double* fprj;
 
-    z = (double**) malloc(1*sizeof(double*));
-    lambda = (double**) malloc(1*sizeof(double*));
-    tmp_tau = (double**) malloc(1*sizeof(double*));
-    tmp_mu = (double**) malloc(1*sizeof(double*));
-    tmp_sigma = (double**) malloc(1*sizeof(double*));
-    tmp_fmask = (double**) malloc(1*sizeof(double*));
-    tmp_fprj = (double**) malloc(1*sizeof(double*));
+    z           = (double**) malloc(1*sizeof(double*));
+    lambda      = (double**) malloc(1*sizeof(double*));
+    tmp_tau     = (double**) malloc(1*sizeof(double*));
+    tmp_mu      = (double**) malloc(1*sizeof(double*));
+    tmp_sigma   = (double**) malloc(1*sizeof(double*));
+    tmp_fmask   = (double**) malloc(1*sizeof(double*));
+    tmp_fprj    = (double**) malloc(1*sizeof(double*));
     if (z == NULL || lambda == NULL || tmp_tau == NULL || tmp_mu == NULL || tmp_sigma == NULL
         || tmp_fmask == NULL || tmp_fprj == NULL)
     {
@@ -599,18 +611,17 @@ double SDSS_P_lambda_obs_given_true_lambda(double observed_lambda, double true_l
     }
 
     // we don't want to guess the appropriate GSL z array ordering in z = f(x, y)
-    tau = (double*) malloc(nz*nlambda*sizeof(double));
-    mu = (double*) malloc(nz*nlambda*sizeof(double));
-    sigma = (double*) malloc(nz*nlambda*sizeof(double));
-    fmask = (double*) malloc(nz*nlambda*sizeof(double));
-    fprj = (double*) malloc(nz*nlambda*sizeof(double));
+    tau     = (double*) malloc(nz*nlambda*sizeof(double));
+    mu      = (double*) malloc(nz*nlambda*sizeof(double));
+    sigma   = (double*) malloc(nz*nlambda*sizeof(double));
+    fmask   = (double*) malloc(nz*nlambda*sizeof(double));
+    fprj    = (double*) malloc(nz*nlambda*sizeof(double));
     if (tau == NULL || mu == NULL || sigma == NULL || fmask == NULL || fprj == NULL)
     {
       log_fatal("fail allocation");
       exit(1);
     }
 
-    #pragma omp parallel for collapse(2)
     for (int i=0; i<nz; i++) 
     {
       for (int j=0; j<nlambda; j++) 
@@ -702,7 +713,6 @@ double SDSS_P_lambda_obs_given_true_lambda(double observed_lambda, double true_l
     free(fprj);  // GSL SPLINE 2D copies the array
   }
   
-
   double tau, mu, sigma, fmask, fprj;
   {
     int status = 0;
@@ -757,43 +767,62 @@ double SDSS_P_lambda_obs_given_true_lambda(double observed_lambda, double true_l
   return r0 + r1 + r2 - r3;
 }
 
-double SDSS_P_lambda_obs_lambda_true_given_M(double true_lambda, const double obs_lambda, 
-const double M, const double z)
+static double SDSS_P_lambda_obs_lambda_true_given_M(double true_lambda, 
+const double observed_lambda, const double M, const double z)
 {
-  const double r1 = SDSS_P_lambda_obs_given_true_lambda(obs_lambda, true_lambda, z);
+  const double r1 = SDSS_P_lambda_obs_given_true_lambda(observed_lambda, true_lambda, z);
   const double r2 = SDSS_P_true_lambda_given_mass(true_lambda, M, z);
   return r1*r2;
 }
 
 double SDSS_P_lambda_obs_lambda_true_given_M_wrapper(double true_lambda, void* params)
 {
-  return SDSS_P_lambda_obs_lambda_true_given_M(true_lambda, obs_lambda, M, z);
+  double* ar = (double*) params;
+  const double M = ar[0];
+  const double z = ar[1];
+  const double observed_lambda = ar[2];
+  return SDSS_P_lambda_obs_lambda_true_given_M(true_lambda, observed_lambda, M, z);
 }
 
-double SDSS_P_lambda_obs_given_M(double obs_lambda, const double M, const double z)
+
+double SDSS_P_lambda_obs_given_M(const double observed_lambda, const double M, const double z, 
+const int init_static_vars_only)
 {  
-  double params_in[3] = {M, z, obs_lambda}; 
-  const double true_lambda_min =  3.;
-  const double true_lambda_max =  160.;
-  return int_gsl_integrate_medium_precision(SDSS_P_lambda_obs_lambda_true_given_M_wrapper, 
+  double params_in[3] = {M, z, observed_lambda}; 
+  
+  const double true_lambda_min = limits.SDSS_P_lambda_obs_given_M_true_lambda_min;
+  const double true_lambda_max = limits.SDSS_P_lambda_obs_given_M_true_lambda_max;
+  
+  return (init_static_vars_only == 1) ? 
+    SDSS_P_lambda_obs_lambda_true_given_M_wrapper(true_lambda_min, (void*) params_in) :
+    int_gsl_integrate_medium_precision(SDSS_P_lambda_obs_lambda_true_given_M_wrapper, 
       (void*) params_in, true_lambda_min, true_lambda_max, NULL, GSL_WORKSPACE_SIZE);
 }
 
-double SDSS_P_lambda_obs_given_M_wrapper(double obs_lambda, void* params)
+static double SDSS_P_lambda_obs_given_M_wrapper(double observed_lambda, void* params)
 {
   double* ar = (double*) params; 
+  
   const double M = ar[0];
   const double z = ar[1];
-  return SDSS_P_lambda_obs_given_M(obs_lambda, M, z);
+  
+  const int init_static_vars_only = (int) ar[2];
+  
+  return SDSS_P_lambda_obs_given_M(observed_lambda, M, z, init_static_vars_only);
 }
 
-double SDSS_binned_P_lambda_obs_given_M(int nl, double M, double z)
+double SDSS_binned_P_lambda_obs_given_M(const int nl, const double M, const double z, 
+const int init_static_vars_only)
 {
-  double params[2] = {M, z};
+  double params[3] = {M, z, (double) init_static_vars_only};
+  
   const int nl_min = Cluster.N_min[nl];
   const int nl_max = Cluster.N_max[nl];
-  return int_gsl_integrate_medium_precision(SDSS_P_lambda_obs_given_M_wrapper, (void*) params, 
-    (double) nl_min, (double) nl_max, NULL, GSL_WORKSPACE_SIZE);
+  
+  return (init_static_vars_only == 1) ?
+    SDSS_P_lambda_obs_given_M_wrapper((double) nl_min, (void*) params) :
+    int_gsl_integrate_medium_precision(SDSS_P_lambda_obs_given_M_wrapper, (void*) params, 
+      (double) nl_min, (double) nl_max, NULL, GSL_WORKSPACE_SIZE);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -806,46 +835,16 @@ double SDSS_binned_P_lambda_obs_given_M(int nl, double M, double z)
 
 // \int_(bin_lambda_obs_min)^(bin_lambda_obs_max) \dlambda_obs P(\lambda_obs|M)
 // (see for example https://arxiv.org/pdf/1810.09456.pdf - eq 3 and eq 6) 
-double binned_P_lambda_obs_given_M_noiterp(int nl, double M, double z)
+double binned_P_lambda_obs_given_M_nointerp(const int nl, const double M, const double z, 
+  const int init_static_vars_only)
 {
   if (strcmp(Cluster.model, "SDSS") == 0) 
   {
-    return SDSS_binned_P_lambda_obs_given_M(nl, M, z);
-    /*
-      const int nsizex = 20;
-      const int nsizey = 20;
-      const double true_lambda_min = 3.;
-      const double true_lambda_max = 160.;
-      const double obs_lambda_min = Cluster.N_min[nl];
-      const double obs_lambda_max = Cluster.N_max[nl];
-      const int dobs_lambda = (obs_lambda_max-obs_lambda_min)/((double) nsizex - 1);
-      const int dtrue_lambda = (true_lambda_max-true_lambda_min)/((double) nsizey - 1);
-
-      for(int i=0; i<nsizex; i++) // integrate on lambda_obs inside the bin nl
-      {
-        for(int j=0; j<nsizey; j++) // integrate on lambda_true
-        {
-          const double obs_lambda = obs_lambda_min + i*dobs_lambda;
-          const double true_lambda = true_lambda_min + i*dtrue_lambda;
-          const double wx = (i == 0 || nsizex - 1) ? 0.5*dobs_lambda : dobs_lambda;
-          const double wy = (j == 0 || nsizey - 1) ? 0.5*dtrue_lambda : dtrue_lambda;
-          sum[i*nsizey + j] = wx*wy*SDSS_P_lambda_obs_lambda_true_given_M(true_lambda, obs_lambda, M, z);
-        }
-      }
-      double sum = 0.0;
-      for(int i=0; i<nsizex; i++) // integrate on lambda_obs inside the bin nl
-      {
-        for(int j=0; j<nsizey; j++) // integrate on lambda_true
-        {
-          sum += sum[i*nsizey + j];
-        }
-      }
-      return sum;
-    */
+    return SDSS_binned_P_lambda_obs_given_M_nointerp(nl, M, z, init_static_vars_only);
   }
   else if (strcmp(Cluster.model, "BUZZARD") == 0)
   {
-    return buzzard_binned_P_lambda_obs_given_M(nl, M, z);
+    return buzzard_binned_P_lambda_obs_given_M(nl, M, z, init_static_vars_only);
   }
   else
   {
@@ -854,62 +853,68 @@ double binned_P_lambda_obs_given_M_noiterp(int nl, double M, double z)
   }
 }
 
-double binned_P_lambda_obs_given_M(int nl, double M, double z) 
+double binned_P_lambda_obs_given_M(const int nl, const double M, const double z) 
 {
   static cosmopara C;
   static nuisancepara N;
   static double*** table = 0;
 
-  const int nsizez = binned_P_lambda_obs_given_M_size_z_table;
-  const int nsizem = binned_P_lambda_obs_given_M_size_M_table;
-  const int nsizel = Cluster.N200_Nbin;
-  const double logmmin = log_M_min;
-  const double logmmax = log_M_max; 
-  const double zmin = binned_P_lambda_obs_given_M_zmin_table; 
-  const double zmax = binned_P_lambda_obs_given_M_zmax_table;
-  const double dm = (logmmax - logmmin)/((double) nm - 1.0);
-  const double dz = (zmax-zmin)/((double) nsizez - 1.0);
-  const double mmin = pow(10.0, logmmin);
-  const double mmax = pow(10.0, logmmax);
+  const int N_l = Cluster.N200_Nbin;
+  
+  const int N_M  = Ntable.binned_P_lambda_obs_given_M_size_M_table;
+  const double Mmin = pow(10.0, limits.cluster_util_log_M_min);
+  const double Mmax = pow(10.0, limits.cluster_util_log_M_max);
+  const double dlnM = 
+    (limits.cluster_util_log_M_max - limits.cluster_util_log_M_min)/((double) N_M - 1.0);
+
+  const int N_z = Ntable.binned_P_lambda_obs_given_M_size_z_table;
+  const double zmin = limits.binned_P_lambda_obs_given_M_zmin_table; 
+  const double zmax = limits.binned_P_lambda_obs_given_M_zmax_table;
+  const double dz = (zmax-zmin)/((double) N_z - 1.0);
   
   if (table == 0)
   {
-    table = (double***) malloc(sizeof(double**)*nsizel);
-    for(int i=0; i<nz; i++)
+    table = (double***) malloc(sizeof(double**)*N_l);
+    for(int i=0; i<N_l; i++)
     {
-      table[i] = (double**) malloc(sizeof(double*)*nsizez);
-      for(int j=0; j<nz; i++)
+      table[i] = (double**) malloc(sizeof(double*)*N_z);
+      for(int j=0; j<N_z; i++)
       {
-        table[i][j] = (double*) malloc(sizeof(double)*nsizem);
+        table[i][j] = (double*) malloc(sizeof(double)*N_M);
       }
     }
   }
   if (recompute_clusters(C, N))
   { 
-    if (strcmp(Cluster.model, "SDSS") == 0) // init static vars
-    {
-      SDSS_P_lambda_obs_given_true_lambda(50, 50, z);
-      SDSS_P_true_lambda_given_mass(50, M, z);
-    }
+    // init static vars
+    binned_P_lambda_obs_given_M_nointerp(pow(10.0, limits.cluster_util_log_M_min), zmin, 1); 
+    
     #pragma omp parallel for collapse(3)
-    for (int i=0; i<nsizel; i++) 
+    for (int i=0; i<N_l; i++) 
     {
-      for (int j=0; j<nsizez; j++) 
+      for (int j=0; j<N_z; j++) 
       {
-        for (int k=0; k<nsizem; k++) 
+        for (int k=0; k<N_M; k++) 
         {
-          table[i][j][k] = 
-            binned_P_lambda_obs_given_M_noiterp(i, pow(10, logmmin + k*dm), zmin + j*dz);
+          table[i][j][k] = binned_P_lambda_obs_given_M_nointerp(i, 
+            pow(10.0, limits.cluster_util_log_M_min + k*dlnM), zmin + j*dz, 0);
         }
       }
     }
+
     update_cosmopara(&C);
     update_nuisance(&N);
   }
-  if (z > zmin && z < zmax && M > mmin && M < mmax)
+  if (nl < 0 || nl > N_l - 1)
+  {
+    log_fatal("error in selecting bin number");
+    exit(1);
+  }
+  if (z > zmin && z < zmax && M > Mmin && M < Mmax)
   {
     const double logM = log10(M);
-    return interpol2d(table[nl], nz, zmin, zmax, dz, z, nm, logmmin, logmmax, dm, logM, 1, 1);
+    return interpol2d(table[nl], N_z, zmin, zmax, dz, z, N_M, limits.cluster_util_log_M_min, 
+      limits.cluster_util_log_M_max, dlnM, logM, 1.0, 1.0);
   }
   else
   {
@@ -920,17 +925,50 @@ double binned_P_lambda_obs_given_M(int nl, double M, double z)
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
+// BINNED CLUSTER MASS FUNCTION 
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+
+double dndlnM_times_binned_P_lambda_obs_given_M(double lnM, void* params)
+{
+  double* ar = (double*) params; 
+  const int nl = (int) ar[0];
+  const double z = ar[1];
+  const double M = exp(lnM);
+  const double a = 1.0/(1.0 + z);
+
+  double mfunc; 
+  if (Cluster.hmf_model == 0)
+  {
+    mfunc = massfunc(M, a);
+  }
+  else if (Cluster.hmf_model == 1)
+  {
+    mfunc = tinker_emu_massfunc_tab(M, a);
+  }
+  else
+  {
+    log_fatal("massfunc model %i not implemented", Cluster.hmf_model);
+    exit(1); 
+  }
+  return mfunc*M*binned_P_lambda_obs_given_M(nl, M , z);
+}
+
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
 // CLUSTER BIAS
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 
-double B1_x_BSF(double M, double a)
+double B1_x_BSF(const double M, const double a)
 { // cluster bias including selection bias
   double B1;
   if (Cluster.bias_model == 0) 
   {
-    B1 = B1(mass, a);
+    B1 = B1(M, a);
   } 
   else if (Cluster.bias_model == 1) 
   {
@@ -960,13 +998,12 @@ double B1_x_BSF(double M, double a)
   return B1 * BS;
 }
 
-double B2_x_BSF(double mass, double a)
+double B2_x_BSF(const double M, const double a)
 { // cluster bias (b2) including selection bias
-
   double B1;
   if (Cluster.bias_model == 0) 
   {
-    B1 = B1(mass,a);
+    B1 = B1(M, a);
   } 
   else if (Cluster.bias_model == 1) 
   {
@@ -998,12 +1035,12 @@ double B2_x_BSF(double mass, double a)
   return B2 * BS;
 }
 
-double B1M1_x_BS(double mass, double a)
+double B1M1_x_BS(const double M, const double a)
 {
   double B1M1;
   if (Cluster.bias_model == 0) 
   {
-    B1M1 = B1(mass,a) -1;
+    B1M1 = B1(M, a) -1;
   } 
   else if (Cluster.bias_model == 1) 
   {
@@ -1033,53 +1070,26 @@ double B1M1_x_BS(double mass, double a)
   return B1M1 * BS;
 }
 
-double dndlnM_times_binned_P_lambda_obs_given_M(double lnM, void* params)
-{
-  double *ar = (double*) params; 
-  const int nl = (int) ar[0];
-  const double z = ar[1];
-  const double M = exp(lnM);
-  const double a = 1./(1. + z);
-
-  double mfunc; 
-  if (Cluster.hmf_model == 0)
-  {
-    mfunc = massfunc(M, a);
-  }
-  else if (Cluster.hmf_model == 1)
-  {
-    mfunc = tinker_emu_massfunc_tab(M, a);
-  }
-  else
-  {
-    log_fatal("massfunc model %i not implemented", Cluster.hmf_model);
-    exit(1); 
-  }
-  return mfunc*M*binned_P_lambda_obs_given_M(nl, M , z);
-}
-
 double int_for_weighted_B1(double lnM, void* params)
 {
-  double *ar = (double*) params; //nl, z
+  double* ar = (double*) params; // {nl, z}
   const double z = ar[1];
   const double M = exp(lnM);  
-  const double a = 1./(1. + z);
+  const double a = 1.0/(1.0 + z);
   return B1_x_BSF(M, a)*dndlnM_times_binned_P_lambda_obs_given_M(lnM, params); 
 }
 
-double weighted_B1_nointerp(int nl, double z, int init_static_vars_only)
+double weighted_B1_nointerp(const int nl, const double z, const int init_static_vars_only)
 {  
-  const double ln_M_min = 
-    (Cluster.N_min[nlambda] > 1E10) ? log(Cluster.N_min[nlambda]) : log_M_min/LOG10_E;
-  const double ln_M_max = 
-    (Cluster.N_min[nlambda] > 1E10) ? log(Cluster.N_max[nlambda]) : log_M_max/LOG10_E;
+  const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E;
+  const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E;
  
   double param[2] = {(double) nl, z};
 
   if(int init_static_vars_only == 1)
   {
     const double r1 = int_for_weighted_B1(ln_M_min, (void*) param);
-    const double r2 = dndlnM_times_binned_P_lambda_obs_given_M(M_min, (void*) param);
+    const double r2 = dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) param);
     return 0.0;
   }
   else
@@ -1093,64 +1103,73 @@ double weighted_B1_nointerp(int nl, double z, int init_static_vars_only)
   return (r2 <= 0) ? 0.0 : r1/r2; 
 }
 
-double weighted_B1(int nl, double z)
+double weighted_B1(const int nl, const double z)
 {
   static cosmopara C;
   static nuisancepara N;
   static double** table;
 
-  const int nasize = Ntable.N_a;
-  const int nlsize = Cluster.N200_Nbin;
+  const int N_l = Cluster.N200_Nbin;
+  
+  const int N_a = Ntable.N_a;
   const double zmin = fmax(tomo.cluster_zmin[0]-0.05, 0.01); 
-  const double zmax = tomo.cluster_zmax[tomo.cluster_Nbin-1] + 0.05;
-  const double amin = 1./(1.+zmax); 
-  const double amax = 1./(1.+zmin);
-  const double da = (amax-amin)/(nasize-1.);
+  const double zmax = tomo.cluster_zmax[tomo.cluster_Nbin - 1] + 0.05;
+  const double amin = 1.0/(1.0 + zmax); 
+  const double amax = 1.0/(1.0 + zmin);
+  const double da = (amax - amin)/((double) N_a - 1.);
 
-  if (table == 0) 
+  if (table == 0)
   {
-    table = (double**) malloc(sizeof(double*)*nlsize);
-    for(int i=0; i<nlsize; i++)
+    table = (double**) malloc(sizeof(double*)*N_l);
+    for(int i=0; i<N_l; i++)
     {
-      table[i] = (double*) malloc(sizeof(double)*nasize);
+      table[i] = (double*) malloc(sizeof(double)*N_a);
     }
   }
   if (recompute_clusters(C, N))
   {    
     weighted_B1_nointerp(0, 1.0/amin - 1.0, 1); // init static vars only
     #pragma omp parallel for collapse(2)
-    for (int n=0; n<nlsize; n++)
+    for (int n=0; n<N_l; n++)
     {
-      for (int i=0; i<nasize; i++)
+      for (int i=0; i<N_a; i++)
       {
         const double a = amin + i*da;
-        table[n][i] = weighted_B1_nointerp(n, 1./a - 1.0, 0);
+        table[n][i] = weighted_B1_nointerp(n, 1.0/a - 1.0, 0);
       }
     }
     update_cosmopara(&C);
     update_nuisance(&N);
   }
-  const double a = 1./(z + 1.);
-  return interpol(table[nl], nasize, amin, amax, da, a, 0., 0.);
+  const double a = 1.0/(z + 1.0);
+  if(!(a>0) || !(a<1)) 
+  {
+    log_fatal("a>0 and a<1 not true");
+    exit(1);
+  }
+  if(nl < 0 || nl > N_l - 1)
+  {
+    log_fatal("invalid bin input nl = %d", nl);
+    exit(1);
+  }
+  return interpol(table[nl], N_a, amin, amax, da, a, 0., 0.);
 }
 
 double int_for_weighted_B2(double lnM, void* params)
 {
-  double *ar = (double*) params; //nl, z
+  double* ar = (double*) params; //nl, z
   const double z = ar[1];
   const double M = exp(lnM);  
   const double a = 1./(1. + z);
   return B2_x_BSF(M, a)*dndlnM_times_binned_P_lambda_obs_given_M(lnM, params); 
 }
 
-double weighted_B2_nointerp(int nl, double z, int init_static_vars_only)
+double weighted_B2_nointerp(const int nl, const double z, const int init_static_vars_only)
 {  
-  const double ln_M_min = 
-    (Cluster.N_min[nlambda] > 1E10) ? log(Cluster.N_min[nlambda]) : log_M_min/LOG10_E; 
-  const double ln_M_max = 
-    (Cluster.N_min[nlambda] > 1E10) ? log(Cluster.N_max[nlambda]) : log_M_max/LOG10_E; 
+  const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E; 
+  const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E; 
  
-   double param[2] = {(double) nl, z};
+  double param[2] = {(double) nl, z};
 
   if(int init_static_vars_only == 1)
   {
@@ -1170,63 +1189,73 @@ double weighted_B2_nointerp(int nl, double z, int init_static_vars_only)
   }
 }
 
-double weighted_B2(int nl, double z)
+double weighted_B2(const int nl, const double z)
 {
   static cosmopara C;
   static nuisancepara N;
   static double** table;
 
-  const int nasize = Ntable.N_a;
-  const int nlsize = Cluster.N200_Nbin;
-  const double zmin = fmax(tomo.cluster_zmin[0]-0.05, 0.01); 
-  const double zmax = tomo.cluster_zmax[tomo.cluster_Nbin-1] + 0.05;
-  const double amin = 1./(1.+zmax); 
-  const double amax = 1./(1.+zmin);
-  const double da = (amax-amin)/(nasize-1.);
+  const int N_l = Cluster.N200_Nbin;
+
+  const int N_a = Ntable.N_a;
+  const double zmin = fmax(tomo.cluster_zmin[0] - 0.05, 0.01); 
+  const double zmax = tomo.cluster_zmax[tomo.cluster_Nbin - 1] + 0.05;
+  const double amin = 1.0/(1.0 + zmax); 
+  const double amax = 1.0/(1.0 + zmin);
+  const double da = (amax-amin)/(N_a-1.);
 
   if (table == 0) 
   {
-    table = (double**) malloc(sizeof(double*)*nlsize);
-    for(int i=0; i<nlsize; i++)
+    table = (double**) malloc(sizeof(double*)*N_l);
+    for(int n=0; n<N_l; n++)
     {
-      table[i] = (double*) malloc(sizeof(double)*nasize);
+      table[n] = (double*) malloc(sizeof(double)*N_a);
     }
   }
   if (recompute_clusters(C, N))
   {    
-    weighted_B2_nointerp(0, 1.0/amin - 1., 1); // init static vars only
+    weighted_B2_nointerp(0, 1.0/amin - 1.0, 1); // init static vars only
     #pragma omp parallel for collapse(2)
-    for (int n=0; n<nlsize; n++)
+    for (int n=0; n<N_l; n++)
     {
-      for (int i=0; i<nasize; i++)
+      for (int i=0; i<N_a; i++)
       {
         const double a = amin + i*da;
-        table[n][i] = weighted_B2_nointerp(n, 1./a - 1.0, 0);
+        table[n][i] = weighted_B2_nointerp(n, 1.0/a - 1.0, 0);
       }
     }
     update_cosmopara(&C);
     update_nuisance(&N);
   }
-  const double a = 1./(z + 1.);
-  return interpol(table[nl], nasize, amin, amax, da, a, 0., 0.);
+
+  const double a = 1.0/(z + 1.0);
+  if(!(a>0) || !(a<1)) 
+  {
+    log_fatal("a>0 and a<1 not true");
+    exit(1);
+  }
+  if(nl < 0 || nl > N_l - 1)
+  {
+    log_fatal("invalid bin input nl1 = %d", nl);
+    exit(1);
+  }
+  return interpol(table[nl], N_a, amin, amax, da, a, 0., 0.);
 }
 
 double int_for_weighted_B1M1(double lnM, void* params)
 {
-  double *ar = (double*) params;
+  double* ar = (double*) params;
   const double z = ar[1];
   const double M = exp(lnM);  
   const double a = 1.0/(1.0 + z);
   return B1M1_x_BS(M, a)*dndlnM_times_binned_P_lambda_obs_given_M(lnM, params); 
 }
 
-double weighted_B1M1_nointerp(int nl, double z, int init_static_vars_only)
+double weighted_B1M1_nointerp(const int nl, const double z, const int init_static_vars_only)
 {  
-  const double ln_M_min = 
-    (Cluster.N_min[nlambda] > 1E10) ? log(Cluster.N_min[nlambda]) : log_M_min/LOG10_E; 
-  const double ln_M_max = 
-    (Cluster.N_min[nlambda] > 1E10) ? log(Cluster.N_max[nlambda]) : log_M_max/LOG10_E;
-
+  const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E; 
+  const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E;
+  
   double params[2] = {(double) nl, z};
 
   if (init_static_vars_only == 1)
@@ -1247,36 +1276,36 @@ double weighted_B1M1_nointerp(int nl, double z, int init_static_vars_only)
   }
 }
 
-double weighted_B1M1(int nl, double z)
+double weighted_B1M1(const int nl, const double z)
 {
   static cosmopara C;
   static nuisancepara N;
   static double** table;
 
-  const int nasize = Ntable.N_a;
-  const int nlsize = Cluster.N200_Nbin;
+  const int N_l = Cluster.N200_Nbin;
   
+  const int N_a = Ntable.N_a;
   const double zmin = fmax(tomo.cluster_zmin[0]-0.05, 0.01); 
   const double zmax = tomo.cluster_zmax[tomo.cluster_Nbin-1] + 0.05;
   const double amin = 1./(1.+zmax); 
   const double amax = 1./(1.+zmin);
-  const double da = (amax-amin)/(nasize-1.);
+  const double da = (amax-amin)/(N_a-1.);
 
   if (table == 0) 
   {
-    table = (double**) malloc(sizeof(double*)*nlsize);
-    for(int i=0; i<nlsize; i++)
+    table = (double**) malloc(sizeof(double*)*N_l);
+    for(int i=0; i<N_l; i++)
     {
-      table[i] = (double*) malloc(sizeof(double)*nasize);
+      table[i] = (double*) malloc(sizeof(double)*N_a);
     }
   }
   if (recompute_clusters(C, N))
   {    
     weighted_B1M1_nointerp(0, 1.0/amin - 1., 1); // init static vars only
     #pragma omp parallel for collapse(2)
-    for (int n=0; n<nlsize; n++)
+    for (int n=0; n<N_l; n++)
     {
-      for (int i=0; i<nasize; i++)
+      for (int i=0; i<N_a; i++)
       {
         const double a = amin + i*da;
         table[n][i] = weighted_B1M1_nointerp(n, 1./a - 1.0, 0);
@@ -1285,8 +1314,19 @@ double weighted_B1M1(int nl, double z)
     update_cosmopara(&C);
     update_nuisance(&N);
   }
+
   const double a = 1./(z + 1.);
-  return interpol(table[nl], nasize, amin, amax, da, a, 0., 0.);
+  if(!(a>0) || !(a<1)) 
+  {
+    log_fatal("a>0 and a<1 not true");
+    exit(1);
+  }
+  if(nl < 0 || nl > N_l - 1)
+  {
+    log_fatal("invalid bin input nl = %d", nl);
+    exit(1);
+  }
+  return interpol(table[nl], N_a, amin, amax, da, a, 0., 0.);
 }
 
 // ----------------------------------------------------------------------------
@@ -1301,8 +1341,10 @@ double weighted_B1M1(int nl, double z)
 double binned_average_number_counts(int nl, double z)
 { // def: eq 3 of https://arxiv.org/pdf/1810.09456.pdf; nl = lambda_obs bin, nz = redshift bin
   double param[2] = {(double) nl, z};
-  const double ln_M_min = log_M_min/LOG10_E; 
-  const double ln_M_max = log_M_max/LOG10_E; 
+  
+  const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E; 
+  const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E; 
+  
   return int_gsl_integrate_low_precision(dndlnM_times_binned_P_lambda_obs_given_M, 
     (void*) param, ln_M_min, ln_M_max, NULL, GSL_WORKSPACE_SIZE);
 }
@@ -1316,13 +1358,20 @@ double binned_average_number_counts(int nl, double z)
 // ---------------------------------------------------------------------------------------
 // nl{1,2} = lambda_obs bins, n{i,j} = cluster redshift bins
 
-double binned_p_cc(double k, double a, int nl1, int nl2, int use_linear_ps)
+double binned_p_cc(const double k, const double a, const int nl1, const int nl2, 
+  const int use_linear_ps)
 { // binned in lambda_obs (nl1, nl2 = lambda_obs bin (cluster 1 and 2))
   if(!(a>0) || !(a<1)) 
   {
     log_fatal("a>0 and a<1 not true");
     exit(1);
   }
+  if(nl1 < 0 || nl1 > Cluster.N200_Nbin - 1 || nl2 < 0 || nl2 > Cluster.N200_Nbin - 1)
+  {
+    log_fatal("invalid bin input (nl1,nl2) = (%d,%d)", nl1, nl2);
+    exit(1);
+  }
+
   const double z = 1.0/a - 1;
   const double cluster_B1_1 = weighted_B1(nl1, z); 
   const double PK = use_linear_ps == 1 ? p_lin(k, a) : Pdelta(k, a);
@@ -1364,9 +1413,11 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
   static nuisancepara N;
   static double****** table = 0;
 
+  const int N_l = Cluster.N200_Nbin;
+
   const int N_k = Ntable.N_k_halo_exclusion;
-  const double ln_k_min = log(1E-2); 
-  const double ln_k_max = log(3E6);
+  const double ln_k_min = log(limits.halo_exclusion_k_min); 
+  const double ln_k_max = log(limits.halo_exclusion_k_max);
   const double dlnk = (ln_k_max - ln_k_min)/((double) N_k - 1.0);
   
   const int N_a = Ntable.N_a_halo_exclusion;
@@ -1374,23 +1425,23 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
   const double amax = 1.0/(1.0 + tomo.cluster_zmin[0]) + 0.01;
   const double da = (amax - amin)/((double) N_a - 1.0);
 
-  const int N_k_hankel = ?;
-  const double ln_k_min_hankel = log(5.0E-4);
-  const double ln_k_max_hankel = log(1.0E8);
+  const int N_k_hankel = Ntable.N_k_hankel_halo_exclusion;
+  const double ln_k_min_hankel = log(limits.halo_exclusion_k_min_hankel);
+  const double ln_k_max_hankel = log(limits.halo_exclusion_k_max_hankel);
   const double dlnk_hankel = (ln_k_max_hankel - ln_k_min_hankel)/((double) N_k_hankel - 1.0);
   
   const int N_lnM = ?;
-  const double ln_lnM_min = 
-  const double ln_lnM_max =
-  const double dlnlnM = (ln_lnM_max - ln_lnM_min)/((double) N_lnM - 1.0);
+  const double lnM_min = limits.cluster_util_log_M_min/LOG10_E;
+  const double lnM_max = limits.cluster_util_log_M_max/LOG10_E;
+  const double dlnM = (lnM_max - ln_lnM_min)/((double) N_lnM - 1.0);
 
   if(table == 0)
   {
-    table2 = (double******) malloc(sizeof(double*****)*Cluster.N200_Nbin);
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    table2 = (double******) malloc(sizeof(double*****)*N_l);
+    for(int i=0; i<N_l; i++)
     {          
-      table2[i] = (double*****) malloc(sizeof(double****)*Cluster.N200_Nbin);
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      table2[i] = (double*****) malloc(sizeof(double****)*N_l);
+      for(int j=i; j<N_l; j++)
       {
         table2[i][j] = (double****) malloc(sizeof(double***)*N_a);
         for (int k=0; k<N_a; k++) 
@@ -1418,19 +1469,19 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
     arg[0] = 0;     // bias
     arg[1] = 0.5;   // order of Bessel function 
     
-    fftw_plan***** plan   = (fftw_plan*****) malloc(sizeof(fftw_plan****)*Cluster.N200_Nbin);
-    fftw_plan***** plan1  = (fftw_plan*****) malloc(sizeof(fftw_plan****)*Cluster.N200_Nbin);
-    fftwZ****** f_lP      = (fftwZ******)    malloc(sizeof(fftwZ*****)*Cluster.N200_Nbin);
-    fftwZ****** conv      = (fftwZ******)    malloc(sizeof(fftwZ*****)*Cluster.N200_Nbin);
-    double****** lP       = (double******)   malloc(sizeof(double*****)*Cluster.N200_Nbin);
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    fftw_plan***** plan   = (fftw_plan*****) malloc(sizeof(fftw_plan****)*N_l);
+    fftw_plan***** plan1  = (fftw_plan*****) malloc(sizeof(fftw_plan****)*N_l);
+    fftwZ****** f_lP      = (fftwZ******)    malloc(sizeof(fftwZ*****)*N_l);
+    fftwZ****** conv      = (fftwZ******)    malloc(sizeof(fftwZ*****)*N_l);
+    double****** lP       = (double******)   malloc(sizeof(double*****)*N_l);
+    for(int i=0; i<N_l; i++)
     {
-      plan[i]   = (fftw_plan****) malloc(sizeof(fftw_plan***)*Cluster.N200_Nbin);
-      plan1[i]  = (fftw_plan****) malloc(sizeof(fftw_plan***)*Cluster.N200_Nbin);
-      f_lP[i]   = (fftwZ*****)    malloc(sizeof(fftwZ****)*Cluster.N200_Nbin);
-      conv[i]   = (fftwZ*****)    malloc(sizeof(fftwZ****)*Cluster.N200_Nbin);
-      lP[i]     = (double*****)   malloc(sizeof(double****)*Cluster.N200_Nbin);
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      plan[i]   = (fftw_plan****) malloc(sizeof(fftw_plan***)*N_l);
+      plan1[i]  = (fftw_plan****) malloc(sizeof(fftw_plan***)*N_l);
+      f_lP[i]   = (fftwZ*****)    malloc(sizeof(fftwZ****)*N_l);
+      conv[i]   = (fftwZ*****)    malloc(sizeof(fftwZ****)*N_l);
+      lP[i]     = (double*****)   malloc(sizeof(double****)*N_l);
+      for(int j=i; j<N_l; j++)
       {
         plan[i][j]   = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_a);
         plan1[i][j]  = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_a);
@@ -1467,9 +1518,9 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
     weighted_B1(0, 1.0/amin - 1.0);     // init static vars
     Pdelta(exp(ln_k_min_hankel), amin); // init static vars
     #pragma omp parallel for collapse(6)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         { 
@@ -1491,9 +1542,9 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
         }
       }
     }
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         { 
@@ -1512,9 +1563,9 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
       }
     }
     #pragma omp parallel for collapse(5)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         { 
@@ -1529,9 +1580,9 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
       }
     }
     #pragma omp parallel for collapse(5)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         {
@@ -1568,9 +1619,9 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
         }
       }
     }
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         {
@@ -1588,50 +1639,65 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
     // ---------------------------------------------------------------------------------------------
     // STEP 3: exclusion_filter
     // ---------------------------------------------------------------------------------------------
-    #pragma omp parallel for collapse(4)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    #pragma omp parallel for collapse(6)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         {
-          for (int p=0; p<N_k_hankel; p++) 
+          for (int p=0; p<N_lnM; p++) 
           {
-            const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);    
-            const double rr = 1.0/kk;
-            const double R = 1.5*pow(0.25*(Cluster.N_min[i] + Cluster.N_min[j] + 
-              Cluster.N_max[i] + Cluster.N_max[j])/100., 0.2)/cosmology.coverH0/aa;
-            
-            if (Cluster.halo_exclusion_model == 0)
+            for (int l=0; l<N_lnM; l++) 
             {
-              if(rr < R) 
+              for (int q=0; q<N_k_hankel; q++) 
               {
-                XI_HANKEL[i][j][k][p] = -1; 
-              } 
-            }
-            else if (Cluster.halo_exclusion_model == 1)
-            { // Baldauf 2013 eq. 43
-              if (R > 0) 
-              {
-                const double sigma = 0.0387;
-                const double xi = XI_HANKEL[i][j][k][p];
-                const double tmp = log(rr/R)/(M_SQRT2*sigma);
-                  
-                double tmp2;
-                int status = gsl_sf_erf_e(tmp, &tmp2);
-                if (status)
+                const double aa = amin + k*da;
+                const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);     
+                const double rr = 1.0/kk;
+                const double M1 = exp(lnM_min + p*dlnM);  
+                const double M2 = exp(lnM_min + l*dlnM);
+
+                const double tmp = 
+                  0.75/(M_PI*Cluster.delta_exclusion*cosmology.rho_crit*cosmology.Omega_m);
+                const double R1 = pow(M1*tmp, 1./3.);
+                const double R2 = pow(M2*tmp, 1./3.);
+                
+                // Cosmolike: This is to remove small oscilliating stuffs. 
+                // Cosmolike: It makes the integral faster
+                const double R = (kk*(0.5*(R1 + R2)) > 1) ? 0.0 : 0.5*(R1 + R2);
+
+                if (Cluster.halo_exclusion_model == 0)
                 {
-                  log_fatal(gsl_strerror(status));
+                  if(rr < R) 
+                  {
+                    lP[i][j][k][p][l][q] = -1; 
+                  } 
+                }
+                else if (Cluster.halo_exclusion_model == 1)
+                { // Baldauf 2013 eq. 43
+                  if (R > 0) 
+                  {
+                    const double sigma = 0.0387;
+                    const double tmp = log(rr/R)/(M_SQRT2*sigma);
+                      
+                    double tmp2;
+                    int status = gsl_sf_erf_e(tmp, &tmp2);
+                    if (status)
+                    {
+                      log_fatal(gsl_strerror(status));
+                      exit(1);
+                    }
+
+                    lP[i][j][k][p][l][q] = 0.5*(1.0 + tmp2)*(lP[i][j][k][p][l][q] + 1.0) - 1.0;
+                  }
+                }
+                else // code to be executed if n doesn't match any cases
+                {  
+                  log_fatal("excusion type : %d  not implemented", type); 
                   exit(1);
                 }
-                
-                xi = 0.5*(1.0 + tmp2)*(xi + 1.0) - 1.0;
               }
-            }
-            else // code to be executed if n doesn't match any cases
-            {  
-              log_fatal("excusion type : %d  not implemented", type); 
-              exit(1);
             }
           }
         }
@@ -1641,9 +1707,9 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
     // STEP 4: - xi_to_pk
     // ---------------------------------------------------------------------------------------------
     #pragma omp parallel for collapse(6)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         { 
@@ -1662,9 +1728,9 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
         }
       }
     }
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         { 
@@ -1683,9 +1749,9 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
       }
     }
     #pragma omp parallel for collapse(5)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         { 
@@ -1700,9 +1766,9 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
       }
     }
     #pragma omp parallel for collapse(5)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         {
@@ -1749,9 +1815,9 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
         }
       }
     }
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         { 
@@ -1769,14 +1835,14 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
     // ---------------------------------------------------------------------------------------------
     // Step 5 - Evaluate binned_p_cc_incl_halo_exclusion in the interpolation table
     // ---------------------------------------------------------------------------------------------
-    B1_x_BSF(exp(ln_lnM_min), amin); // init static vars
+    B1_x_BSF(exp(lnM_min), amin); // init static vars
     {
       double params_in[2] = {0, 1.0/amin - 1.0};
-      dndlnM_times_binned_P_lambda_obs_given_M(ln_lnM_min, (void*) params_in); // init static vars
+      dndlnM_times_binned_P_lambda_obs_given_M(lnM_min, (void*) params_in); // init static vars
     }
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         {
@@ -1790,8 +1856,8 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
                 const double kk = exp(ln_k_min + q*dlnk);
                 
                 const double zz = 1.0/aa - 1.0;
-                const double lnM1 = ln_lnM_min + p*dlnlnM;
-                const double lnM2 = ln_lnM_min + l*dlnlnM;
+                const double lnM1 = lnM_min + p*dlnM;
+                const double lnM2 = lnM_min + l*dlnM;
                 const double M1 = exp(lnM1);  
                 const double M2 = exp(lnM2);
 
@@ -1803,7 +1869,8 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
                 const double R1 = pow(M1*tmp, 1./3.);
                 const double R2 = pow(M2*tmp, 1./3.);
                 
-                // Cosmolike: This is to remove small oscilliating stuffs. It makes the integral faster
+                // Cosmolike: This is to remove small oscilliating stuffs. 
+                // Cosmolike: It makes the integral faster
                 const double R = (kk*(0.5*(R1 + R2)) > 1) ? 0.0 : 0.5*(R1 + R2);
 
                 const double V_EXCL = 4.0*M_PI/3.*3*(sin(kk*R) - k*R*cos(kk*R))/(kk*kk*kk);
@@ -1863,9 +1930,9 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
     // ---------------------------------------------------------------------------------------------
     // Step 6 - clean up
     // ---------------------------------------------------------------------------------------------
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         { 
@@ -1910,6 +1977,7 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
     update_cosmopara(&C);
     update_nuisance(&N);
   }
+
   double* ar = (double*) params;
   const int nl1 = ar[0]; 
   const int nl2 = ar[1];
@@ -1917,14 +1985,23 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
   const int na = ar[3];
   const double lnM1 = ar[4];
 
-  if(nl1 < 0 || nl1 > Cluster.N200_Nbin -1 || nl2 < 0 || nl2 > Cluster.N200_Nbin -1)
+  if(nl1 < 0 || nl1 > N_l -1 || nl2 < 0 || nl2 > N_l -1)
   {
     log_fatal("invalid bin input (nl1, nl2) = (%d, %d)", nl1, nl2);
     exit(1);
   }
-
-  return interpol2d(table[nl1][nl2][na][nk], N_lnM, ln_lnM_min, ln_lnM_max, dlnlnM, lnM, N_lnM, 
-    ln_lnM_min, ln_lnM_max, dlnlnM, lnM1, 1., 1.);
+  if(nk < 0 || nk > N_k - 1)
+  {
+    log_fatal("invalid bin input nk = %d", nk);
+    exit(1);
+  }
+  if(na < 0 || na > N_a - 1)
+  {
+    log_fatal("invalid bin input na = %d", na);
+    exit(1);
+  }
+  return interpol2d(table[nl1][nl2][na][nk], N_lnM, lnM_min, lnM_max, dlnM, lnM, N_lnM, 
+    lnM_min, lnM_max, dlnM, lnM1, 1.0, 1.0);
 }
 
 double int_for_binned_p_cc_incl_halo_exclusion(double lnM, void* params)
@@ -1935,36 +2012,43 @@ double int_for_binned_p_cc_incl_halo_exclusion(double lnM, void* params)
   const int nk = ar[2]; 
   const int na = ar[3];
   const int init_static_vars_only = (int) ar[4];
-  
-  const double ln_M_min = log_M_min/LOG10_E; 
-  const double ln_M_max = log_M_max/LOG10_E;
+
+  const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E; 
+  const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E;
 
   double params_in[5] = {nl1, nl2, nk, na, lnM};
+  
   return (init_static_vars_only == 1) ? 
     int_for_int_for_binned_p_cc_incl_halo_exclusion(ln_M_min, (void*) params_in) :
     int_gsl_integrate_low_precision(int_for_int_for_binned_p_cc_incl_halo_exclusion, 
       (void*) params_in, ln_M_min, ln_M_max, NULL, GSL_WORKSPACE_SIZE); 
 }
 
-double binned_p_cc_incl_halo_exclusion_nointerp(int nl1, int nl2, int nk, int na, int init_static_vars_only)
-{
+double binned_p_cc_incl_halo_exclusion_nointerp(const int nl1, const int nl2, const int na, 
+  const int nk, const int init_static_vars_only)
+{  
   const int N_k = Ntable.N_k_halo_exclusion;
-  const double ln_k_min = log(1E-2); 
-  const double ln_k_max = log(3E6);
-  const double dlnk = (ln_k_max - ln_k_min)/((double) N_k - 1.0);
-  
+  if(nk < 0 || nk > N_k - 1)
+  {
+    log_fatal("invalid bin input nk = %d", nk);
+    exit(1);
+  }
+
   const int N_a = Ntable.N_a_halo_exclusion;
   const double amin = 1.0/(1.0 + tomo.cluster_zmax[tomo.cluster_Nbin - 1]);
   const double amax = 1.0/(1.0 + tomo.cluster_zmin[0]) + 0.01;
   const double da = (amax - amin)/((double) N_a - 1.0);
-
   const double a = amin + na*da;
-  const double k = exp(ln_k_min + nk*dlnk);
-  const double z = 1./a-1;
+  if(na < 0 || na > N_a - 1)
+  {
+    log_fatal("invalid bin input na = %d", na);
+    exit(1);
+  }
+  const double z = 1.0/a - 1.0;
 
-  const double ln_M_min = log_M_min/LOG10_E; 
-  const double ln_M_max = log_M_max/LOG10_E; 
-  
+  const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E; 
+  const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E; 
+ 
   double norm1;
   {
     double params[2] = {nl1, z};
@@ -1983,6 +2067,7 @@ double binned_p_cc_incl_halo_exclusion_nointerp(int nl1, int nl2, int nk, int na
   }
 
   double params[5] = {nl1, nl2, nk, na, init_static_vars_only};
+  
   const double res = (init_static_vars_only == 1) ? 
     int_for_binned_p_cc_incl_halo_exclusion(ln_M_min, (void*) params) :
     int_gsl_integrate_low_precision(int_for_binned_p_cc_incl_halo_exclusion, (void*) params,
@@ -1991,16 +2076,17 @@ double binned_p_cc_incl_halo_exclusion_nointerp(int nl1, int nl2, int nk, int na
   return (norm1*norm2 == 0) ? 0.0 : res/(norm1*norm2);
 }
 
-
-double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, int nl1, int nl2)
+double binned_p_cc_incl_halo_exclusion(const double k, const double a, const int nl1, const int nl2)
 {
   static cosmopara C;
   static nuisancepara N;
   static double**** table = 0;
 
+  const int N_l = Cluster.N200_Nbin;
+
   const int N_k = Ntable.N_k_halo_exclusion;
-  const double ln_k_min = log(1E-2); 
-  const double ln_k_max = log(3E6);
+  const double ln_k_min = log(limits.halo_exclusion_k_min); 
+  const double ln_k_max = log(limits.halo_exclusion_k_max);
   const double dlnk = (ln_k_max - ln_k_min)/((double) N_k - 1.0);
   
   const int N_a = Ntable.N_a_halo_exclusion;
@@ -2008,28 +2094,111 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
   const double amax = 1.0/(1.0 + tomo.cluster_zmin[0]) + 0.01;
   const double da = (amax - amin)/((double) N_a - 1.0);
 
-  const int N_k_hankel = ?;
-  const double ln_k_min_hankel = log(5.0E-4);
-  const double ln_k_max_hankel = log(1.0E8);
-  const double dlnk_hankel = (ln_k_max_hankel - ln_k_min_hankel)/((double) N_k_hankel - 1.0);
-
   if(table == 0)
   {
-    table = (double****) malloc(sizeof(double***)*Cluster.N200_Nbin);
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    table = (double****) malloc(sizeof(double***)*N_l);
+    for(int i=0; i<N_l; i++)
     {          
-      table[i] = (double***) malloc(sizeof(double**)*Cluster.N200_Nbin);
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      table[i] = (double***) malloc(sizeof(double**)*N_l);
+      for(int j=i; j<N_l; j++)
       {
         table[i][j] = (double**) malloc(sizeof(double*)*N_a);
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         { 
-          table[i][j][k] = (double*) malloc(sizeof(double)*N_k);
+          table[i][j][l] = (double*) malloc(sizeof(double)*N_k);
         }
       }
     }
   }
-  if (recompute_DESclusters(C, N))
+  if (recompute_clusters(C, N))
+  { 
+    binned_p_cc_incl_halo_exclusion_nointerp(0, 0, 0, 0, 1); // init static vars only
+    #pragma omp parallel for collapse(4)
+    for(int i=0; i<N_l; i++)
+    {
+      for(int j=i; j<N_l; j++)
+      {
+        for (int l=0; l<N_a; l++) 
+        { 
+          for (int p=0; p<N_k; p++) 
+          {
+            const double aa = amin + l*da;
+            const double kk = exp(ln_k_min + p*dlnk);
+
+            table[i][j][l][p] = binned_p_cc_incl_halo_exclusion_nointerp(i, j, l, p, 0);
+            
+            // for interpolation
+            table[i][j][l][p] = log(kk*kk*kk*sqrt(aa)*table[i][j][l][p] + 1.E8); 
+            table[j][i][l][p] = table[i][j][l][p];
+          }
+        }
+      }
+    }
+  }
+
+  if (nl1 < 0 || nl1 > N_l - 1 || nl2 < 0 || nl2 > N_l - 1)
+  {
+    log_fatal("invalid bin input (nl1, nl2) = (%d, %d)", nl1, nl2);
+    exit(1);
+  }
+  if (a < amin || a > amax)
+  {
+    log_fatal("a = %e outside look-up table range [%e,%e]", a, amin, amax);
+    exit(1);
+  } 
+  const double lnk = log(k);
+  if (lnk < ln_k_min || lnk > ln_k_max)
+  {
+    log_fatal("k = %e outside look-up table range [%e,%e]", k, exp(ln_k_min), exp(ln_k_max));
+    exit(1);
+  } 
+
+  const double val = 
+    interpol2d(table[nl1][nl2], N_a, amin, amax, da, a, N_k, ln_k_min, ln_k_max, dlnk, lnk, 1., 1.);
+  return (exp(val) - 1.E8)/(k*k*k*sqrt(a));
+}
+
+double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const double a, 
+  const int nl1, const int nl2)
+{
+  static cosmopara C;
+  static nuisancepara N;
+  static double**** table = 0;
+
+  const int N_l = Cluster.N200_Nbin;
+
+  const int N_k = Ntable.N_k_halo_exclusion;
+  const double ln_k_min = log(limits.halo_exclusion_k_min); 
+  const double ln_k_max = log(limits.halo_exclusion_k_max);
+  const double dlnk = (ln_k_max - ln_k_min)/((double) N_k - 1.0);
+  
+  const int N_a = Ntable.N_a_halo_exclusion;
+  const double amin = 1.0/(1.0 + tomo.cluster_zmax[tomo.cluster_Nbin - 1]);
+  const double amax = 1.0/(1.0 + tomo.cluster_zmin[0]) + 0.01;
+  const double da = (amax - amin)/((double) N_a - 1.0);
+
+  const int N_k_hankel = Ntable.N_k_hankel_halo_exclusion;
+  const double ln_k_min_hankel = log(limits.halo_exclusion_k_min_hankel);
+  const double ln_k_max_hankel = log(limits.halo_exclusion_k_max_hankel);
+  const double dlnk_hankel = (ln_k_max_hankel - ln_k_min_hankel)/((double) N_k_hankel - 1.0);
+
+  if(table == 0)
+  {
+    table = (double****) malloc(sizeof(double***)*N_l);
+    for(int i=0; i<N_l; i++)
+    {          
+      table[i] = (double***) malloc(sizeof(double**)*N_l);
+      for(int j=i; j<N_l; j++)
+      {
+        table[i][j] = (double**) malloc(sizeof(double*)*N_a);
+        for (int l=0; l<N_a; l++) 
+        { 
+          table[i][j][l] = (double*) malloc(sizeof(double)*N_k);
+        }
+      }
+    }
+  }
+  if (recompute_clusters(C, N))
   { 
     // ---------------------------------------------------------------------------------------------
     // Step 1 - memory allocation (except for FFTW plans)
@@ -2042,30 +2211,30 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
     
     const double CO = 1.0; // cutoff = CO
 
-    fftw_plan*** plan     = (fftw_plan***) malloc(sizeof(fftw_plan**)*Cluster.N200_Nbin);
-    fftw_plan*** plan1    = (fftw_plan***) malloc(sizeof(fftw_plan**)*Cluster.N200_Nbin);
-    fftwZ**** f_lP        = (fftwZ****)    malloc(sizeof(fftwZ***)*Cluster.N200_Nbin);
-    fftwZ**** conv        = (fftwZ****)    malloc(sizeof(fftwZ***)*Cluster.N200_Nbin);
-    double**** lP         = (double****)   malloc(sizeof(double***)*Cluster.N200_Nbin);
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    fftw_plan*** plan    = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_l);
+    fftw_plan*** plan1   = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_l);
+    fftwZ**** f_lP       = (fftwZ****)    malloc(sizeof(fftwZ***)*N_l);
+    fftwZ**** conv       = (fftwZ****)    malloc(sizeof(fftwZ***)*N_l);
+    double**** lP        = (double****)   malloc(sizeof(double***)*N_l);
+    for(int i=0; i<N_l; i++)
     {
-      plan[i]       = (fftw_plan**) malloc(sizeof(fftw_plan*)*Cluster.N200_Nbin);
-      plan1[i]      = (fftw_plan**) malloc(sizeof(fftw_plan*)*Cluster.N200_Nbin);    
-      f_lP[i]       = (fftwZ***)    malloc(sizeof(fftwZ**)*Cluster.N200_Nbin);
-      conv[i]       = (fftwZ***)    malloc(sizeof(fftwZ**)*Cluster.N200_Nbin);
-      lP[i]         = (double***)   malloc(sizeof(double**)*Cluster.N200_Nbin);
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      plan[i]   = (fftw_plan**) malloc(sizeof(fftw_plan*)*N_l);
+      plan1[i]  = (fftw_plan**) malloc(sizeof(fftw_plan*)*N_l);    
+      f_lP[i]   = (fftwZ***)    malloc(sizeof(fftwZ**)*N_l);
+      conv[i]   = (fftwZ***)    malloc(sizeof(fftwZ**)*N_l);
+      lP[i]     = (double***)   malloc(sizeof(double**)*N_l);
+      for(int j=i; j<N_l; j++)
       {
-        plan[i][j]       = (fftw_plan*) malloc(sizeof(fftw_plan)*N_a);
-        plan1[i][j]      = (fftw_plan*) malloc(sizeof(fftw_plan)*N_a);
-        f_lP[i][j]       = (fftwZ**)    malloc(sizeof(fftwZ*)*N_a);
-        conv[i][j]       = (fftwZ**)    malloc(sizeof(fftwZ*)*N_a);
-        lP[i][j]         = (double**)   malloc(sizeof(double*)*N_a);
-        for (int k=0; k<N_a; k++) 
+        plan[i][j]   = (fftw_plan*) malloc(sizeof(fftw_plan)*N_a);
+        plan1[i][j]  = (fftw_plan*) malloc(sizeof(fftw_plan)*N_a);
+        f_lP[i][j]   = (fftwZ**)    malloc(sizeof(fftwZ*)*N_a);
+        conv[i][j]   = (fftwZ**)    malloc(sizeof(fftwZ*)*N_a);
+        lP[i][j]     = (double**)   malloc(sizeof(double*)*N_a);
+        for (int l=0; l<N_a; l++) 
         { 
-          f_lP[i][j][k]  = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
-          conv[i][j][k]  = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
-          lP[i][j][k]    = fftw_malloc(N_k_hankel*sizeof(double));
+          f_lP[i][j][l]  = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
+          conv[i][j][l]  = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
+          lP[i][j][l]    = fftw_malloc(N_k_hankel*sizeof(double));
         }
       }
     }
@@ -2075,85 +2244,85 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
     weighted_B1(0, 1.0/amin - 1.0);     // init static vars
     Pdelta(exp(ln_k_min_hankel), amin); // init static vars
     #pragma omp parallel for collapse(4)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         { 
           for (int p=0; p<N_k_hankel; p++) 
           {
-            const double aa = amin + k*da;
+            const double aa = amin + l*da;
             const double zz = 1.0/aa - 1.0;
             const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);
             const double B1_1 = weighted_B1(i, zz);
             const double B1_2 = (i == j) ? B1_1 : weighted_B1(j, zz);
-            lP[i][j][k][p] = kk*sqrt(kk)*Pdelta(kk, aa)*B1_1*B1_2;
+            lP[i][j][l][p] = kk*sqrt(kk)*Pdelta(kk, aa)*B1_1*B1_2;
           }
         }
       }
     }
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         { 
           const int nsize = N_k_hankel;
-          plan[i][j][k] = fftw_plan_dft_r2c_1d(nsize, lP[i][j][k], f_lP[i][j][k], FFTW_ESTIMATE);
-          plan1[i][j][k] = fftw_plan_dft_c2r_1d(nsize, conv[i][j][k], lP[i][j][k], FFTW_ESTIMATE);
+          plan[i][j][l] = fftw_plan_dft_r2c_1d(nsize, lP[i][j][l], f_lP[i][j][l], FFTW_ESTIMATE);
+          plan1[i][j][l] = fftw_plan_dft_c2r_1d(nsize, conv[i][j][l], lP[i][j][l], FFTW_ESTIMATE);
         }
       }
     }
     #pragma omp parallel for collapse(3)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         { 
-          fftw_execute(plan[i][j][k]);
+          fftw_execute(plan[i][j][l]);
         }
       }
     }
     #pragma omp parallel for collapse(3)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         { 
           for(int p=0; p<N_k_hankel/2+1; p++) 
           {            
             fftw_complex  kernel;
             hankel_kernel_FT_3D(2.0*M_PI*p/((double) N_k_hankel*dlnk_hankel), &kernel, arg, 2);
             
-            conv[i][j][k][p][0] = f_lP[i][j][k][p][0]*kernel[0] - f_lP[i][j][k][p][1]*kernel[1];
-            conv[i][j][k][p][1] = f_lP[i][j][k][p][1]*kernel[0] + f_lP[i][j][k][p][0]*kernel[1];
+            conv[i][j][l][p][0] = f_lP[i][j][l][p][0]*kernel[0] - f_lP[i][j][l][p][1]*kernel[1];
+            conv[i][j][l][p][1] = f_lP[i][j][l][p][1]*kernel[0] + f_lP[i][j][l][p][0]*kernel[1];
           }
 
-          conv[i][j][k][0][1] = 0;            
-          conv[i][j][k][N_k_hankel/2][1] = 0;
+          conv[i][j][l][0][1] = 0;            
+          conv[i][j][l][N_k_hankel/2][1] = 0;
 
-          fftw_execute(plan1[i][j][k]);
+          fftw_execute(plan1[i][j][l]);
 
           for (int p=0; p<N_k_hankel; p++) 
           {
             const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);    
             const double rr = 1.0/kk;
-            lP[i][j][k][p] = pow(2.0*M_PI*rr, -1.5)*lP[i][j][k][p]/((double) N_k_hankel); // XI
+            lP[i][j][l][p] = pow(2.0*M_PI*rr, -1.5)*lP[i][j][l][p]/((double) N_k_hankel); // XI
           }
         }
       }
     }
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         { 
-          fftw_destroy_plan(plan[i][j][k]);
-          fftw_destroy_plan(plan1[i][j][k]);
+          fftw_destroy_plan(plan[i][j][l]);
+          fftw_destroy_plan(plan1[i][j][l]);
         }
       }
     }
@@ -2161,15 +2330,15 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
     // STEP 3: exclusion_filter
     // ---------------------------------------------------------------------------------------------
     #pragma omp parallel for collapse(4)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         {
           for (int p=0; p<N_k_hankel; p++) 
           {
-            const double aa = amin + k*da;
+            const double aa = amin + l*da;
             const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);     
             const double rr = 1.0/kk;
             const double R = 1.5*pow(0.25*(Cluster.N_min[i] + Cluster.N_min[j] + 
@@ -2179,7 +2348,7 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
             {
               if(rr < R) 
               {
-                lP[i][j][k][p] = -1; 
+                lP[i][j][l][p] = -1; 
               } 
             }
             else if (Cluster.halo_exclusion_model == 1)
@@ -2197,7 +2366,7 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
                   exit(1);
                 }
 
-                lP[i][j][k][p] = 0.5*(1.0 + tmp2)*(lP[i][j][k][p] + 1.0) - 1.0;
+                lP[i][j][l][p] = 0.5*(1.0 + tmp2)*(lP[i][j][l][p] + 1.0) - 1.0;
               }
             }
             else // code to be executed if n doesn't match any cases
@@ -2213,50 +2382,50 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
     // STEP 4: - xi_to_pk
     // ---------------------------------------------------------------------------------------------
     #pragma omp parallel for collapse(4)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         { 
           for (int p=0; p<N_k_hankel; p++) 
           { 
             const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);    
             const double rr = 1.0/kk;
-            lP[i][j][k][p] = rr*sqrt(rr)*lP[i][j][k][p];
+            lP[i][j][l][p] = rr*sqrt(rr)*lP[i][j][l][p];
           }
         }
       }
     }
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         { 
           const int nsize = N_k_hankel;
-          plan[i][j][k]  = fftw_plan_dft_r2c_1d(nsize, lP[i][j][k], f_lP[i][j][k], FFTW_ESTIMATE);
-          plan1[i][j][k] = fftw_plan_dft_c2r_1d(nsize, conv[i][j][k], lP[i][j][k], FFTW_ESTIMATE);
+          plan[i][j][l]  = fftw_plan_dft_r2c_1d(nsize, lP[i][j][l], f_lP[i][j][l], FFTW_ESTIMATE);
+          plan1[i][j][l] = fftw_plan_dft_c2r_1d(nsize, conv[i][j][l], lP[i][j][l], FFTW_ESTIMATE);
         }
       }
     }
     #pragma omp parallel for collapse(3)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         {      
-          fftw_execute(plan[i][j][k]);
+          fftw_execute(plan[i][j][l]);
         }
       }
     }
     #pragma omp parallel for collapse(3)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         {    
           for(int p=0; p<N_k_hankel/2+1; p++) 
           { // TODO: ok for dlnR < 0 in the denom? (original code is neg)
@@ -2265,38 +2434,38 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
             fftw_complex  kernel;
             hankel_kernel_FT_3D(rr, &kernel, arg, 2);
             
-            conv[i][j][k][p][0] = f_lP[i][j][k][p][0]*kernel[0] - f_lP[i][j][k][p][1]*kernel[1];
-            conv[i][j][k][p][1] = f_lP[i][j][k][p][1]*kernel[0] + f_lP[i][j][k][p][0]*kernel[1];
+            conv[i][j][l][p][0] = f_lP[i][j][l][p][0]*kernel[0] - f_lP[i][j][l][p][1]*kernel[1];
+            conv[i][j][l][p][1] = f_lP[i][j][l][p][1]*kernel[0] + f_lP[i][j][l][p][0]*kernel[1];
           }
 
-          conv[i][j][k][0][1] = 0;            
-          conv[i][j][k][N_k_hankel/2][1] = 0;
+          conv[i][j][l][0][1] = 0;            
+          conv[i][j][l][N_k_hankel/2][1] = 0;
 
-          fftw_execute(plan1[i][j][k]);
+          fftw_execute(plan1[i][j][l]);
 
           for (int p=0; p<N_k_hankel; p++) 
           {
             const double kk = exp(ln_k_min_hankel + p*dlnk_hankel); 
-            lP[i][j][k][p] = pow(2*M_PI*kk, -1.5)*lP[i][j][k][p]/((double) N_k_hankel);
+            lP[i][j][l][p] = pow(2*M_PI*kk, -1.5)*lP[i][j][l][p]/((double) N_k_hankel);
             
             // normalization 
             const double TwoPiCubed = 8*M_PI*M_PI*M_PI;
-            lP[i][j][k][p] *= TwoPiCubed;
+            lP[i][j][l][p] *= TwoPiCubed;
 
             // for interpolation
-            lP[i][j][k][p] = log(kk*kk*kk*lP[i][j][k][p] + 1.0E5); // 1E5 avoid negs inside ln()
+            lP[i][j][l][p] = log(kk*kk*kk*lP[i][j][l][p] + 1.0E5); // 1E5 avoid negs inside ln()
           }
         }
       }
     }
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         { 
-          fftw_destroy_plan(plan[i][j][k]);
-          fftw_destroy_plan(plan1[i][j][k]);
+          fftw_destroy_plan(plan[i][j][l]);
+          fftw_destroy_plan(plan1[i][j][l]);
         }
       }
     }
@@ -2304,15 +2473,15 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
     // Step 5 - Evaluate binned_p_cc_incl_halo_exclusion in the interpolation table
     // ---------------------------------------------------------------------------------------------
     #pragma omp parallel for collapse(4)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         {
           for (int p=0; p<N_k; p++) 
           {
-            const double aa = amin + k*da;
+            const double aa = amin + l*da;
             const double kk = exp(ln_k_min + p*dlnk);
 
             const double B1_1 = weighted_B1(i, zz); 
@@ -2331,7 +2500,7 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
             {
               const double kk_CO = CO/R;
 
-              const double tmp = interpol(lP[i][j][k], N_k_hankel, ln_k_min_hankel, 
+              const double tmp = interpol(lP[i][j][l], N_k_hankel, ln_k_min_hankel, 
                 ln_k_max_hankel, dlnk_hankel, log(kk_CO), 1.0, 1.0);
               const double PK_HALO_EXCL_CO = (exp(tmp) -1.0E5)/(kk_CO*kk_CO*kk_CO);
 
@@ -2343,26 +2512,25 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
 
               const double ENV = pow(kk/kk_CO, -0.7);
 
-              table[i][j][k][p] = 
+              table[i][j][l][p] = 
                 (PKB1B2 - V_EXCL*(1 + (PKB1B2_CO - V_EXCL_CO - P_EXCL_CO)/V_EXCL_CO))*ENV;
             }
             else if (R == 0.0)
             {
-              table[i][j][k][p] = PKB1B2;
+              table[i][j][l][p] = PKB1B2;
             }
             else
             {
-              const double tmp = interpol(lP[i][j][k], N_k_hankel, ln_k_min_hankel, 
+              const double tmp = interpol(lP[i][j][l], N_k_hankel, ln_k_min_hankel, 
                 ln_k_max_hankel, dlnk_hankel, log(kk), 1.0, 1.0);
               const double PK_HALO_EXCL = (exp(tmp) - 1.0E5)/(kk_CO*kk_CO*kk_CO);
 
-              table[i][j][k][p] = (PK_HALO_EXCL + V_EXCL)*B1B2 - V_EXCL;
+              table[i][j][l][p] = (PK_HALO_EXCL + V_EXCL)*B1B2 - V_EXCL;
             }
             
             // for interpolation
-            table[i][j][k][p] =  log(kk*kk*kk*sqrt(aa)*table[i][j][k][p] + 1.E8); 
-            
-            table[j][i][k][p] =  table[i][j][k][p];
+            table[i][j][l][p] =  log(kk*kk*kk*sqrt(aa)*table[i][j][l][p] + 1.E8);  
+            table[j][i][l][p] =  table[i][j][l][p];
           }
         }
       }
@@ -2370,15 +2538,15 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
     // ---------------------------------------------------------------------------------------------
     // Step 6 - clean up
     // ---------------------------------------------------------------------------------------------
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<Cluster.N200_Nbin; j++)
+      for(int j=i; j<N_l; j++)
       {
-        for (int k=0; k<N_a; k++) 
+        for (int l=0; l<N_a; l++) 
         { 
-          fftw_free(f_lP[i][j][k]); 
-          fftw_free(conv[i][j][k]);  
-          fftw_free(lP[i][j][k]);   
+          fftw_free(f_lP[i][j][l]); 
+          fftw_free(conv[i][j][l]);  
+          fftw_free(lP[i][j][l]);   
         }
         free(plan[i][j]);
         free(plan1[i][j]);
@@ -2402,20 +2570,25 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
     update_nuisance(&N);
   }
 
-  if(!(a>0) || !(a<1)) 
-  {
-    log_fatal("a>0 and a<1 not true");
-    exit(1);
-  }
-  if(nl1 < 0 || nl1 > Cluster.N200_Nbin -1 || nl2 < 0 || nl2 > Cluster.N200_Nbin -1)
+  if (nl1 < 0 || nl1 > N_l -1 || nl2 < 0 || nl2 > N_l -1)
   {
     log_fatal("invalid bin input (nl1, nl2) = (%d, %d)", nl1, nl2);
     exit(1);
   }
+  if (a < amin || a > amax)
+  {
+    log_fatal("a = %e outside look-up table range [%e,%e]", a, amin, amax);
+    exit(1);
+  } 
   const double lnk = log(k);
+  if (lnk < ln_k_min || lnk > ln_k_max)
+  {
+    log_fatal("k = %e outside look-up table range [%e,%e]", k, exp(ln_k_min), exp(ln_k_max));
+    exit(1);
+  } 
   const double val = 
-    interpol2d(RES[nl1][nl2], N_a, amin, amax, da, a, N_k, ln_k_min, ln_k_max, dlnk, lnk, 1., 1.);
-  return (exp(val)-1.E8)/(k*k*k*sqrt(a));
+    interpol2d(table[nl1][nl2], N_a, amin, amax, da, a, N_k, ln_k_min, ln_k_max, dlnk, lnk, 1., 1.);
+  return (exp(val) - 1.E8)/(k*k*k*sqrt(a));
 }
 
 // ---------------------------------------------------------------------------------------
@@ -2427,7 +2600,8 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(double k, double a, i
 // ---------------------------------------------------------------------------------------
 
 // nl = lambda_obs bin, nj = galaxy redshift bin
-double binned_p_cg(double k, double a, int nl, int nj, int use_linear_ps)
+double binned_p_cg(const double k, const double a, const int nl, const int nj, 
+  const int use_linear_ps)
 { // binend in lambda_obs
   if(!(a>0) || !(a<1)) 
   {
@@ -2484,6 +2658,11 @@ double int_for_binned_p_cm(double lnM, void* params)
   
   const double M = exp(lnM); 
   const double a = 1./(1 + z);
+  if(!(a>0) || !(a<1)) 
+  {
+    log_fatal("a>0 and a<1 not true");
+    exit(1);
+  }
 
   const double PCM_1H = (include_1h_term == 1) ? 
     M/(cosmology.rho_crit*cosmology.Omega_m)*u_nfw_c(conc(M, a), k, M, a) : 0.0; 
@@ -2495,8 +2674,8 @@ double int_for_binned_p_cm(double lnM, void* params)
   return (PCM_1H + PCM_2H)*dndlnM_times_binned_P_lambda_obs_given_M(lnM, (void*) params_in);
 }
 
-double binned_p_cm_nointerp(double k, double a, int nl, int include_1h_term, int use_linear_ps, 
-int init_static_vars_only)
+double binned_p_cm_nointerp(const double k, const double a, const int nl, 
+  const int include_1h_term, const int use_linear_ps, const int init_static_vars_only)
 {
   if(!(a>0) || !(a<1)) 
   {
@@ -2504,13 +2683,16 @@ int init_static_vars_only)
     exit(1);
   }
   const double z = 1.0/a - 1;
+  
   double params[5] = {(double) nl, z, k, (double) include_1h_term, (double) use_linear_ps};
-  const double ln_M_min = log_M_min/LOG10_E;
-  const double ln_M_max = log_M_max/LOG10_E;  
+  
+  const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E;
+  const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E;  
   
   const double ncounts = binned_average_number_counts(nl, z);
 
-  return (init_static_vars_only == 1) ? int_for_binned_p_cm(ln_M_min, (void*) params) :
+  return (init_static_vars_only == 1) ? 
+    int_for_binned_p_cm(ln_M_min, (void*) params) :
     int_gsl_integrate_low_precision(int_for_binned_p_cm, (void*) params, ln_M_min, ln_M_max, NULL, 
       GSL_WORKSPACE_SIZE)/ncounts; 
 }
@@ -2524,38 +2706,43 @@ double binned_p_cm(double k, double a, int nl, int ni, int include_1h_term, int 
   static double* amax = 0;
   static double* da = 0;
 
+  const int N_l = Cluster.N200_Nbin;
+
+  const int N_z = tomo.cluster_Nbin;
+
   const int N_k = Ntable.N_ell;
   const double ln_k_min = log(limits.k_min_cH0);
   const double ln_k_max = log(limits.k_max_cH0);
   const double dlnk = (ln_k_max - ln_k_min)/((double) N_k - 1.0);
 
-  const int N_a = binned_p_cm_size_a_table;
+  const int N_a = Ntable.binned_p_cm_size_a_table;
 
-  if(table == 0)
+  if (table == 0)
   {
-    table = (double****) malloc(sizeof(double***)*Cluster.N200_Nbin);
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    table = (double****) malloc(sizeof(double***)*N_l);
+    for (int i=0; i<N_l; i++)
     {
-      table[i] = (double***) malloc(sizeof(double**)*tomo.cluster_Nbin);
-      for(int j=0; j<tomo.cluster_Nbin; j++)
+      table[i] = (double***) malloc(sizeof(double**)*N_z);
+      for (int j=0; j<N_z; j++)
       {
         table[i][j] = (double**) malloc(sizeof(double*)*N_k);
-        for(int k=0; k<N_k; k++)
+        for (int l=0; l<N_k; l++)
         {
-          table[i][j][k] = (double*) malloc(sizeof(double)*N_a);
+          table[i][j][l] = (double*) malloc(sizeof(double)*N_a);
         }
       }
     }
-    amin = (double*) malloc(sizeof(double)*tomo.cluster_Nbin);
-    amax = (double*) malloc(sizeof(double)*tomo.cluster_Nbin);
-    da = (double*) malloc(sizeof(double)*tomo.cluster_Nbin);
-    for(int i=0; i<tomo.cluster_Nbin; i++)
+
+    amin = (double*) malloc(sizeof(double)*N_z);
+    amax = (double*) malloc(sizeof(double)*N_z);
+    da = (double*) malloc(sizeof(double)*N_z);
+    for(int j=0; j<N_z; j++)
     {
       const double zmin = tomo.cluster_zmin[j];
       const double zmax = tomo.cluster_zmax[j];
-      amin[i] = 1.0/(1.0 + zmax); 
-      amax[i] = 1.0/(1.0 + zmin);
-      da[i] = (amax - amin)/((double) N_a - 1.0);
+      amin[j] = 1.0/(1.0 + zmax); 
+      amax[j] = 1.0/(1.0 + zmin);
+      da[j] = (amax - amin)/((double) N_a - 1.0);
     }
   }
   if (recompute_clusters(C, N))
@@ -2563,16 +2750,16 @@ double binned_p_cm(double k, double a, int nl, int ni, int include_1h_term, int 
     binned_p_cm_nointerp(exp(ln_k_min), amin[0], 0, include_1h_term, use_linear_ps, 1); //init static
                                                                                         //vars only
     #pragma omp parallel for collapse(4)
-    for(int i=0; i<Cluster.N200_Nbin; i++)
+    for(int i=0; i<N_l; i++)
     {
-      for(int j=0; j<tomo.cluster_Nbin; j++)
+      for(int j=0; j<N_z; j++)
       {
-        for(int k=0; k<N_k; k++)
+        for(int l=0; l<N_k; l++)
         {
           for(int p=0; p<N_a; p++)
           { 
-            table[i][j][k][p] = binned_p_cm_nointerp(exp(ln_k_min + k*dlnk), amin[i] + p*da[i], nl, 
-              include_1h_term, use_linear_ps, 0); 
+            table[i][j][l][p] = binned_p_cm_nointerp(exp(ln_k_min + l*dlnk), 
+              amin[j] + p*da[j], i, include_1h_term, use_linear_ps, 0); 
           }
         }
       }
@@ -2580,19 +2767,25 @@ double binned_p_cm(double k, double a, int nl, int ni, int include_1h_term, int 
     update_cosmopara(&C);
     update_nuisance(&N);   
   }
+  
   if(!(a>0) || !(a<1)) 
   {
     log_fatal("a>0 and a<1 not true");
     exit(1);
   }
-  if(ni < 0 || ni > tomo.cluster_Nbin -1 || nl < 0 || nl > Cluster.N200_Nbin -1)
+  if(ni < 0 || ni > N_z -1 || nl < 0 || nl > N_l -1)
   {
     log_fatal("invalid bin input (nl, ni) = (%d, %d)", nl, ni);
     exit(1);
   }
   const double lnk = log(k);
-  return ((lnk < ln_k_min) & (lnk > ln_k_max)) ? 0.0 : interpol2d(table[nl][ni], N_k, ln_k_min, 
-    ln_k_max, dlnk, lnk, N_a, amin[ni], amax[ni], da[ni], a, 1.0, 1.0); 
+  if (lnk < ln_k_min || lnk > ln_k_max)
+  {
+    log_fatal("k = %e outside look-up table range [%e,%e]", k, exp(ln_k_min), exp(ln_k_max));
+    exit(1);
+  } 
+  return interpol2d(table[nl][ni], N_k, ln_k_min, ln_k_max, dlnk, lnk, N_a, amin[ni], amax[ni], 
+    da[ni], a, 1.0, 1.0); 
 }
 
 // ---------------------------------------------------------------------------------------

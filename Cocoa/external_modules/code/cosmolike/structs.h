@@ -29,6 +29,16 @@ typedef struct
   int LMIN_tab;      // Cosmo2D
   int LMAX;          // Cosmo2D
   int LMAX_NOLIMBER; // Cosmo2D
+  double cluster_util_log_M_min;
+  double cluster_util_log_M_max;
+  double binned_P_lambda_obs_given_M_zmin_table;
+  double binned_P_lambda_obs_given_M_zmax_table;
+  double SDSS_P_lambda_obs_given_M_true_lambda_min;
+  double SDSS_P_lambda_obs_given_M_true_lambda_max;
+  double halo_exclusion_k_min;
+  double halo_exclusion_k_max;
+  double halo_exclusion_k_min_hankel;
+  double halo_exclusion_k_max_hankel;
 } lim;
 
 typedef struct 
@@ -41,13 +51,15 @@ typedef struct
   int N_thetaH;
   int N_S2;
   int N_DS;
-  int N_ell_TATT;         // Cosmo2D
-  int NL_Nell_block;      // Cosmo2D - NL = NonLimber
-  int NL_Nchi;            // Cosmo2D - NL = NonLimber
-  int N_a_halo_exclusion, // N_a for binned_p_cc_incl_halo_exclusion (cluster_util.c)
-  int N_k_halo_exclusion, // N_k for binned_p_cc_incl_halo_exclusion (cluster_util.c)
-  int N_R_halo_exclusion,
-  int N_halo_exclusion    // N for 3D Hankel Transform for Halo Exclusion (pk_to_xi and xi_to_pk) 
+  int N_ell_TATT;                  // Cosmo2D
+  int NL_Nell_block;               // Cosmo2D - NL = NonLimber
+  int NL_Nchi;                     // Cosmo2D - NL = NonLimber
+  int N_a_halo_exclusion,          // N_a for binned_p_cc_incl_halo_exclusion (cluster_util.c)
+  int N_k_halo_exclusion,          // N_k for binned_p_cc_incl_halo_exclusion (cluster_util.c)
+  int N_k_hankel_halo_exclusion,   // N for 3D Hankel Transform (pk_to_xi and xi_to_pk) 
+  int binned_P_lambda_obs_given_M_size_z_table,
+  int binned_P_lambda_obs_given_M_size_M_table,
+  int binned_p_cm_size_a_table
 } Ntab;
 
 typedef struct 
