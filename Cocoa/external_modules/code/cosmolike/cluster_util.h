@@ -90,16 +90,6 @@ double weighted_B2(const int nl, const double z);
 double weighted_B1M1_nointerp(const int nl, const double z, const int init_static_vars_only);
 double weighted_B1M1(const int nl, const double z);
 
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// cluster number counts
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-
-double binned_average_number_counts(int nl, double z); // nl = lambda_obs bin
-
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
@@ -172,7 +162,7 @@ double binned_p_cm(double k, double a, int nl, int use_linear_ps);
 // Cocoa: we try to avoid reading of files in the cosmolike_core code 
 void setup_get_area(int* io_nz, double** io_z, double** io_A, int io);
 
-double get_area(double z);
+double get_area(const double zz, const int interpolate_survey_area);
 
 #ifdef __cplusplus
 }

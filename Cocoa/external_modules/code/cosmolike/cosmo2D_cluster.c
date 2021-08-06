@@ -22,8 +22,6 @@
 
 static int GSL_WORKSPACE_SIZE = 250;
 static int use_linear_ps_limber = 0; /* 0 or 1 */
-static double w_l_min = 0.0001;
-static double w_l_max = 5.0e6; 
 static INCLUDE_MAG_IN_C_CC_NONLIMBER = 0; /* 0 or 1 */
 static INCLUDE_MAG_IN_C_CG_NONLIMBER = 0; /* 0 or 1 */
 
@@ -35,7 +33,8 @@ static INCLUDE_MAG_IN_C_CG_NONLIMBER = 0; /* 0 or 1 */
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 
-double w_gammat_cluster_tomo(int nt, int nl, int ni, int nj, int limber)
+double w_gammat_cluster_tomo(const int nt, const int nl, const int ni, const int nj, 
+const int limber)
 { // nt = theta bin, nl = lambda_obs bin, ni = cluster redshift bin, nj = source redshift bin
   if (like.Ntheta == 0)
   {
@@ -134,8 +133,8 @@ double w_gammat_cluster_tomo(int nt, int nl, int ni, int nj, int limber)
         for(int j=0; j<ngammat_size; j++) 
         { 
           const int L = 1;
-          const double tolerance = 0.0075;    // required fractional accuracy in C(l)
-          const double dev = 10. * tolerance; // will be diff exact vs Limber init to large
+          const double tol = 0.0075;    // required fractional accuracy in C(l)
+          const double dev = 10. * tol; // will be diff exact vs Limber init to large
                                               // value in order to start while loop
           const int ZC = ZCL(j);
           const int ZSC = ZCS(j);
@@ -201,7 +200,8 @@ double w_gammat_cluster_tomo(int nt, int nl, int ni, int nj, int limber)
 }
 
 
-double w_cc_tomo(int nt, int nl1, int nl2, int ni, int nj, int limber)
+double w_cc_tomo(const int nt, const int nl1, const int nl2, const int ni, const int nj, 
+const int limber)
 { // nt = theta bin , nl{1,2} = lambda_obs bins, n{i,j} = cluster redshift bins
   if (like.Ntheta == 0)
   {
@@ -316,8 +316,8 @@ double w_cc_tomo(int nt, int nl1, int nl2, int ni, int nj, int limber)
           {
             const int L = 1;
             const double tol = 0.01; // required fractional accuracy in C(l)
-            const double dev = 10. * tolerance; // will be diff  exact vs Limber init to
-                                                // large value in order to start while loop
+            const double dev = 10. * tol; // will be diff  exact vs Limber init to
+                                          // large value in order to start while loop
             const int ZCCL1 = k; // cross redshift bin not supported so not using ZCCL1(k)
             const int ZCCL2 = k; // cross redshift bin not supported so not using ZCCL2(k)
             const int q = i*nlsize*nccl_size + j*nccl_size + k;
@@ -506,7 +506,8 @@ double w_cg_tomo(int nt, int nl, int ni, int nj, int limber)
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 
-double w_gammat_cluster_tomo_flatsky(double theta, int nl, int ni, int nj, int limber) 
+double w_gammat_cluster_tomo_flatsky(const double theta, const int nl, const int ni, 
+const int nj, const int limber) 
 { // nl = lambda_obs bin, ni = cluster redshift bin, nj = source redshift bin
   static cosmopara C;
   static nuisancepara N;
@@ -518,8 +519,8 @@ double w_gammat_cluster_tomo_flatsky(double theta, int nl, int ni, int nj, int l
   const int ngammat_size = tomo.cgl_Npowerspectra;
   const int NSIZE = nlsize*ngammat_size;
 
-  const double l_min = w_l_min;
-  const double l_max = w_l_max;
+  const double l_min = limits.w_l_min;
+  const double l_max = limits.w_l_max;
   const double lnlmax = log(l_max);
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax-lnlmin)/(1.0*ntheta - 1.);
@@ -690,7 +691,8 @@ double w_gammat_cluster_tomo_flatsky(double theta, int nl, int ni, int nj, int l
   return interpol(table[q], ntheta, lnthetamin, lnthetamax, dlntheta, lntheta, 0, 0);
 }
 
-double w_cc_tomo_flatsky(double theta, int nl1, int nl2, int ni, int nj, int limber)
+double w_cc_tomo_flatsky(const double theta, const int nl1, const int nl2, const int ni, 
+const int nj, const int limber)
 { // nl{1,2} = lambda_obs bins, n{i,j} = cluster redshift bins
   static cosmopara C;
   static nuisancepara N;
@@ -702,8 +704,8 @@ double w_cc_tomo_flatsky(double theta, int nl1, int nl2, int ni, int nj, int lim
   const int NSIZE = nlsize*nlsize*nccl_size;
   const int ntheta = Ntable.N_thetaH;
 
-  const double l_min = w_l_min;
-  const double l_max = w_l_max;
+  const double l_min = limits.w_l_min;
+  const double l_max = limits.w_l_max;
   const double lnlmax = log(l_max);
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax-lnlmin)/(1.0*ntheta-1.);
@@ -713,7 +715,6 @@ double w_cc_tomo_flatsky(double theta, int nl1, int nl2, int ni, int nj, int lim
   const double lnthetamin = (nc-ntheta+1)*dlnl-lnrc;
   const double lnthetamax = nc*dlnl-lnrc;
   const double dlntheta = (lnthetamax - lnthetamin)/((double) ntheta);
-  const double lntheta = log(theta);
 
   if (table == 0)
   {
@@ -770,9 +771,9 @@ double w_cc_tomo_flatsky(double theta, int nl1, int nl2, int ni, int nj, int lim
               Cl_NL[j][k] = calloc(limits.LMAX_NOLIMBER, sizeof(double));
             }
             const int L = 1;
-            const double tol = 0.0075;          // required fractional accuracy in C(l)
-            const double dev = 10. * tolerance; // will be diff exact vs Limber init to large
-                                                // value in order to start while loop
+            const double tol = 0.0075;        // required fractional accuracy in C(l)
+            const double dev = 10. * tol;     // will be diff exact vs Limber init to large
+                                              // value in order to start while loop
             for (int k=0; k<nccl_size; k++)
             {
               const int ZCCL1 = k; // cross redshift bin not supported so not using ZCCL1(k)
@@ -939,12 +940,12 @@ double w_cc_tomo_flatsky(double theta, int nl1, int nl2, int ni, int nj, int lim
     update_cosmopara(&C);
     update_nuisance(&N);
   }
-
   if (ni != nj) 
   {
     log_fatal("cross-tomography not supported");
     exit(1);
   }
+  const double lntheta = log(theta);
   if (lntheta < lnthetamin || lntheta > lnthetamax)
   {
     const double theta = exp(lntheta);
@@ -977,8 +978,8 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
   const int NSIZE = nlsize*nisize*njsize;
   const int ntheta = Ntable.N_thetaH;
 
-  const double l_min = w_l_min;
-  const double l_max = w_l_max;
+  const double l_min = limits.w_l_min;
+  const double l_max = limits.w_l_max;
   const double lnlmax = log(l_max);
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax-lnlmin)/(1.0*ntheta-1.);
@@ -1179,17 +1180,17 @@ double int_for_C_cs_tomo_limber(double a, void* params)
 
   struct chis chidchi = chi_all(a);
   const double hoverh0 = hoverh0v2(a, chidchi.dchida);
-  
   const double fK = f_K(chidchi.chi);
-  const double k = ell/fK;
-   
+  const double k = ell/fK;  
   const double PCM = binned_p_cm(k, a, nl, use_linear_ps);
-  const double tmp = W_cluster(ni, a, chidchi.chi, hoverh0)*W_kappa(a, fK, nj);
-  return tmp*PCM*chidchi.dchida/(fK*fK);
+  const double WCL = W_cluster(ni, a, chidchi.chi, hoverh0);
+  const double WK = W_kappa(a, fK, nj);
+  
+  return WCL*WK*PCM*chidchi.dchida/(fK*fK);
 }
 
-double C_cs_tomo_limber_nointerp(double l, int nl, int ni, int nj, int use_linear_ps, 
-int init_static_vars_only)
+double C_cs_tomo_limber_nointerp(const double l, const int nl, const int ni, const int nj, 
+const int use_linear_ps, const int init_static_vars_only)
 {
   double ar[5] = {(double) nl, (double) ni, (double) nj, l, (double) use_linear_ps};
   
@@ -1210,7 +1211,7 @@ int init_static_vars_only)
 
 }
 
-double C_cs_tomo_limber(double l, int nl, int ni, int nj)
+double C_cs_tomo_limber(const double l, const int nl, const int ni, const int nj)
 {
   static cosmopara C;
   static galpara G;
@@ -1307,8 +1308,8 @@ double int_for_C_cc_tomo_limber(double a, void* params)
   return (res == 0.0) ? 0.0 : res*PCC*chidchi.dchida/(fK*fK);
 }
 
-double C_cc_tomo_limber_nointerp(double l, int nl1, int nl2, int ni, int nj, int use_linear_ps,
-int init_static_vars_only)
+double C_cc_tomo_limber_nointerp(const double l, const int nl1, const int nl2, const int ni, 
+const int nj, const int use_linear_ps, const int init_static_vars_only)
 { 
   double ar[6] = {(double) nl1, (double) nl2, (double) ni, (double) nj, l, (double) use_linear_ps};  
   const double zmin = fmax(tomo.cluster_zmin[ni], tomo.cluster_zmin[nj]);
@@ -1327,7 +1328,8 @@ int init_static_vars_only)
   }
 }
 
-double C_cc_tomo_limber(double l, int nl1, int nl2, int ni, int nj) 
+double C_cc_tomo_limber(const double l, const int nl1, const int nl2, const int ni, 
+const int nj) 
 {
   static cosmopara C;
   static nuisancepara N;
@@ -1430,7 +1432,8 @@ double int_for_C_cg_tomo_limber(double a, void* params)
   return tmp*PCG*chidchi.dchida/(fK*fK);
 }
 
-double C_cg_tomo_limber_nointerp(double l, int nl, int ni, int nj, int use_linear_ps) 
+double C_cg_tomo_limber_nointerp(const double l, const int nl, const int ni, const int nj, 
+const int use_linear_ps) 
 {
   double ar[5] = {(double) nl, (double) ni, (double) nj, l, (double) use_linear_ps};
   const double zmin = fmax(tomo.cluster_zmin[ni], tomo.clustering_zmin[nj]);
@@ -1441,7 +1444,7 @@ double C_cg_tomo_limber_nointerp(double l, int nl, int ni, int nj, int use_linea
     (void*) ar, amin, amax, NULL, GSL_WORKSPACE_SIZE);
 }
 
-double C_cg_tomo_limber(double l, int nl, int ni, int nj)
+double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj)
 { // TODO: external ni, nj pairs
   static cosmopara C;
   static galpara G;
@@ -1514,8 +1517,8 @@ double C_cg_tomo_limber(double l, int nl, int ni, int nj)
 
 // ------------------------------------------------------------------------------------
 
-void f_chi_for_Psi_cluster_cl(double* chi, int Nchi, double* fchi, int ni, int nl, double zmin,
-double zmax)
+void f_chi_for_Psi_cluster_cl(double* chi, const int Nchi, double* fchi, const int ni, 
+const int nl, const double zmax)
 {
   const double real_coverH0 = cosmology.coverH0 / cosmology.h0; // unit Mpc
   {
@@ -1545,8 +1548,8 @@ double zmax)
   }
 }
 
-void f_chi_for_Psi_cluster_cl_RSD(double* chi, int Nchi, double* fchi, int ni, int nl, double zmin, 
-double zmax)
+void f_chi_for_Psi_cluster_cl_RSD(double* chi, const int Nchi, double* fchi, const int ni, 
+const int nl, const double zmax)
 {
   const double real_coverH0 = cosmology.coverH0 / cosmology.h0;
   {
@@ -1578,7 +1581,8 @@ double zmax)
   }
 }
 
-void f_chi_for_Psi_cluster_cl_Mag(double* chi, int Nchi, double* fchi, int ni, int nl, double zmax) 
+void f_chi_for_Psi_cluster_cl_Mag(double* chi, const int Nchi, double* fchi, const int ni, 
+const int nl, const double zmax) 
 {
   const double real_coverH0 = cosmology.coverH0 / cosmology.h0;
   {
@@ -1610,7 +1614,8 @@ void f_chi_for_Psi_cluster_cl_Mag(double* chi, int Nchi, double* fchi, int ni, i
   }
 }
 
-void C_cc_tomo(int L, int nl1, int nl2, int ni, int nj, double* Cl, double dev, double tol)
+void C_cc_tomo(int L, const int nl1, const int nl2, const int ni, const int nj, double* Cl, 
+double dev, const double tol)
 { // nl{1,2} = lambda_obs bins, n{i,j} = cluster redshift bins
   if (ni != nj)
   {
@@ -1722,7 +1727,7 @@ void C_cc_tomo(int L, int nl1, int nl2, int ni, int nj, double* Cl, double dev, 
 
   int i_block = 0;
     
-  while ((fabs(dev) > tolerance) & (L < limits.LMAX_NOLIMBER))
+  while ((fabs(dev) > tol) & (L < limits.LMAX_NOLIMBER))
   { 
     for(int i=0; i<Nell_block; i++) 
     {
@@ -1793,7 +1798,8 @@ void C_cc_tomo(int L, int nl1, int nl2, int ni, int nj, double* Cl, double dev, 
 
 // ------------------------------------------------------------------------------------
 
-void C_cg_tomo(int L, int nl, int ni, int nj, double* Cl, double dev, double tol)
+void C_cg_tomo(int L, const int nl, const int ni, const int nj, double* Cl, double dev, 
+const double tol)
 { // nl = lambda_obs bin, ni = cluster redshift bin, nj = galaxy redshift bin
   if (ni != nj)
   {
@@ -1905,7 +1911,7 @@ void C_cg_tomo(int L, int nl, int ni, int nj, double* Cl, double dev, double tol
 
   int i_block = 0;
     
-  while ((fabs(dev) > tolerance) & (L < limits.LMAX_NOLIMBER))
+  while ((fabs(dev) > tol) & (L < limits.LMAX_NOLIMBER))
   { 
     for(int i=0; i<Nell_block; i++) 
     {
@@ -1963,44 +1969,149 @@ void C_cg_tomo(int L, int nl, int ni, int nj, double* Cl, double dev, double tol
   }
 }
 
-// ----------------------------------------------------------------------------------------
-// ----------------------------------------------------------------------------------------
-// ----------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // cluster number counts
-// ----------------------------------------------------------------------------------------
-// ----------------------------------------------------------------------------------------
-// ----------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // nl = lambda_obs bin, ni = cluster redshift bin
 
-double int_projected_average_number_counts(double a, void* params)
+double binned_Ndensity_nointerp(const int nl, const double z, const int init_static_vars_only)
+{
+  const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E;
+  const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E;
+
+  double params[2] = {(double) nl, z};
+  
+  return (init_static_vars_only == 1) ? 
+    dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) params) :
+    int_gsl_integrate_low_precision(dndlnM_times_binned_P_lambda_obs_given_M, (void*) params, 
+      ln_M_min, ln_M_max, NULL, GSL_WORKSPACE_SIZE);
+}
+
+double binned_Ndensity(const int nl, const double z)
+{
+  static cosmopara C;
+  static nuisancepara N;
+  static double** table;
+
+  const int N_l = Cluster.N200_Nbin;
+
+  const int N_a = Ntable.N_a;
+  const double zmin = fmax(tomo.cluster_zmin[0] - 0.05, 0.01); 
+  const double zmax = tomo.cluster_zmax[tomo.cluster_Nbin - 1] + 0.05;
+  const double amin = 1.0/(1.0 + zmax);
+  const double amax = 1.0/(1.0 + zmin);
+  const double da = (amax - amin)/((double) N_a - 1.0);
+
+  if (table == 0)
+  {
+    table = (double**) malloc(sizeof(double*)*N_l);
+    for(int i=0; i<N_l; i++)
+    {
+      table[i] = (double*) malloc(sizeof(double)*N_a);
+    }
+  }
+  if (recompute_clusters(C, N))
+  {
+    binned_n_nointerp(0, 1.0/amin - 1.0, 1); // init static vars only
+    #pragma omp parallel for collapse(2)
+    for (int i=0; i<N_l; i++)
+    {
+      for (int j=0; j<N_a; j++)
+      {
+        const double aa = amin + j*da;
+        table[i][j] = binned_n_nointerp(i, 1.0/aa - 1.0, 0);
+      }
+    }
+    update_cosmopara(&C);
+    update_nuisance(&N);
+  }
+  if (nl < 0 || nl > N_l - 1)
+  {
+    log_fatal("error in selecting bin number");
+    exit(1);
+  }
+  if (z < zmin || z > zmax)
+  {
+    log_fatal("z = %e outside look-up table range [%e,%e]", z, zmin, zmax);
+    exit(1);
+  }
+  return interpol(table[nl], N_a, amin, amax, da, 1.0/(z + 1.0), 0., 0.);
+}
+
+double int_for_binned_N(double a, void* params)
 {
   if(!(a>0)) 
   {
     log_fatal("a > 0 not true");
     exit(1);
   }
-
   double* ar = (double*) params;   
-  const double z = 1./a-1 ;
   const int nl = (int) ar[0];
-  const int interpolate_survey_area = (int) ar[1];
-  
-  const double norm = interpolate_survey_area > 0 ? get_area(z) : survey.area;  
-  struct chis chidchi = chi_all(a);  
-  const double fK = f_K(chidchi.chi);
-  
-  return fK*fK*chidchi.dchida*binned_average_number_counts(nl, z)*norm;
+  const int nz = (int) ar[1];
+  const int interpolate_survey_area = (int) ar[2];
+
+  const double z = 1.0/a - 1.0 ;
+  const double dzda = 1.0/(a*a); 
+  const double norm = get_area(z, interpolate_survey_area);  
+  return dV_cluster(z, nz)*dzda*binned_Ndensity(nl, z)*norm;
 }
 
-double projected_average_number_counts(int nl, int ni)
-{ // nl = lambda_obs bin, ni = cluster redshift bin
-  const int interpolate_survey_area = survey.area < 0 ? 1 : 0;
-  double params[2] = {(double) nl, interpolate_survey_area};
+double binned_N_nointerp(const int nl, const int nz, const int interpolate_survey_area, 
+const int init_static_vars_only)
+{
+  double params[2] = {(double) nl, (double) nz, interpolate_survey_area};
+  const double tmp = 4.0*M_PI/41253.0;
+  const double amin = 1.0/(1.0 + tomo.cluster_zmax[nz]);
+  const double amax = 1.0/(1.0 + tomo.cluster_zmin[nz])
 
-  const double amin = 1./(1 + tomo.cluster_zmax[ni]);
-  const double amax = 1./(1 + tomo.cluster_zmin[ni]);
-  const double tmp = (4.0*M_PI/41253.0);
+  return (init_static_vars_only == 1) ? int_for_binned_N(amin, (void*) params) :
+    tmp*int_gsl_integrate_low_precision(int_for_binned_N, (void*) params, amin, amax, NULL, 
+      GSL_WORKSPACE_SIZE);
+}
 
-  return tmp*int_gsl_integrate_low_precision(int_projected_average_number_counts, 
-    (void*) params, amin, amax, NULL, GSL_WORKSPACE_SIZE);
+double binned_N(const int nl, const int nz)
+{
+  static cosmopara C;
+  static nuisancepara N;
+  static double** table;
+
+  const int N_l = Cluster.N200_Nbin;
+  const int N_z = tomo.cluster_Nbin;
+  if (table == 0)
+  {
+    table = (double**) malloc(sizeof(double*)*N_l);
+    for(int i=0; i<N_l; i++)
+    {
+      table[i] = (double*) malloc(sizeof(double)*N_z);
+    }
+  }
+  if (recompute_clusters(C, N))
+  {
+    binned_N_nointerp(0, 0, Cluster.interpolate_survey_area, 1); // init static vars only
+    #pragma omp parallel for collapse(2)
+    for (int i=0; i<N_l; i++)
+    {
+      for (int j=0; j<N_z; j++)
+      {
+        table[i][j] = binned_N_nointerp(i, j, Cluster.interpolate_survey_area, 0);
+      }
+    }
+    update_cosmopara(&C);
+    update_nuisance(&N);
+  }
+  if (nl < 0 || nl > N_l - 1)
+  {
+    log_fatal("error in selecting bin number");
+    exit(1);
+  }
+  if (nz < 0 || nz > N_z - 1)
+  {
+    log_fatal("error in selecting bin number");
+    exit(1);
+  }
+  return table[nl, nz];
 }

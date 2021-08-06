@@ -70,6 +70,7 @@ galpara gbias =
 
 clusterpara Cluster =
 {
+  .interpolate_survey_area = 1,
   .bias_model = 0,
   .hmf_model = 0,
   .nonlinear_bias = 0,
@@ -157,7 +158,9 @@ lim limits =
   .halo_exclusion_k_min = 1E-2,
   .halo_exclusion_k_max = 3E6,
   .halo_exclusion_k_min_hankel = 5.0E-4,
-  .halo_exclusion_k_max_hankel = 1.0E8
+  .halo_exclusion_k_max_hankel = 1.0E8,
+  w_l_min = 0.0001,
+  w_l_max = 5.0e6
 };
 
 Ntab Ntable = 

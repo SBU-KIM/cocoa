@@ -29,10 +29,12 @@ extern "C" {
 // nt = theta bin
 
 // nl = lambda_obs bin, ni = cluster redshift bin, nj = source redshift bin
-double w_gammat_cluster_tomo(int nt, int nl, int ni, int nj, int limber);
+double w_gammat_cluster_tomo(const int nt, const int nl, const int ni, const int nj, 
+const int limber);
 
 // nl{1,2} = lambda_obs bins, n{i,j} = cluster redshift bins
-double w_cc_tomo(int nt, int nl1, int nl2, int ni, int nj, int limber);
+double w_cc_tomo(const int nt, const int nl1, const int nl2, const int ni, const int nj, 
+const int limber);
 
 // nl = lambda_obs bin, ni = cluster redshift bin, nj = galaxy redshift bin
 double w_cg_tomo(int nt, int nl, int ni, int nj, int limber);
@@ -46,10 +48,12 @@ double w_cg_tomo(int nt, int nl, int ni, int nj, int limber);
 // -------------------------------------------------------------------------------------------
 
 // nl = lambda_obs bin, ni = cluster redshift bin, nj = source redshift bin
-double w_gammat_cluster_tomo_flatsky(double theta, int nl, int ni, int nj, int limber);
+double w_gammat_cluster_tomo_flatsky(const double theta, const int nl, const int ni, 
+const int nj, const int limber);
 
 // nl{1,2} = lambda_obs bins, n{i,j} = cluster redshift bins
-double w_cc_tomo_flatsky(double theta, int nl1, int nl2, int ni, int nj, int limber);
+double w_cc_tomo_flatsky(const double theta, const int nl1, const int nl2, const int ni, 
+const int nj, const int limber);
 
 // nl = lambda_obs bin, ni = cluster redshift bin, nj = galaxy redshift bin
 double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber);
@@ -61,19 +65,22 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber);
 // -------------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------------
-void f_chi_for_Psi_cluster_cl(double* chi, int Nchi, double* fchi, int ni, int nl, double zmin,
-double zmax);
+void f_chi_for_Psi_cluster_cl(double* chi, const int Nchi, double* fchi, const int ni, 
+const int nl, const double zmax);
 
 void f_chi_for_Psi_cluster_cl_RSD(double* chi, int Nchi, double* fchi, int ni, int nl, double zmin, 
 double zmax);
 
-void f_chi_for_Psi_cluster_cl_Mag(double* chi, int Nchi, double* fchi, int ni, int nl, double zmax);
+void f_chi_for_Psi_cluster_cl_Mag(double* chi, const int Nchi, double* fchi, const int ni, 
+const int nl, const double zmax);
 
 // nl = lambda_obs bin, ni = cluster redshift bin, nj = galaxy redshift bin
-void C_cg_tomo(int L, int nl, int ni, int nj, double* Cl, double dev, double tol);
+void C_cg_tomo(int L, const int nl, const int ni, const int nj, double* Cl, double dev, 
+const double tol);
 
 // nl{1,2} = lambda_obs bins, n{i,j} = cluster redshift bins
-void C_cc_tomo(int L, int nl1, int nl2, int ni, int nj, double* Cl, double dev, double tol);
+void C_cc_tomo(int L, const int nl1, const int nl2, const int ni, const int nj, double* Cl, 
+double dev, const double tol);
 
 // -------------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------------
@@ -84,30 +91,41 @@ void C_cc_tomo(int L, int nl1, int nl2, int ni, int nj, double* Cl, double dev, 
 // -------------------------------------------------------------------------------------------
 
 // nl = lambda_obs bin, ni = cluster redshift bin, nj = source redshift bin
-double C_cs_tomo_limber_nointerp(double l, int nl, int ni, int nj, int use_linear_ps);
+double C_cs_tomo_limber_nointerp(const double l, const int nl, const int ni, const int nj, 
+const int use_linear_ps, const int init_static_vars_only);
 
-double C_cs_tomo_limber(double l, int nl, int ni, int nj);
+double C_cs_tomo_limber(const double l, const int nl, const int ni, const int nj);
 
 // nl{1,2} = lambda_obs bins, n{i,j} = cluster redshift bins
-double C_cc_tomo_limber_nointerp(double l, int nl1, int nl2, int ni, int nj, int use_linear_ps);
+double C_cc_tomo_limber_nointerp(const double l, const int nl1, const int nl2, const int ni, 
+const int nj, const int use_linear_ps, const int init_static_vars_only);
 
-double C_cc_tomo_limber(double l, int nl1, int nl2, int ni, int nj);
+double C_cc_tomo_limber(const double l, const int nl1, const int nl2, const int ni, 
+const int nj);
 
 // nl = lambda_obs bin, ni = cluster redshift bin, nj = galaxy redshift bin
-double C_cg_tomo_limber_nointerp(double l, int nl, int ni, int nj, int use_linear_ps);
+double C_cg_tomo_limber_nointerp(const double l, const int nl, const int ni, const int nj, 
+const int use_linear_ps);
 
-double C_cg_tomo_limber(double l, int nl, int ni, int nj);
+double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj);
 
-// -------------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // cluster number counts
-// -------------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
-// nl = lambda_obs bin, ni = cluster redshift bin
-double projected_average_number_counts(int nl, int nz);
+// nl = lambda_obs bin
+double binned_Ndensity_nointerp(const int nl, const double z, const int init_static_vars_only);
+
+double binned_Ndensity(const int nl, const double z);
+
+double binned_N_nointerp(const int nl, const int nz, const int interpolate_survey_area, 
+const int init_static_vars_only);
+
+double binned_N(const int nl, const int nz);
 
 #ifdef __cplusplus
 }

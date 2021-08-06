@@ -26,7 +26,6 @@
 
 #include "log.c/src/log.h"
 
-static int INTERPOLATE_SURVEY_AREA = 1;
 static int ASSUME_CONSTANT_LAMBD_HALO_EXCLUSION = 1;
 static int GSL_WORKSPACE_SIZE = 250;
 static double M_PIVOT = 5E14; //Msun/h
@@ -828,7 +827,7 @@ const int init_static_vars_only)
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
-// INTERFACE
+// INTERFACE - binned_P_lambda_obs_given_M
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
@@ -864,7 +863,7 @@ double binned_P_lambda_obs_given_M(const int nl, const double M, const double z)
   const int N_M  = Ntable.binned_P_lambda_obs_given_M_size_M_table;
   const double Mmin = pow(10.0, limits.cluster_util_log_M_min);
   const double Mmax = pow(10.0, limits.cluster_util_log_M_max);
-  const double dlnM = 
+  const double dlogM = 
     (limits.cluster_util_log_M_max - limits.cluster_util_log_M_min)/((double) N_M - 1.0);
 
   const int N_z = Ntable.binned_P_lambda_obs_given_M_size_z_table;
@@ -888,7 +887,6 @@ double binned_P_lambda_obs_given_M(const int nl, const double M, const double z)
   { 
     // init static vars
     binned_P_lambda_obs_given_M_nointerp(pow(10.0, limits.cluster_util_log_M_min), zmin, 1); 
-    
     #pragma omp parallel for collapse(3)
     for (int i=0; i<N_l; i++) 
     {
@@ -896,12 +894,12 @@ double binned_P_lambda_obs_given_M(const int nl, const double M, const double z)
       {
         for (int k=0; k<N_M; k++) 
         {
-          table[i][j][k] = binned_P_lambda_obs_given_M_nointerp(i, 
-            pow(10.0, limits.cluster_util_log_M_min + k*dlnM), zmin + j*dz, 0);
+          const double zz = zmin + j*dz;
+          const double MM = pow(10.0, limits.cluster_util_log_M_min + k*dlogM);
+          table[i][j][k] = binned_P_lambda_obs_given_M_nointerp(i, MM, zz, 0);
         }
       }
     }
-
     update_cosmopara(&C);
     update_nuisance(&N);
   }
@@ -910,16 +908,20 @@ double binned_P_lambda_obs_given_M(const int nl, const double M, const double z)
     log_fatal("error in selecting bin number");
     exit(1);
   }
-  if (z > zmin && z < zmax && M > Mmin && M < Mmax)
+  if (z < zmin || z > zmax)
   {
-    const double logM = log10(M);
-    return interpol2d(table[nl], N_z, zmin, zmax, dz, z, N_M, limits.cluster_util_log_M_min, 
+    log_fatal("z = %e outside look-up table range [%e,%e]", z, zmin, zmax);
+    exit(1);
+  } 
+  const double logM = log10(M);
+  if (logM < limits.cluster_util_log_M_min || logM > limits.cluster_util_log_M_max)
+  {
+    log_fatal("logM = %e outside look-up table range [%e,%e]", logM, 
+      limits.cluster_util_log_M_min, limits.cluster_util_log_M_max);
+    exit(1);
+  } 
+  return interpol2d(table[nl], N_z, zmin, zmax, dz, z, N_M, limits.cluster_util_log_M_min, 
       limits.cluster_util_log_M_max, dlnM, logM, 1.0, 1.0);
-  }
-  else
-  {
-    return 0.0;
-  }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1315,7 +1317,7 @@ double weighted_B1M1(const int nl, const double z)
     update_nuisance(&N);
   }
 
-  const double a = 1./(z + 1.);
+  const double a = 1.0/(z + 1.0);
   if(!(a>0) || !(a<1)) 
   {
     log_fatal("a>0 and a<1 not true");
@@ -1327,26 +1329,6 @@ double weighted_B1M1(const int nl, const double z)
     exit(1);
   }
   return interpol(table[nl], N_a, amin, amax, da, a, 0., 0.);
-}
-
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// cluster number counts
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// nl = lambda_obs bin, ni = cluster redshift bin
-
-double binned_average_number_counts(int nl, double z)
-{ // def: eq 3 of https://arxiv.org/pdf/1810.09456.pdf; nl = lambda_obs bin, nz = redshift bin
-  double param[2] = {(double) nl, z};
-  
-  const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E; 
-  const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E; 
-  
-  return int_gsl_integrate_low_precision(dndlnM_times_binned_P_lambda_obs_given_M, 
-    (void*) param, ln_M_min, ln_M_max, NULL, GSL_WORKSPACE_SIZE);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -2269,7 +2251,7 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
         for (int l=0; l<N_a; l++) 
         { 
           const int nsize = N_k_hankel;
-          plan[i][j][l] = fftw_plan_dft_r2c_1d(nsize, lP[i][j][l], f_lP[i][j][l], FFTW_ESTIMATE);
+          plan[i][j][l]  = fftw_plan_dft_r2c_1d(nsize, lP[i][j][l], f_lP[i][j][l], FFTW_ESTIMATE);
           plan1[i][j][l] = fftw_plan_dft_c2r_1d(nsize, conv[i][j][l], lP[i][j][l], FFTW_ESTIMATE);
         }
       }
@@ -2657,7 +2639,7 @@ double int_for_binned_p_cm(double lnM, void* params)
   const int use_linear_ps = (int) ar[4];
   
   const double M = exp(lnM); 
-  const double a = 1./(1 + z);
+  const double a = 1.0/(1.0 + z);
   if(!(a>0) || !(a<1)) 
   {
     log_fatal("a>0 and a<1 not true");
@@ -2682,19 +2664,19 @@ double binned_p_cm_nointerp(const double k, const double a, const int nl,
     log_fatal("a>0 and a<1 not true");
     exit(1);
   }
-  const double z = 1.0/a - 1;
+  const double z = 1.0/a - 1.0;
   
   double params[5] = {(double) nl, z, k, (double) include_1h_term, (double) use_linear_ps};
   
   const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E;
   const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E;  
   
-  const double ncounts = binned_average_number_counts(nl, z);
+  const double norm = binned_n_nointerp(nl, z, init_static_vars_only);
 
   return (init_static_vars_only == 1) ? 
     int_for_binned_p_cm(ln_M_min, (void*) params) :
     int_gsl_integrate_low_precision(int_for_binned_p_cm, (void*) params, ln_M_min, ln_M_max, NULL, 
-      GSL_WORKSPACE_SIZE)/ncounts; 
+      GSL_WORKSPACE_SIZE)/norm; 
 }
 
 double binned_p_cm(double k, double a, int nl, int ni, int include_1h_term, int use_linear_ps)
@@ -2873,9 +2855,9 @@ void setup_get_area(int* io_nz, double** io_z, double** io_A, int io)
   }
 }
 
-double get_area(double zz)
+double get_area(const double zz, const int interpolate_survey_area)
 {
-  if(INTERPOLATE_SURVEY_AREA == 1)
+  if(interpolate_survey_area == 1)
   {
     static gsl_spline* fA = NULL;
 

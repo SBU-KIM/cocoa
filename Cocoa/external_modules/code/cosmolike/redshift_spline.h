@@ -142,19 +142,21 @@ double zmean_source(int j); // mean true redshift of source galaxies in tomograp
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 
-double g_cmb(double a); // lens efficiency for CMB lensing
+double g_cmb(const double a); // lens efficiency for CMB lensing
 
-double g_tomo(double a, int zbin); // lens efficiency of source galaxies in tomography bin zbin
+// lens efficiency of source galaxies in tomography bin ni
+double g_tomo(const double a, const int ni); 
 
-double g2_tomo(double a, int zbin); // lens efficiency of source galaxies in tomography bin zbin
+// lens efficiency of source galaxies in tomography bin zbin
+double g2_tomo(const double a, const int ni) ;
 
 // lens efficiency of *lens* galaxies in tomography bin zbin
 // used in magnification calculations
-double g_lens(double a, int zbin);
+double g_lens(const double a, const int ni);
 
-// lens efficiency of *lens* cluster in tomography bin nz, lambda bin nl
+// lens efficiency of lens cluster in tomo bin nz, lambda bin nl
 // used in magnification calculations
-double g_lens_cluster(double a, int nz, int nl) // for *lens* tomography bin zbin
+double g_lens_cluster(const double a, const int nz, const int nl);
 
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------

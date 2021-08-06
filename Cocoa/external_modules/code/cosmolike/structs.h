@@ -39,6 +39,8 @@ typedef struct
   double halo_exclusion_k_max;
   double halo_exclusion_k_min_hankel;
   double halo_exclusion_k_max_hankel;
+  double w_l_min;
+  double w_l_max;
 } lim;
 
 typedef struct 
@@ -146,6 +148,7 @@ typedef struct
 
 typedef struct
 {
+  int interpolate_survey_area;
   int bias_model;                 // Bias model
   int hmf_model;                  // HMF model 
   int nonlinear_bias;             // Do we include nonlinear bias in cluster analysis?

@@ -27,8 +27,6 @@ static int use_linear_ps_limber = 0; /* 0 or 1 */
 static int include_RSD_GS = 0; /* 0 or 1 */
 static int include_RSD_GG = 1; /* 0 or 1 */
 static int include_RSD_GK = 0; /* 0 or 1 */
-static double w_l_min = 0.0001;
-static double w_l_max = 5.0e6;
 
 double beam_cmb(const double l)
 {
@@ -922,8 +920,8 @@ double xi_pm_tomo_flatsky(int pm, double theta, int ni, int nj, int limber)
 
   const int NSIZE = tomo.shear_Npowerspectra;
   const int ntheta = Ntable.N_thetaH;
-  const double l_min = w_l_min;
-  const double l_max = w_l_max;
+  const double l_min = limits.w_l_min;
+  const double l_max = limits.w_l_max;
   const double lnlmax = log(l_max);
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax - lnlmin)/(1.0*ntheta);
@@ -1124,8 +1122,8 @@ double w_gammat_tomo_flatsky(double theta, int ni, int nj, int limber)
   const int NSIZE = tomo.ggl_Npowerspectra;
   const int ntheta = Ntable.N_thetaH;
 
-  const double l_min = w_l_min;
-  const double l_max = w_l_max;
+  const double l_min = limits.w_l_min;
+  const double l_max = limits.w_l_max;
   const double lnlmax = log(l_max);
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax-lnlmin)/(ntheta - 1.);
@@ -1385,8 +1383,8 @@ double w_gg_tomo_flatsky(double theta, int ni, int nj, int limber)
   const int NSIZE = tomo.clustering_Npowerspectra;
   const int ntheta = Ntable.N_thetaH;
 
-  const double lmin = w_l_min;
-  const double lmax = w_l_max;
+  const double lmin = limits.w_l_min;
+  const double lmax = limits.w_l_max;
   const double lnlmax = log(lmax);
   const double lnlmin = log(lmin);
   const double dlnl = (lnlmax - lnlmin)/(1.0*ntheta - 1.);
@@ -1646,8 +1644,8 @@ double w_gk_tomo_flatsky(double theta, int ni, int limber)
   const int ntheta = Ntable.N_thetaH;
   const int NSIZE = nisize;
 
-  const double lmin = w_l_min;
-  const double lmax = w_l_max;
+  const double lmin = limits.w_l_min;
+  const double lmax = limits.w_l_max;
   const double lnlmax = log(lmax);
   const double lnlmin = log(lmin);
   const double dlnl = (lnlmax - lnlmin)/(1.0*ntheta - 1.);
@@ -1824,8 +1822,8 @@ double w_ks_tomo_flatsky(double theta, int ni, int limber)
   const int ntheta = Ntable.N_thetaH;
   const int NSIZE = nisize;
 
-  const double l_min = w_l_min;
-  const double l_max = w_l_max;
+  const double l_min = limits.w_l_min;
+  const double l_max = limits.w_l_max;
   const double lnlmax = log(l_max);
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax-lnlmin)/(ntheta - 1.);
