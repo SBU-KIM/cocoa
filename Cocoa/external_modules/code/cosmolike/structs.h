@@ -39,6 +39,8 @@ typedef struct
   double halo_exclusion_k_max;
   double halo_exclusion_k_min_hankel;
   double halo_exclusion_k_max_hankel;
+  double halo_exclusion_R_min;
+  double halo_exclusion_R_max;
   double w_l_min;
   double w_l_max;
 } lim;
@@ -59,9 +61,11 @@ typedef struct
   int N_a_halo_exclusion,          // N_a for binned_p_cc_incl_halo_exclusion (cluster_util.c)
   int N_k_halo_exclusion,          // N_k for binned_p_cc_incl_halo_exclusion (cluster_util.c)
   int N_k_hankel_halo_exclusion,   // N for 3D Hankel Transform (pk_to_xi and xi_to_pk) 
+  int N_R_halo_exclusion,
   int binned_P_lambda_obs_given_M_size_z_table,
   int binned_P_lambda_obs_given_M_size_M_table,
   int binned_p_cm_size_a_table
+  int 
 } Ntab;
 
 typedef struct 

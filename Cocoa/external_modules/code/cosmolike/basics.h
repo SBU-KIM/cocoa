@@ -39,6 +39,8 @@ void hankel_kernel_FT(double x, fftw_complex* res, double* arg, int argc __attri
 
 void cdgamma(fftw_complex x, fftw_complex *res);
 
+void hankel_kernel_FT_3D(double x, fftw_complex *res, double *arg, int argc);
+
 #ifdef __cplusplus
 }
 #endif

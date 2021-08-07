@@ -75,7 +75,9 @@ double dndlnM_times_binned_P_lambda_obs_given_M(double lnM, void* params);
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 
-double B1_x_BSF(const double M, const double a); // BSF = selection bias
+double BSF(const double M); // BSF = selection bias
+
+double B1_x_BSF(const double M, const double a); 
 
 double B2_x_BSF(const double M, const double a);
 
@@ -148,9 +150,9 @@ double binned_p_cg(const double k, const double a, const int nl, const int nj,
 double binned_p_cm_nointerp(const double k, const double a, const int nl, 
   const int include_1h_term, const int use_linear_ps, int init_static_vars_only);
 
-// nl = lambda_obs bin, ni = cluster redshift bin, nj = source redshift bin
-double binned_p_cm(double k, double a, int nl, int use_linear_ps);
-
+// nl = lambda_obs bin, ni = cluster redshift bin
+double binned_p_cm(const double k, const double a, const int nl, const int ni, 
+const int include_1h_term, const int use_linear_ps);
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------

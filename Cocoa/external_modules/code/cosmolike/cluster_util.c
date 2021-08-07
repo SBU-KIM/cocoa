@@ -658,7 +658,6 @@ const double zz)
         }
       }
     }
-
     int status = 0;
     status = gsl_spline2d_init(ftau, (*z), (*lambda), tau, nz, nlambda);
     if (status) 
@@ -690,7 +689,6 @@ const double zz)
       log_fatal(gsl_strerror(status));
       exit(1);
     }
-
     free(z[0]);
     free(lambda[0]);
     free(tmp_tau[0]);
@@ -863,13 +861,14 @@ double binned_P_lambda_obs_given_M(const int nl, const double M, const double z)
   const int N_M  = Ntable.binned_P_lambda_obs_given_M_size_M_table;
   const double Mmin = pow(10.0, limits.cluster_util_log_M_min);
   const double Mmax = pow(10.0, limits.cluster_util_log_M_max);
-  const double dlogM = 
-    (limits.cluster_util_log_M_max - limits.cluster_util_log_M_min)/((double) N_M - 1.0);
-
+  const double log_M_max = limits.cluster_util_log_M_max;
+  const double log_M_min = limits.cluster_util_log_M_min;
+  const double dlogM = (log_M_max - log_M_min)/((double) N_M - 1.0);
+  
   const int N_z = Ntable.binned_P_lambda_obs_given_M_size_z_table;
   const double zmin = limits.binned_P_lambda_obs_given_M_zmin_table; 
   const double zmax = limits.binned_P_lambda_obs_given_M_zmax_table;
-  const double dz = (zmax-zmin)/((double) N_z - 1.0);
+  const double dz = (zmax - zmin)/((double) N_z - 1.0);
   
   if (table == 0)
   {
@@ -920,8 +919,8 @@ double binned_P_lambda_obs_given_M(const int nl, const double M, const double z)
       limits.cluster_util_log_M_min, limits.cluster_util_log_M_max);
     exit(1);
   } 
-  return interpol2d(table[nl], N_z, zmin, zmax, dz, z, N_M, limits.cluster_util_log_M_min, 
-      limits.cluster_util_log_M_max, dlnM, logM, 1.0, 1.0);
+  return interpol2d(table[nl], N_z, zmin, zmax, dz, z, N_M, log_M_min, log_M_max, dlnM, 
+    logM, 1.0, 1.0);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -936,9 +935,19 @@ double dndlnM_times_binned_P_lambda_obs_given_M(double lnM, void* params)
 {
   double* ar = (double*) params; 
   const int nl = (int) ar[0];
+  if(nl < 0 || nl > Cluster.N200_Nbin - 1)
+  {
+    log_fatal("invalid bin input nl = %d", nl);
+    exit(1);
+  }
   const double z = ar[1];
-  const double M = exp(lnM);
+  if(!(z>0))
+  {
+    log_fatal("invalid redshift input z = %d", z);
+    exit(1);
+  } 
   const double a = 1.0/(1.0 + z);
+  const double M = exp(lnM);
 
   double mfunc; 
   if (Cluster.hmf_model == 0)
@@ -965,6 +974,26 @@ double dndlnM_times_binned_P_lambda_obs_given_M(double lnM, void* params)
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 
+double BSF(const double M)
+{
+  double BS;
+  if (Cluster.N_SF == 1) 
+  {
+    BS = nuisance.cluster_selection[0]; 
+  }
+  else if (Cluster.N_SF == 2)
+  {
+    BS = 
+    nuisance.cluster_selection[0]*pow((M1/M_PIVOT), nuisance.cluster_selection[1]); 
+  }
+  else
+  {
+    log_fatal("Cluster selection bias model %i not implemented", Cluster.bias_model);
+    exit(0); 
+  }
+  return BS;
+}
+
 double B1_x_BSF(const double M, const double a)
 { // cluster bias including selection bias
   double B1;
@@ -981,23 +1010,7 @@ double B1_x_BSF(const double M, const double a)
     log_fatal("Cluster bias model %i not implemented", Cluster.bias_model);
     exit(0); 
   }
-   
-  double BS;
-  if (Cluster.N_SF == 1) 
-  {
-    BS = nuisance.cluster_selection[0]; 
-  }
-  else if (Cluster.N_SF == 2)
-  {
-    BS = nuisance.cluster_selection[0]*pow((M/M_PIVOT), nuisance.cluster_selection[1]); 
-  }
-  else
-  {
-    log_fatal("Cluster selection bias model %i not implemented", Cluster.bias_model);
-    exit(0); 
-  }
-
-  return B1 * BS;
+  return B1 * BSF(M);
 }
 
 double B2_x_BSF(const double M, const double a)
@@ -1016,25 +1029,7 @@ double B2_x_BSF(const double M, const double a)
     log_fatal("Cluster bias model %i not implemented", Cluster.bias_model);
     exit(0); 
   }
-
-  const double B2 = b2_from_b1(B1);
-  
-  double BS;
-  if (Cluster.N_SF == 1) 
-  {
-    BS = nuisance.cluster_selection[0]; 
-  }
-  else if (Cluster.N_SF == 2)
-  {
-    BS = nuisance.cluster_selection[0]*pow((M/M_PIVOT), nuisance.cluster_selection[1]); 
-  }
-  else
-  {
-    log_fatal("Cluster selection bias model %i not implemented", Cluster.bias_model);
-    exit(0); 
-  }
-  
-  return B2 * BS;
+  return b2_from_b1(B1) * BSF(M);
 }
 
 double B1M1_x_BS(const double M, const double a)
@@ -1042,40 +1037,29 @@ double B1M1_x_BS(const double M, const double a)
   double B1M1;
   if (Cluster.bias_model == 0) 
   {
-    B1M1 = B1(M, a) -1;
+    B1M1 = B1(M, a) - 1;
   } 
   else if (Cluster.bias_model == 1) 
   {
-    B1M1 = tinker_emu_B1_tab(M, a) -1;
+    B1M1 = tinker_emu_B1_tab(M, a) - 1;
   }
   else 
   {
     log_fatal("Cluster bias model %i not implemented", Cluster.bias_model);
     exit(0); 
   }
-
-  double BS;
-  if (Cluster.N_SF == 1) 
-  {
-    BS = nuisance.cluster_selection[0]; 
-  }
-  else if (Cluster.N_SF == 2)
-  {
-    BS = nuisance.cluster_selection[0]*pow((M/M_PIVOT), nuisance.cluster_selection[1]); 
-  }
-  else
-  {
-    log_fatal("Cluster selection bias model %i not implemented", Cluster.bias_model);
-    exit(0); 
-  }
-
-  return B1M1 * BS;
+  return B1M1 * BSF(M);
 }
 
 double int_for_weighted_B1(double lnM, void* params)
 {
   double* ar = (double*) params; // {nl, z}
   const double z = ar[1];
+  if(!(z>0))
+  {
+    log_fatal("invalid redshift input z = %d", z);
+    exit(1);
+  } 
   const double M = exp(lnM);  
   const double a = 1.0/(1.0 + z);
   return B1_x_BSF(M, a)*dndlnM_times_binned_P_lambda_obs_given_M(lnM, params); 
@@ -1112,9 +1096,8 @@ double weighted_B1(const int nl, const double z)
   static double** table;
 
   const int N_l = Cluster.N200_Nbin;
-  
   const int N_a = Ntable.N_a;
-  const double zmin = fmax(tomo.cluster_zmin[0]-0.05, 0.01); 
+  const double zmin = fmax(tomo.cluster_zmin[0] - 0.05, 0.01); 
   const double zmax = tomo.cluster_zmax[tomo.cluster_Nbin - 1] + 0.05;
   const double amin = 1.0/(1.0 + zmax); 
   const double amax = 1.0/(1.0 + zmin);
@@ -1129,8 +1112,13 @@ double weighted_B1(const int nl, const double z)
     }
   }
   if (recompute_clusters(C, N))
-  {    
-    weighted_B1_nointerp(0, 1.0/amin - 1.0, 1); // init static vars only
+  {
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"    
+    {
+      double init_static_vars_only = weighted_B1_nointerp(0, 1.0/amin - 1.0, 1); 
+    }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(2)
     for (int n=0; n<N_l; n++)
     {
@@ -1144,11 +1132,11 @@ double weighted_B1(const int nl, const double z)
     update_nuisance(&N);
   }
   const double a = 1.0/(z + 1.0);
-  if(!(a>0) || !(a<1)) 
+  if (a < amin || a > amax)
   {
-    log_fatal("a>0 and a<1 not true");
+    log_fatal("a = %e outside look-up table range [%e,%e]", a, amin, amax);
     exit(1);
-  }
+  } 
   if(nl < 0 || nl > N_l - 1)
   {
     log_fatal("invalid bin input nl = %d", nl);
@@ -1161,6 +1149,11 @@ double int_for_weighted_B2(double lnM, void* params)
 {
   double* ar = (double*) params; //nl, z
   const double z = ar[1];
+  if(!(z>0))
+  {
+    log_fatal("invalid redshift input z = %d", z);
+    exit(1);
+  }
   const double M = exp(lnM);  
   const double a = 1./(1. + z);
   return B2_x_BSF(M, a)*dndlnM_times_binned_P_lambda_obs_given_M(lnM, params); 
@@ -1198,13 +1191,12 @@ double weighted_B2(const int nl, const double z)
   static double** table;
 
   const int N_l = Cluster.N200_Nbin;
-
   const int N_a = Ntable.N_a;
   const double zmin = fmax(tomo.cluster_zmin[0] - 0.05, 0.01); 
   const double zmax = tomo.cluster_zmax[tomo.cluster_Nbin - 1] + 0.05;
   const double amin = 1.0/(1.0 + zmax); 
   const double amax = 1.0/(1.0 + zmin);
-  const double da = (amax-amin)/(N_a-1.);
+  const double da = (amax-amin)/((double) N_a - 1.0);
 
   if (table == 0) 
   {
@@ -1215,8 +1207,13 @@ double weighted_B2(const int nl, const double z)
     }
   }
   if (recompute_clusters(C, N))
-  {    
-    weighted_B2_nointerp(0, 1.0/amin - 1.0, 1); // init static vars only
+  {  
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"    
+    {
+      double init_static_vars_only =  weighted_B2_nointerp(0, 1.0/amin - 1.0, 1);
+    }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(2)
     for (int n=0; n<N_l; n++)
     {
@@ -1231,11 +1228,11 @@ double weighted_B2(const int nl, const double z)
   }
 
   const double a = 1.0/(z + 1.0);
-  if(!(a>0) || !(a<1)) 
+  if (a < amin || a > amax)
   {
-    log_fatal("a>0 and a<1 not true");
+    log_fatal("a = %e outside look-up table range [%e,%e]", a, amin, amax);
     exit(1);
-  }
+  } 
   if(nl < 0 || nl > N_l - 1)
   {
     log_fatal("invalid bin input nl1 = %d", nl);
@@ -1248,6 +1245,11 @@ double int_for_weighted_B1M1(double lnM, void* params)
 {
   double* ar = (double*) params;
   const double z = ar[1];
+  if(!(z>0))
+  {
+    log_fatal("invalid redshift input z = %d", z);
+    exit(1);
+  }
   const double M = exp(lnM);  
   const double a = 1.0/(1.0 + z);
   return B1M1_x_BS(M, a)*dndlnM_times_binned_P_lambda_obs_given_M(lnM, params); 
@@ -1284,14 +1286,13 @@ double weighted_B1M1(const int nl, const double z)
   static nuisancepara N;
   static double** table;
 
-  const int N_l = Cluster.N200_Nbin;
-  
+  const int N_l = Cluster.N200_Nbin; 
   const int N_a = Ntable.N_a;
-  const double zmin = fmax(tomo.cluster_zmin[0]-0.05, 0.01); 
-  const double zmax = tomo.cluster_zmax[tomo.cluster_Nbin-1] + 0.05;
-  const double amin = 1./(1.+zmax); 
-  const double amax = 1./(1.+zmin);
-  const double da = (amax-amin)/(N_a-1.);
+  const double zmin = fmax(tomo.cluster_zmin[0] - 0.05, 0.01); 
+  const double zmax = tomo.cluster_zmax[tomo.cluster_Nbin - 1] + 0.05;
+  const double amin = 1./(1.0 + zmax); 
+  const double amax = 1./(1.0 + zmin);
+  const double da = (amax - amin)/((double) N_a - 1.0);
 
   if (table == 0) 
   {
@@ -1302,8 +1303,13 @@ double weighted_B1M1(const int nl, const double z)
     }
   }
   if (recompute_clusters(C, N))
-  {    
-    weighted_B1M1_nointerp(0, 1.0/amin - 1., 1); // init static vars only
+  { 
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"    
+    {
+      double init_static_vars_only =  weighted_B1M1_nointerp(0, 1.0/amin - 1.0, 1);
+    }
+    #pragma GCC diagnostic pop   
     #pragma omp parallel for collapse(2)
     for (int n=0; n<N_l; n++)
     {
@@ -1316,13 +1322,12 @@ double weighted_B1M1(const int nl, const double z)
     update_cosmopara(&C);
     update_nuisance(&N);
   }
-
   const double a = 1.0/(z + 1.0);
-  if(!(a>0) || !(a<1)) 
+  if (a < amin || a > amax)
   {
-    log_fatal("a>0 and a<1 not true");
+    log_fatal("a = %e outside look-up table range [%e,%e]", a, amin, amax);
     exit(1);
-  }
+  } 
   if(nl < 0 || nl > N_l - 1)
   {
     log_fatal("invalid bin input nl = %d", nl);
@@ -1354,8 +1359,9 @@ double binned_p_cc(const double k, const double a, const int nl1, const int nl2,
     exit(1);
   }
 
-  const double z = 1.0/a - 1;
-  const double cluster_B1_1 = weighted_B1(nl1, z); 
+  const double z = 1.0/a - 1.0;
+  const double cluster_B1_1 = weighted_B1(nl1, z);
+  const double cluster_B1_2 = (nl1 == nl2) ? cluster_B1_1 : weighted_B1(nl2, z);  
   const double PK = use_linear_ps == 1 ? p_lin(k, a) : Pdelta(k, a);
 
   double P_1loop = 0;
@@ -1368,32 +1374,23 @@ double binned_p_cc(const double k, const double a, const int nl1, const int nl2,
     const double b2g = weighted_B2(nl1, z);
     const double bs2g = bs2_from_b1(b1g);
     
-    const double b1c = weighted_B1(nl2, z);
-    const double b2c = weighted_B2(nl2, z);
-    const double bs2c = bs2_from_b1(b1c);
+    const double b1c = cluster_B1_2;
+    const double b2c = (nl1 == nl2) ? b2g : weighted_B2(nl2, z);
+    const double bs2c = (nl1 == nl2) ? bs2g : bs2_from_b1(b1c);
     
     P_1loop = 0.5*(b1c*b2g+b2c*b1g)*PT_d1d2(k) + 0.25*b2g*b2c*PT_d2d2(k) 
       + 0.5*(b1c*bs2g+b1g*bs2c)*PT_d1s2(k) +0.25*(b2c*bs2g+b2g*bs2c)*PT_d2s2(k) 
       + 0.25*(bs2g*bs2c)*PT_s2s2(k)+ 0.5*(b1c*b3nl_from_b1(b1g) + b1g*b3nl_from_b1(b1c))*PT_d1d3(k);
     P_1loop *= g4;
   }
-
-  if (nl1 == nl2)
-  {
-    return cluster_bias1*cluster_B1_1*PK + P_1loop;
-  }
-  else
-  {
-    const double cluster_B1_2 = weighted_B1(nl2, z); 
-    return cluster_bias1*cluster_B1_2*PK + P_1loop;
-  }
+  return cluster_B1_1*cluster_B1_2*PK + P_1loop;
 }
 
-double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* params)
+double int_for_int_for_binned_p_cc_incl_halo_exclusion(double lnM1, void* params)
 {
   static cosmopara C;
   static nuisancepara N;
-  static double****** table = 0;
+  static double***** table = 0; // table = PK_HALO_EXCL interpolation
 
   const int N_l = Cluster.N200_Nbin;
 
@@ -1411,31 +1408,32 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
   const double ln_k_min_hankel = log(limits.halo_exclusion_k_min_hankel);
   const double ln_k_max_hankel = log(limits.halo_exclusion_k_max_hankel);
   const double dlnk_hankel = (ln_k_max_hankel - ln_k_min_hankel)/((double) N_k_hankel - 1.0);
-  
-  const int N_lnM = ?;
-  const double lnM_min = limits.cluster_util_log_M_min/LOG10_E;
-  const double lnM_max = limits.cluster_util_log_M_max/LOG10_E;
-  const double dlnM = (lnM_max - ln_lnM_min)/((double) N_lnM - 1.0);
+
+  const int N_R = Ntable.N_R_halo_exclusion;
+  const double R_min = limits.halo_exclusion_R_min;
+  const double R_max = limits.halo_exclusion_R_max;
+  const double dR = (R_max - R_min)/((double) N_R - 1.0);
+
+  typedef fftw_complex fftwZ;
+  double arg[2];
+  arg[0] = 0;     // bias
+  arg[1] = 0.5;   // order of Bessel function 
 
   if(table == 0)
   {
-    table2 = (double******) malloc(sizeof(double*****)*N_l);
+    table = (double*****) malloc(sizeof(double****)*N_l);
     for(int i=0; i<N_l; i++)
     {          
-      table2[i] = (double*****) malloc(sizeof(double****)*N_l);
-      for(int j=i; j<N_l; j++)
+      table[i] = (double****) malloc(sizeof(double***)*N_l);
+      for(int j=0; j<N_l; j++)
       {
-        table2[i][j] = (double****) malloc(sizeof(double***)*N_a);
+        table[i][j] = (double***) malloc(sizeof(double**)*N_a);
         for (int k=0; k<N_a; k++) 
         { 
-          table[i][j][k] = (double***) malloc(sizeof(double**)*N_k);
+          table[i][j][k] = (double**) malloc(sizeof(double*)*N_k);
           for (int p=0; p<N_k; p++) 
           {
-            table[i][j][k][p] = (double**) malloc(sizeof(double*)*N_lnM);
-            for (int l=0; l<N_lnM; l++) 
-            {
-              table[i][j][k][p][l] = (double*) malloc(sizeof(double)*N_lnM);
-            }
+            table[i][j][k][p] = (double*) malloc(sizeof(double)*N_R);
           } 
         }
       }
@@ -1444,82 +1442,69 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
   if (recompute_clusters(C, N))
   { 
     // ---------------------------------------------------------------------------------------------
-    // Step 0 - memory allocation (except for FFTW plans)
-    // ---------------------------------------------------------------------------------------------
-    typedef fftw_complex fftwZ;
-    double arg[2];
-    arg[0] = 0;     // bias
-    arg[1] = 0.5;   // order of Bessel function 
-    
-    fftw_plan***** plan   = (fftw_plan*****) malloc(sizeof(fftw_plan****)*N_l);
-    fftw_plan***** plan1  = (fftw_plan*****) malloc(sizeof(fftw_plan****)*N_l);
-    fftwZ****** f_lP      = (fftwZ******)    malloc(sizeof(fftwZ*****)*N_l);
-    fftwZ****** conv      = (fftwZ******)    malloc(sizeof(fftwZ*****)*N_l);
-    double****** lP       = (double******)   malloc(sizeof(double*****)*N_l);
+    // Step 1 - memory allocation (except for FFTW plans)
+    // ---------------------------------------------------------------------------------------------    
+    fftw_plan**** plan   = (fftw_plan****) malloc(sizeof(fftw_plan***)*N_l);
+    fftw_plan**** plan1  = (fftw_plan****) malloc(sizeof(fftw_plan***)*N_l);
+    fftwZ***** flP       = (fftwZ*****)    malloc(sizeof(fftwZ****)*N_l);
+    fftwZ***** conv      = (fftwZ*****)    malloc(sizeof(fftwZ****)*N_l);
+    double***** lP       = (double*****)   malloc(sizeof(double****)*N_l);
     for(int i=0; i<N_l; i++)
     {
-      plan[i]   = (fftw_plan****) malloc(sizeof(fftw_plan***)*N_l);
-      plan1[i]  = (fftw_plan****) malloc(sizeof(fftw_plan***)*N_l);
-      f_lP[i]   = (fftwZ*****)    malloc(sizeof(fftwZ****)*N_l);
-      conv[i]   = (fftwZ*****)    malloc(sizeof(fftwZ****)*N_l);
-      lP[i]     = (double*****)   malloc(sizeof(double****)*N_l);
-      for(int j=i; j<N_l; j++)
+      plan[i]   = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_l);
+      plan1[i]  = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_l);
+      flP[i]    = (fftwZ****)    malloc(sizeof(fftwZ***)*N_l);
+      conv[i]   = (fftwZ****)    malloc(sizeof(fftwZ***)*N_l);
+      lP[i]     = (double****)   malloc(sizeof(double***)*N_l);
+      for(int j=0; j<N_l; j++)
       {
-        plan[i][j]   = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_a);
-        plan1[i][j]  = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_a);
-        f_lP[i][j]   = (fftwZ****)    malloc(sizeof(fftwZ***)*N_a);
-        conv[i][j]   = (fftwZ****)    malloc(sizeof(fftwZ***)*N_a);
-        lP[i][j]     = (double****)   malloc(sizeof(double***)*N_a);
+        plan[i][j]   = (fftw_plan**) malloc(sizeof(fftw_plan*)*N_a);
+        plan1[i][j]  = (fftw_plan**) malloc(sizeof(fftw_plan*)*N_a);
+        flP[i][j]    = (fftwZ***)    malloc(sizeof(fftwZ**)*N_a);
+        conv[i][j]   = (fftwZ***)    malloc(sizeof(fftwZ**)*N_a);
+        lP[i][j]     = (double***)   malloc(sizeof(double**)*N_a);
         for (int k=0; k<N_a; k++) 
         { 
-          plan[i][j][k]  = (fftw_plan**) malloc(sizeof(fftw_plan*)*N_lnM);
-          plan1[i][j][k] = (fftw_plan**) malloc(sizeof(fftw_plan*)*N_lnM);    
-          f_lP[i][j][k]  = (fftwZ***)    malloc(sizeof(fftwZ**)*N_lnM);
-          conv[i][j][k]  = (fftwZ***)    malloc(sizeof(fftwZ**)*N_lnM);
-          lP[i][j][k]    = (double***)   malloc(sizeof(double**)*N_lnM);
-          for (int p=0; p<N_lnM; p++) 
+          plan[i][j][k]  = (fftw_plan*) malloc(sizeof(fftw_plan)*N_R);
+          plan1[i][j][k] = (fftw_plan*) malloc(sizeof(fftw_plan)*N_R);    
+          flP[i][j][k]   = (fftwZ**)    malloc(sizeof(fftwZ*)*N_R);
+          conv[i][j][k]  = (fftwZ**)    malloc(sizeof(fftwZ*)*N_R);
+          lP[i][j][k]    = (double**)   malloc(sizeof(double*)*N_R);
+          for (int p=0; p<N_R; p++) 
           {
-            plan[i][j][k][p]  = (fftw_plan*) malloc(sizeof(fftw_plan)*N_lnM);
-            plan1[i][j][k][p] = (fftw_plan*) malloc(sizeof(fftw_plan)*N_lnM);
-            f_lP[i][j][k][p]  = (fftwZ**)    malloc(sizeof(fftwZ*)*N_lnM);
-            conv[i][j][k][p]  = (fftwZ**)    malloc(sizeof(fftwZ*)*N_lnM);
-            lP[i][j][k][p]    = (double**)   malloc(sizeof(double*)*N_lnM);
-            for (int l=0; l<N_lnM; l++) 
-            {
-              f_lP[i][j][k][p][l] = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
-              conv[i][j][k][p][l] = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
-              lP[i][j][k][p][l]   = fftw_malloc(N_k_hankel*sizeof(double));
-            }
+            flP[i][j][k][p]   = (fftwZ*)  malloc(sizeof(fftwZ)*N_k_hankel);
+            conv[i][j][k][p]  = (fftwZ*)  malloc(sizeof(fftwZ)*N_k_hankel);
+            lP[i][j][k][p]    = (double*) malloc(sizeof(double)*N_k_hankel);
           }
         }
       }
     }
     // ---------------------------------------------------------------------------------------------
-    // STEP 1: - pk_to_xi
+    // STEP 2: - pk_to_xi
     // ---------------------------------------------------------------------------------------------
-    weighted_B1(0, 1.0/amin - 1.0);     // init static vars
-    Pdelta(exp(ln_k_min_hankel), amin); // init static vars
-    #pragma omp parallel for collapse(6)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      double init_static_vars_only  = weighted_B1(0, 1.0/amin - 1.0);     
+      double init_static_vars_only2 = Pdelta(exp(ln_k_min_hankel), amin); 
+    }
+    #pragma GCC diagnostic pop
+    #pragma omp parallel for collapse(3)
     for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<N_l; j++)
+      for (int q=0; q<N_k_hankel; q++) 
       {
         for (int k=0; k<N_a; k++) 
         { 
-          for (int p=0; p<N_lnM; p++) 
-          {
-            for (int l=0; l<N_lnM; l++) 
-            {
-              for (int q=0; q<N_k_hankel; q++) 
-              {
-                const double aa = amin + k*da;
-                const double zz = 1.0/aa - 1.0;
-                const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);
-                const double B1_1 = weighted_B1(i, zz);
-                const double B1_2 = (i == j) ? B1_1 : weighted_B1(j, zz);
-                lP[i][j][k][p][l][q] = kk*sqrt(kk)*Pdelta(kk, aa)*B1_1*B1_2;
-              }
-            }
+          const double aa = amin + k*da;
+          const double zz = 1.0/aa - 1.0;
+          const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);
+          const double B1_1 = weighted_B1(i, zz);
+          const double PK = Pdelta(kk, aa);
+          for(int j=i; j<N_l; j++)
+          {  
+            const double B1_2 = (i == j) ? B1_1 : weighted_B1(j, zz);
+            lP[i][j][k][0][q] = kk*sqrt(kk)*PK*B1_1*B1_2;
           }
         }
       }
@@ -1530,380 +1515,277 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
       {
         for (int k=0; k<N_a; k++) 
         { 
-          for (int p=0; p<N_lnM; p++) 
-          {
-            for (int l=0; l<N_lnM; l++) 
-            {
-              const int nsize = N_k_hankel;
-              plan[i][j][k][p][l]  = 
-                fftw_plan_dft_r2c_1d(nsize, lP[i][j][k][p][l], f_lP[i][j][k][p][l], FFTW_ESTIMATE);
-              plan1[i][j][k][p][l] = 
-                fftw_plan_dft_c2r_1d(nsize, conv[i][j][k][p][l], lP[i][j][k][p][l], FFTW_ESTIMATE);
-            }
-          }
+          plan[i][j][k][0] = 
+            fftw_plan_dft_r2c_1d(N_k_hankel, lP[i][j][k][0], flP[i][j][k][0], FFTW_ESTIMATE);
         }
       }
     }
-    #pragma omp parallel for collapse(5)
+    #pragma omp parallel for collapse(2)
+    for(int i=0; i<N_l; i++)
+    {
+      for (int k=0; k<N_a; k++) 
+      {
+        for(int j=i; j<N_l; j++)
+        {
+          fftw_execute(plan[i][j][k][0]);
+        }
+      }
+    }  
     for(int i=0; i<N_l; i++)
     {
       for(int j=i; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         { 
-          for (int p=0; p<N_lnM; p++) 
+          fftw_destroy_plan(plan[i][j][k][0]);
+          plan1[i][j][k][0] = 
+            fftw_plan_dft_c2r_1d(N_k_hankel, conv[i][j][k][0], lP[i][j][k][0], FFTW_ESTIMATE);
+        }
+      }
+    }  
+    #pragma omp parallel for collapse(2)
+    for(int i=0; i<N_l; i++)
+    {
+      for (int k=0; k<N_a; k++) 
+      {
+        for(int j=i; j<N_l; j++)
+        {    
+          for(int q=0; q<N_k_hankel/2+1; q++) 
+          {            
+            fftw_complex krn;
+            hankel_kernel_FT_3D(2.0*M_PI*q/((double) N_k_hankel*dlnk_hankel), &krn, arg, 2);
+            conv[i][j][k][0][q][0] = flP[i][j][k][0][q][0]*krn[0] - flP[i][j][k][0][q][1]*krn[1];
+            conv[i][j][k][0][q][1] = flP[i][j][k][0][q][1]*krn[0] + flP[i][j][k][0][q][0]*krn[1];
+          }
+
+          conv[i][j][k][0][0][1] = 0;            
+          conv[i][j][k][0][N_k_hankel/2][1] = 0;
+
+          fftw_execute(plan1[i][j][k][0]);
+
+          for (int q=0; q<N_k_hankel; q++) 
           {
-            for (int l=0; l<N_lnM; l++) 
-            {
-              fftw_execute(plan[i][j][k][p][l]);
-            }
+            const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);    
+            const double rr = 1.0/kk;
+            lP[i][j][k][0][q] = pow(2.0*M_PI*rr, -1.5)*lP[i][j][k][0][q]/((double) N_k_hankel); 
           }
         }
       }
     }
-    #pragma omp parallel for collapse(5)
     for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<N_l; j++)
+      for (int k=0; k<N_a; k++) 
+      {
+        for(int j=i; j<N_l; j++)
+        {
+          fftw_destroy_plan(plan1[i][j][k][0]);
+        }
+      }
+    }
+    #pragma omp parallel for collapse(3)
+    for(int i=0; i<N_l; i++)
+    {
+      for (int p=1; p<N_R; p++) 
+      { 
+        for (int k=0; k<N_a; k++) 
+        {
+          for(int j=i; j<N_l; j++)
+          {
+            lP[i][j][k][p][q] = lP[i][j][k][0][q]; // pk_to_xi does not depend on R!
+          }
+        }
+      }
+    }
+    // ---------------------------------------------------------------------------------------------
+    // Step 3: exclusion_filter
+    // ---------------------------------------------------------------------------------------------
+    #pragma omp parallel for collapse(4)
+    for(int i=0; i<N_l; i++)
+    {
+      for (int q=0; q<N_k_hankel; q++) 
       {
         for (int k=0; k<N_a; k++) 
         {
-          for (int p=0; p<N_lnM; p++) 
+          for (int p=0; p<N_R; p++) 
           {
-            for (int l=0; l<N_lnM; l++) 
-            { 
-              for(int q=0; q<N_k_hankel/2+1; q++) 
-              {            
-                fftw_complex kernel;
-                hankel_kernel_FT_3D(2.0*M_PI*q/((double) N_k_hankel*dlnk_hankel), &kernel, arg, 2);
-                
-                conv[i][j][k][p][l][q][0] = 
-                  f_lP[i][j][k][p][l][q][0]*kernel[0] - f_lP[i][j][k][p][l][q][1]*kernel[1];
-                
-                conv[i][j][k][p][l][q][1] = 
-                  f_lP[i][j][k][p][l][q][1]*kernel[0] + f_lP[i][j][k][p][l][q][0]*kernel[1];
-              }
+            const double aa = amin + k*da;
+            const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);     
+            const double rr = 1.0/kk;
+            const double R = R_min + p*dR
 
-              conv[i][j][k][p][l][0][1] = 0;            
-              conv[i][j][k][p][l][N_k_hankel/2][1] = 0;
-
-              fftw_execute(plan1[i][j][k][p][l]);
-
-              for (int q=0; q<N_k_hankel; q++) 
-              {
-                const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);    
-                const double rr = 1.0/kk;
-                lP[i][j][k][p][l][q] = 
-                  pow(2.0*M_PI*rr, -1.5)*lP[i][j][k][p][l][q]/((double) N_k_hankel); // XI
-              }
-            }
-          }
-        }
-      }
-    }
-    for(int i=0; i<N_l; i++)
-    {
-      for(int j=i; j<N_l; j++)
-      {
-        for (int k=0; k<N_a; k++) 
-        {
-          for (int p=0; p<N_lnM; p++) 
-          {
-            for (int l=0; l<N_lnM; l++) 
-            {  
-              fftw_destroy_plan(plan[i][j][k][p][l]);
-              fftw_destroy_plan(plan1[i][j][k]p][l]);
-            }
-          }
-        }
-      }
-    }
-    // ---------------------------------------------------------------------------------------------
-    // STEP 3: exclusion_filter
-    // ---------------------------------------------------------------------------------------------
-    #pragma omp parallel for collapse(6)
-    for(int i=0; i<N_l; i++)
-    {
-      for(int j=i; j<N_l; j++)
-      {
-        for (int k=0; k<N_a; k++) 
-        {
-          for (int p=0; p<N_lnM; p++) 
-          {
-            for (int l=0; l<N_lnM; l++) 
+            if (Cluster.halo_exclusion_model == 0)
             {
-              for (int q=0; q<N_k_hankel; q++) 
+              if(rr < R) 
               {
-                const double aa = amin + k*da;
-                const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);     
-                const double rr = 1.0/kk;
-                const double M1 = exp(lnM_min + p*dlnM);  
-                const double M2 = exp(lnM_min + l*dlnM);
-
-                const double tmp = 
-                  0.75/(M_PI*Cluster.delta_exclusion*cosmology.rho_crit*cosmology.Omega_m);
-                const double R1 = pow(M1*tmp, 1./3.);
-                const double R2 = pow(M2*tmp, 1./3.);
-                
-                // Cosmolike: This is to remove small oscilliating stuffs. 
-                // Cosmolike: It makes the integral faster
-                const double R = (kk*(0.5*(R1 + R2)) > 1) ? 0.0 : 0.5*(R1 + R2);
-
-                if (Cluster.halo_exclusion_model == 0)
+                for(int j=i; j<N_l; j++)
                 {
-                  if(rr < R) 
-                  {
-                    lP[i][j][k][p][l][q] = -1; 
-                  } 
+                  lP[i][j][k][p][q] = -1; 
                 }
-                else if (Cluster.halo_exclusion_model == 1)
-                { // Baldauf 2013 eq. 43
-                  if (R > 0) 
-                  {
-                    const double sigma = 0.0387;
-                    const double tmp = log(rr/R)/(M_SQRT2*sigma);
-                      
-                    double tmp2;
-                    int status = gsl_sf_erf_e(tmp, &tmp2);
-                    if (status)
-                    {
-                      log_fatal(gsl_strerror(status));
-                      exit(1);
-                    }
-
-                    lP[i][j][k][p][l][q] = 0.5*(1.0 + tmp2)*(lP[i][j][k][p][l][q] + 1.0) - 1.0;
-                  }
-                }
-                else // code to be executed if n doesn't match any cases
-                {  
-                  log_fatal("excusion type : %d  not implemented", type); 
+              } 
+            }
+            else if (Cluster.halo_exclusion_model == 1)
+            { // Baldauf 2013 eq. 43
+              if (R > 0) 
+              {                     
+                double tmp;
+                int status = gsl_sf_erf_e(log(rr/R)/(M_SQRT2*0.0387), &tmp);
+                if (status)
+                {
+                  log_fatal(gsl_strerror(status));
                   exit(1);
                 }
-              }
-            }
-          }
-        }
-      }
-    }
-    // ---------------------------------------------------------------------------------------------
-    // STEP 4: - xi_to_pk
-    // ---------------------------------------------------------------------------------------------
-    #pragma omp parallel for collapse(6)
-    for(int i=0; i<N_l; i++)
-    {
-      for(int j=i; j<N_l; j++)
-      {
-        for (int k=0; k<N_a; k++) 
-        { 
-          for (int p=0; p<N_lnM; p++) 
-          {
-            for (int l=0; l<N_lnM; l++) 
-            {
-              for (int q=0; q<N_k_hankel; q++) 
-              {
-                const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);    
-                const double rr = 1.0/kk;
-                lP[i][j][k][p][l][q] = pow(rr, 1.5)*lP[i][j][k][p][l][q];
-              }
-            }
-          }
-        }
-      }
-    }
-    for(int i=0; i<N_l; i++)
-    {
-      for(int j=i; j<N_l; j++)
-      {
-        for (int k=0; k<N_a; k++) 
-        { 
-          for (int p=0; p<N_lnM; p++) 
-          {
-            for (int l=0; l<N_lnM; l++) 
-            {
-              const int nsize = N_k_hankel;
-              plan[i][j][k][p][l]  = 
-                fftw_plan_dft_r2c_1d(nsize, lP[i][j][k][p][l], f_lP[i][j][k][p][l], FFTW_ESTIMATE);
-              plan1[i][j][k][p][l] = 
-                fftw_plan_dft_c2r_1d(nsize, conv[i][j][k][p][l], lP[i][j][k][p][l], FFTW_ESTIMATE);
-            }
-          }
-        }
-      }
-    }
-    #pragma omp parallel for collapse(5)
-    for(int i=0; i<N_l; i++)
-    {
-      for(int j=i; j<N_l; j++)
-      {
-        for (int k=0; k<N_a; k++) 
-        { 
-          for (int p=0; p<N_lnM; p++) 
-          {
-            for (int l=0; l<N_lnM; l++) 
-            {
-              fftw_execute(plan[i][j][k][p][l]);
-            }
-          }
-        }
-      }
-    }
-    #pragma omp parallel for collapse(5)
-    for(int i=0; i<N_l; i++)
-    {
-      for(int j=i; j<N_l; j++)
-      {
-        for (int k=0; k<N_a; k++) 
-        {
-          for (int p=0; p<N_lnM; p++) 
-          {
-            for (int l=0; l<N_lnM; l++) 
-            { 
-              for(int q=0; q<N_k_hankel/2+1; q++) 
-              { // TODO: ok for dlnR < 0 in the denom? (original code is neg)
-                const double rr = 2.0*M_PI*q/((double) N_k_hankel*(-1.0*dlnk_hankel)); 
-
-                fftw_complex  kernel;
-                hankel_kernel_FT_3D(rr, &kernel, arg, 2);
-                
-                conv[i][j][k][p][l][q][0] = 
-                  f_lP[i][j][k][p][l][q][0]*kernel[0] - f_lP[i][j][k][p][l][q][1]*kernel[1];
-                
-                conv[i][j][k][p][l][q][1] = 
-                  f_lP[i][j][k][p][l][q][1]*kernel[0] + f_lP[i][j][k][p][l][q][0]*kernel[1];
-              }
-
-              conv[i][j][k][p][l][0][1] = 0;            
-              conv[i][j][k][p][l][N_k_hankel/2][1] = 0;
-
-              fftw_execute(plan[i][j][k][p][l]);
-
-              for (int q=0; q<N_k_hankel; q++) 
-              {
-                const double kk = exp(ln_k_min_hankel + q*dlnk_hankel); 
-                
-                lP[i][j][k][p][l][q] = 
-                  pow(2*M_PI*kk, -1.5)*lP[i][j][k][p][l][q]/((double) N_k_hankel);
-                
-                // normalization 
-                const double TwoPiCubed = 8*M_PI*M_PI*M_PI;
-                lP[i][j][k][p][l][q] *= TwoPiCubed;
-
-                // for interpolation
-                lP[i][j][k][p][l][q] = 
-                  log(kk*kk*kk*lP[i][j][k][p][l][q] + 1.0E5); // 1E5 avoid negs inside ln()
-              }
-            }
-          }
-        }
-      }
-    }
-    for(int i=0; i<N_l; i++)
-    {
-      for(int j=i; j<N_l; j++)
-      {
-        for (int k=0; k<N_a; k++) 
-        { 
-          for (int p=0; p<N_lnM; p++) 
-          {
-            for (int l=0; l<N_lnM; l++) 
-            { 
-              fftw_destroy_plan(plan[i][j][k][p][l]);
-              fftw_destroy_plan(plan1[i][j][k][p][l]);
-            }
-          }
-        }
-      }
-    }
-    // ---------------------------------------------------------------------------------------------
-    // Step 5 - Evaluate binned_p_cc_incl_halo_exclusion in the interpolation table
-    // ---------------------------------------------------------------------------------------------
-    B1_x_BSF(exp(lnM_min), amin); // init static vars
-    {
-      double params_in[2] = {0, 1.0/amin - 1.0};
-      dndlnM_times_binned_P_lambda_obs_given_M(lnM_min, (void*) params_in); // init static vars
-    }
-    for(int i=0; i<N_l; i++)
-    {
-      for(int j=i; j<N_l; j++)
-      {
-        for (int k=0; k<N_a; k++) 
-        {
-          for (int p=0; p<N_lnM; p++) 
-          {
-            for (int l=0; l<N_lnM; l++) 
-            {
-              for (int q=0; q<N_k; q++) 
-              {
-                const double aa = amin + k*da;
-                const double kk = exp(ln_k_min + q*dlnk);
-                
-                const double zz = 1.0/aa - 1.0;
-                const double lnM1 = lnM_min + p*dlnM;
-                const double lnM2 = lnM_min + l*dlnM;
-                const double M1 = exp(lnM1);  
-                const double M2 = exp(lnM2);
-
-                const double B1_1 = B1_x_BSF(M1, aa);
-                const double B1_2 = B1_x_BSF(M2, aa); 
-
-                const double tmp = 
-                  0.75/(M_PI*Cluster.delta_exclusion*cosmology.rho_crit*cosmology.Omega_m);
-                const double R1 = pow(M1*tmp, 1./3.);
-                const double R2 = pow(M2*tmp, 1./3.);
-                
-                // Cosmolike: This is to remove small oscilliating stuffs. 
-                // Cosmolike: It makes the integral faster
-                const double R = (kk*(0.5*(R1 + R2)) > 1) ? 0.0 : 0.5*(R1 + R2);
-
-                const double V_EXCL = 4.0*M_PI/3.*3*(sin(kk*R) - k*R*cos(kk*R))/(kk*kk*kk);
-                
-                // need to do the spline here
-                const double PK = (R == 0) ?  Pdelta(kk, aa)*B1_1*B1_2 :
-                  (pk_halo_with_exclusion_Rtab(k, R, a, 1., 1., 1) + V_EXCL)*B1_1*B1_2 - V_EXCL;
-
-                double res1;
-                {                
-                  double BS;
-                  if (Cluster.N_SF == 1) 
-                  {
-                    BS = nuisance.cluster_selection[0]; 
-                  }
-                  else if (Cluster.N_SF == 2)
-                  {
-                    BS = 
-                    nuisance.cluster_selection[0]*pow((M1/M_PIVOT), nuisance.cluster_selection[1]); 
-                  }
-                  else
-                  {
-                    log_fatal("Cluster selection bias model %i not implemented", Cluster.bias_model);
-                    exit(0); 
-                  }
-                  double params_in[2] = {i, zz};
-                  res1 = dndlnM_times_binned_P_lambda_obs_given_M(lnM1, (void*) params_in)*BS;
-                }
-                double res2;
+                for(int j=i; j<N_l; j++)
                 {
-                  double BS;
-                  if (Cluster.N_SF == 1) 
-                  {
-                    BS = nuisance.cluster_selection[0]; 
-                  }
-                  else if (Cluster.N_SF == 2)
-                  {
-                    BS = 
-                    nuisance.cluster_selection[0]*pow((M2/M_PIVOT), nuisance.cluster_selection[1]); 
-                  }
-                  else
-                  {
-                    log_fatal("Cluster selection bias model %i not implemented", Cluster.bias_model);
-                    exit(0); 
-                  }
-                  double params_in[2] = {j, zz};
-                  res2 = dndlnM_times_binned_P_lambda_obs_given_M(lnM2, (void*) params_in)*BS;
+                  lP[i][j][k][p][q] = 0.5*(1.0 + tmp)*(lP[i][j][k][p][q] + 1.0) - 1.0;
                 }
-                table[i][j][k][q][p][l] = PK*res1*res2;
-                table[j][i][k][q][p][l] = table[i][j][k][q][p][l];
               }
+            }
+            else
+            {  
+              log_fatal("excusion type : %d  not implemented", type); 
+              exit(1);
+            }
+          }
+        }
+      }
+    }
+    // ---------------------------------------------------------------------------------------------
+    // Step4 4: - xi_to_pk
+    // ---------------------------------------------------------------------------------------------
+    #pragma omp parallel for collapse(4)
+    for(int i=0; i<N_l; i++)
+    {
+      for (int q=0; q<N_k_hankel; q++) 
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_R; p++) 
+          {
+            const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);    
+            const double rr = 1.0/kk;
+            for(int j=i; j<N_l; j++)
+            {
+              lP[i][j][k][p][q] = rr*sqrt(rr)*lP[i][j][k][p][q];
+            }
+          }
+        }
+      }
+    }
+    for(int i=0; i<N_l; i++)
+    {
+      for(int j=i; j<N_l; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_R; p++) 
+          {
+            plan[i][j][k][p] = 
+              fftw_plan_dft_r2c_1d(N_k_hankel, lP[i][j][k][p], flP[i][j][k][p], FFTW_ESTIMATE);
+          }
+        }
+      }
+    }
+    #pragma omp parallel for collapse(3)
+    for(int i=0; i<N_l; i++)
+    {
+      for (int p=0; p<N_R; p++) 
+      {
+        for (int k=0; k<N_a; k++) 
+        {
+          for(int j=i; j<N_l; j++)
+          {    
+            fftw_execute(plan[i][j][k][p]);
+          }
+        }
+      }
+    }
+    for(int i=0; i<N_l; i++)
+    {
+      for(int j=i; j<N_l; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_R; p++) 
+          {
+            fftw_destroy_plan(plan[i][j][k][p]);
+            plan1[i][j][k][p] = 
+              fftw_plan_dft_c2r_1d(N_k_hankel, conv[i][j][k][p], lP[i][j][k][p], FFTW_ESTIMATE);
+          }
+        }
+      }
+    }
+    #pragma omp parallel for collapse(3)
+    for(int i=0; i<N_l; i++)
+    {
+      for (int p=0; p<N_R; p++) 
+      {
+        for (int k=0; k<N_a; k++) 
+        {
+          for(int j=i; j<N_l; j++)
+          { 
+            for(int q=0; q<N_k_hankel/2+1; q++) 
+            { // TODO: ok for dR < 0 in the denom? (original code is neg)
+              const double rr = 2.0*M_PI*q/((double) N_k_hankel*(-1.0*dlnk_hankel)); 
+
+              fftw_complex  krn;
+              hankel_kernel_FT_3D(rr, &krn, arg, 2);
+              
+              conv[i][j][k][p][q][0] = flP[i][j][k][p][q][0]*krn[0] - flP[i][j][k][p][q][1]*krn[1];
+              conv[i][j][k][p][q][1] = flP[i][j][k][p][q][1]*krn[0] + flP[i][j][k][p][q][0]*krn[1];
+            }
+
+            conv[i][j][k][p][0][1] = 0;            
+            conv[i][j][k][p][N_k_hankel/2][1] = 0;
+
+            fftw_execute(plan[i][j][k][p]);
+
+            for (int q=0; q<N_k_hankel; q++) 
+            {
+              const double kk = exp(ln_k_min_hankel + q*dlnk_hankel); 
+              
+              lP[i][j][k][p][q] = pow(2.0*M_PI*kk, -1.5)*lP[i][j][k][p][q]/((double) N_k_hankel);
+              
+              // normalization 
+              lP[i][j][k][p][q] *= 2.0*2.0*2.0*M_PI*M_PI*M_PI;
+
+              // for interpolation
+              lP[i][j][k][p][q] = log(kk*kk*kk*lP[i][j][k][p][q] + 1.0E5);
+            }
+          }
+        }
+      }
+    }
+    for(int i=0; i<N_l; i++)
+    {
+      for(int j=i; j<N_l; j++)
+      {
+        for (int k=0; k<N_a; k++) 
+        { 
+          for (int p=0; p<N_R; p++) 
+          {
+            fftw_destroy_plan(plan1[i][j][k][p]);
+          }
+        }
+      }
+    }
+    // ---------------------------------------------------------------------------------------------
+    // Step 5 - Make Table
+    // ---------------------------------------------------------------------------------------------
+    #pragma omp parallel for collapse(4)
+    for(int i=0; i<N_l; i++)
+    {
+      for (int q=0; q<N_k; q++) 
+      {
+        for (int k=0; k<N_a; k++) 
+        {
+          for (int p=0; p<N_R; p++) 
+          {
+            for(int j=i; j<N_l; j++)
+            {
+              table[i][j][k][q][p] = interpol(lP[i][j][k][p], N_k_hankel, ln_k_min_hankel, 
+                ln_k_max_hankel, dlnk_hankel, ln_k_min + q*dlnk, 1.0, 1.0);          
+     
+              table[j][i][k][q][p] = table[i][j][k][q][p];
             }
           }
         }
@@ -1914,59 +1796,51 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
     // ---------------------------------------------------------------------------------------------
     for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<N_l; j++)
+      for(int j=0; j<N_l; j++)
       {
         for (int k=0; k<N_a; k++) 
         { 
-          for (int p=0; p<N_lnM; p++) 
+          for (int p=0; p<N_R; p++) 
           {
-            for (int l=0; l<N_lnM; l++) 
-            { 
-              fftw_free(f_lP[i][j][k][p][l]); 
-              fftw_free(conv[i][j][k][p][l]);  
-              fftw_free(lP[i][j][k][p][l]);
-            }
-            free(plan[i][j][k][p]);
-            free(plan1[i][j][k][p]);
-            free(f_lP[i][j][k][p]); 
-            free(conv[i][j][k][p]);  
-            free(lP[i][j][k][p]);
+            fftw_free(flP[i][j][k][p]);
+            fftw_free(lP[i][j][k][p]); 
+            fftw_free(conv[i][j][k][p]);  
           }
           free(plan[i][j][k]);
           free(plan1[i][j][k]);
-          free(f_lP[i][j][k]); 
+          free(flP[i][j][k]); 
           free(conv[i][j][k]);  
-          free(lP[i][j][k]);
+          free(lp[i][j][k]);
         }
         free(plan[i][j]);
         free(plan1[i][j]);
-        free(f_lP[i][j]);
+        free(flP[i][j]);
         free(conv[i][j]);
-        free(lP[i][j]);
+        free(lp[i][j]);
       }
       free(plan[i]);
       free(plan1[i]);
-      free(f_lP[i]);
+      free(flP[i]);
       free(conv[i]);
-      free(lP[i]);
+      free(lp[i]);
     }
     free(plan);
     free(plan1);
-    free(f_lP);
-    free(conv);
     free(lP);
-
+    free(flP);
+    free(conv);
+    // ---------------------------------------------------------------------------------------------
+    // Step 7 Update cosmo and nuisance param classes
+    // ---------------------------------------------------------------------------------------------   
     update_cosmopara(&C);
     update_nuisance(&N);
   }
-
   double* ar = (double*) params;
   const int nl1 = ar[0]; 
   const int nl2 = ar[1];
   const int nk = ar[2]; 
   const int na = ar[3];
-  const double lnM1 = ar[4];
-
+  const double lnM2 = ar[4];
   if(nl1 < 0 || nl1 > N_l -1 || nl2 < 0 || nl2 > N_l -1)
   {
     log_fatal("invalid bin input (nl1, nl2) = (%d, %d)", nl1, nl2);
@@ -1982,8 +1856,44 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion_exact(double lnM, void* p
     log_fatal("invalid bin input na = %d", na);
     exit(1);
   }
-  return interpol2d(table[nl1][nl2][na][nk], N_lnM, lnM_min, lnM_max, dlnM, lnM, N_lnM, 
-    lnM_min, lnM_max, dlnM, lnM1, 1.0, 1.0);
+  const double aa = amin + na*da;
+  const double kk = exp(ln_k_min + nk*dlnk);  
+  const double zz = 1.0/aa - 1.0;
+  const double M1 = exp(lnM1);  
+  const double M2 = exp(lnM2);
+
+  const double B1_1 = B1_x_BSF(M1, aa);
+  const double B1_2 = B1_x_BSF(M2, aa); 
+
+  const double tmp = 0.75/(M_PI*Cluster.delta_exclusion*cosmology.rho_crit*cosmology.Omega_m);
+  const double R1 = pow(M1*tmp, 1./3.);
+  const double R2 = pow(M2*tmp, 1./3.);
+  const double R = (0.5*(R1 + R2));
+  if (R < R_min || R > R_max)
+  {
+    log_fatal("R = %e outside look-up table range [%e,%e]", R, R_min, R_max);
+    exit(1);
+  } 
+
+  const double V_EXCL = (4.0*M_PI/3.0)*3.0*(sin(kk*R) - k*R*cos(kk*R))/(kk*kk*kk);
+
+  const double PK_HALO_EXCL = (exp(interpol(table[nl1][nl2][na][nk], N_R, R_min, 
+    R_max, dR, R, 1.0, 1.0)) - 1.0E5)/(kk*kk*kk);
+
+  const double PK = (R == 0) ?  Pdelta(kk, aa)*B1_1*B1_2 : 
+    (PK_HALO_EXCL + V_EXCL)*B1_1*B1_2 - V_EXCL;
+
+  double res1;
+  { // TODO: is it really BSF(M = M1) ?!             
+    double params_in[2] = {i, zz};
+    res1 = dndlnM_times_binned_P_lambda_obs_given_M(lnM1, (void*) params_in)*BSF(M1);
+  }
+  double res2;
+  { // TODO: is it really BSF(M = M2) ?! 
+    double params_in[2] = {j, zz};
+    res2 = dndlnM_times_binned_P_lambda_obs_given_M(lnM2, (void*) params_in)*BSF(M2);
+  }
+  return (kk*R > 1) ? 0.0 : PK*res1*res2;
 }
 
 double int_for_binned_p_cc_incl_halo_exclusion(double lnM, void* params)
@@ -1991,7 +1901,7 @@ double int_for_binned_p_cc_incl_halo_exclusion(double lnM, void* params)
   double* ar = (double*) params;
   const int nl1 = ar[0]; 
   const int nl2 = ar[1];
-  const int nk = ar[2]; 
+  const int nk = ar[2];
   const int na = ar[3];
   const int init_static_vars_only = (int) ar[4];
 
@@ -2008,29 +1918,33 @@ double int_for_binned_p_cc_incl_halo_exclusion(double lnM, void* params)
 
 double binned_p_cc_incl_halo_exclusion_nointerp(const int nl1, const int nl2, const int na, 
   const int nk, const int init_static_vars_only)
-{  
+{
+  const double N_l = Cluster.N200_Nbin;
+  if (nl1 < 0 || nl1 > N_l - 1 || nl2 < 0 || nl2 > N_l - 1)
+  {
+    log_fatal("invalid bin input (nl1, nl2) = (%d, %d)", nl1, nl2);
+    exit(1);
+  }  
   const int N_k = Ntable.N_k_halo_exclusion;
   if(nk < 0 || nk > N_k - 1)
   {
     log_fatal("invalid bin input nk = %d", nk);
     exit(1);
   }
-
   const int N_a = Ntable.N_a_halo_exclusion;
-  const double amin = 1.0/(1.0 + tomo.cluster_zmax[tomo.cluster_Nbin - 1]);
-  const double amax = 1.0/(1.0 + tomo.cluster_zmin[0]) + 0.01;
-  const double da = (amax - amin)/((double) N_a - 1.0);
-  const double a = amin + na*da;
   if(na < 0 || na > N_a - 1)
   {
     log_fatal("invalid bin input na = %d", na);
     exit(1);
   }
+  const double amin = 1.0/(1.0 + tomo.cluster_zmax[tomo.cluster_Nbin - 1]);
+  const double amax = 1.0/(1.0 + tomo.cluster_zmin[0]) + 0.01;
+  const double da = (amax - amin)/((double) N_a - 1.0);
+  const double a = amin + na*da;
   const double z = 1.0/a - 1.0;
-
   const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E; 
   const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E; 
- 
+
   double norm1;
   {
     double params[2] = {nl1, z};
@@ -2094,15 +2008,20 @@ double binned_p_cc_incl_halo_exclusion(const double k, const double a, const int
   }
   if (recompute_clusters(C, N))
   { 
-    binned_p_cc_incl_halo_exclusion_nointerp(0, 0, 0, 0, 1); // init static vars only
-    #pragma omp parallel for collapse(4)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      double init_static_vars_only = binned_p_cc_incl_halo_exclusion_nointerp(0, 0, 0, 0, 1); 
+    }
+    #pragma GCC diagnostic pop
+    #pragma omp parallel for collapse(3)
     for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<N_l; j++)
+      for (int p=0; p<N_k; p++) 
       {
         for (int l=0; l<N_a; l++) 
         { 
-          for (int p=0; p<N_k; p++) 
+          for(int j=i; j<N_l; j++)
           {
             const double aa = amin + l*da;
             const double kk = exp(ln_k_min + p*dlnk);
@@ -2117,7 +2036,6 @@ double binned_p_cc_incl_halo_exclusion(const double k, const double a, const int
       }
     }
   }
-
   if (nl1 < 0 || nl1 > N_l - 1 || nl2 < 0 || nl2 > N_l - 1)
   {
     log_fatal("invalid bin input (nl1, nl2) = (%d, %d)", nl1, nl2);
@@ -2134,9 +2052,8 @@ double binned_p_cc_incl_halo_exclusion(const double k, const double a, const int
     log_fatal("k = %e outside look-up table range [%e,%e]", k, exp(ln_k_min), exp(ln_k_max));
     exit(1);
   } 
-
-  const double val = 
-    interpol2d(table[nl1][nl2], N_a, amin, amax, da, a, N_k, ln_k_min, ln_k_max, dlnk, lnk, 1., 1.);
+  const double val = interpol2d(table[nl1][nl2], N_a, amin, amax, da, a, N_k, ln_k_min, ln_k_max, 
+    dlnk, lnk, 1.0, 1.0);
   return (exp(val) - 1.E8)/(k*k*k*sqrt(a));
 }
 
@@ -2164,13 +2081,19 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
   const double ln_k_max_hankel = log(limits.halo_exclusion_k_max_hankel);
   const double dlnk_hankel = (ln_k_max_hankel - ln_k_min_hankel)/((double) N_k_hankel - 1.0);
 
+  typedef fftw_complex fftwZ;
+  const double CO = 1.0; // cutoff = CO
+  double arg[2];
+  arg[0] = 0;     // bias
+  arg[1] = 0.5;   // order of Bessel function  
+
   if(table == 0)
   {
     table = (double****) malloc(sizeof(double***)*N_l);
     for(int i=0; i<N_l; i++)
     {          
       table[i] = (double***) malloc(sizeof(double**)*N_l);
-      for(int j=i; j<N_l; j++)
+      for(int j=0; j<N_l; j++)
       {
         table[i][j] = (double**) malloc(sizeof(double*)*N_a);
         for (int l=0; l<N_a; l++) 
@@ -2184,60 +2107,57 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
   { 
     // ---------------------------------------------------------------------------------------------
     // Step 1 - memory allocation (except for FFTW plans)
-    // ---------------------------------------------------------------------------------------------
-    typedef fftw_complex fftwZ;
-    
-    double arg[2];
-    arg[0] = 0;     // bias
-    arg[1] = 0.5;   // order of Bessel function  
-    
-    const double CO = 1.0; // cutoff = CO
-
-    fftw_plan*** plan    = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_l);
-    fftw_plan*** plan1   = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_l);
-    fftwZ**** f_lP       = (fftwZ****)    malloc(sizeof(fftwZ***)*N_l);
-    fftwZ**** conv       = (fftwZ****)    malloc(sizeof(fftwZ***)*N_l);
-    double**** lP        = (double****)   malloc(sizeof(double***)*N_l);
+    // --------------------------------------------------------------------------------------------- 
+    fftw_plan*** plan   = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_l);
+    fftw_plan*** plan1  = (fftw_plan***) malloc(sizeof(fftw_plan**)*N_l);
+    fftwZ**** flP      = (fftwZ****)    malloc(sizeof(fftwZ***)*N_l);
+    fftwZ**** conv      = (fftwZ****)    malloc(sizeof(fftwZ***)*N_l);
+    double**** lP       = (double****)   malloc(sizeof(double***)*N_l);
     for(int i=0; i<N_l; i++)
     {
-      plan[i]   = (fftw_plan**) malloc(sizeof(fftw_plan*)*N_l);
-      plan1[i]  = (fftw_plan**) malloc(sizeof(fftw_plan*)*N_l);    
-      f_lP[i]   = (fftwZ***)    malloc(sizeof(fftwZ**)*N_l);
-      conv[i]   = (fftwZ***)    malloc(sizeof(fftwZ**)*N_l);
-      lP[i]     = (double***)   malloc(sizeof(double**)*N_l);
-      for(int j=i; j<N_l; j++)
+      plan[i]  = (fftw_plan**) malloc(sizeof(fftw_plan*)*N_l);
+      plan1[i] = (fftw_plan**) malloc(sizeof(fftw_plan*)*N_l);    
+      flP[i]  = (fftwZ***)    malloc(sizeof(fftwZ**)*N_l);
+      conv[i]  = (fftwZ***)    malloc(sizeof(fftwZ**)*N_l);
+      lP[i]    = (double***)   malloc(sizeof(double**)*N_l);
+      for(int j=0; j<N_l; j++)
       {
-        plan[i][j]   = (fftw_plan*) malloc(sizeof(fftw_plan)*N_a);
-        plan1[i][j]  = (fftw_plan*) malloc(sizeof(fftw_plan)*N_a);
-        f_lP[i][j]   = (fftwZ**)    malloc(sizeof(fftwZ*)*N_a);
-        conv[i][j]   = (fftwZ**)    malloc(sizeof(fftwZ*)*N_a);
-        lP[i][j]     = (double**)   malloc(sizeof(double*)*N_a);
+        plan[i][j]  = (fftw_plan*) malloc(sizeof(fftw_plan)*N_a);
+        plan1[i][j] = (fftw_plan*) malloc(sizeof(fftw_plan)*N_a);
+        flP[i][j]  = (fftwZ**)    malloc(sizeof(fftwZ*)*N_a);
+        conv[i][j]  = (fftwZ**)    malloc(sizeof(fftwZ*)*N_a);
+        lP[i][j]    = (double**)   malloc(sizeof(double*)*N_a);
         for (int l=0; l<N_a; l++) 
         { 
-          f_lP[i][j][l]  = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
-          conv[i][j][l]  = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
-          lP[i][j][l]    = fftw_malloc(N_k_hankel*sizeof(double));
+          flP[i][j][l] = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
+          conv[i][j][l] = fftw_malloc((N_k_hankel/2 + 1)*sizeof(fftw_complex));
+          lP[i][j][l]   = fftw_malloc(N_k_hankel*sizeof(double));
         }
       }
     }
     // ---------------------------------------------------------------------------------------------
-    // STEP 2: - pk_to_xi
+    // Step 2: - pk_to_xi
     // ---------------------------------------------------------------------------------------------
-    weighted_B1(0, 1.0/amin - 1.0);     // init static vars
-    Pdelta(exp(ln_k_min_hankel), amin); // init static vars
-    #pragma omp parallel for collapse(4)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      double init_static_vars_only  = weighted_B1(0, 1.0/amin - 1.0);     
+      double init_static_vars_only2 = Pdelta(exp(ln_k_min_hankel), amin); 
+    }
+    #pragma GCC diagnostic pop
+    #pragma omp parallel for collapse(3)
     for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<N_l; j++)
-      {
-        for (int l=0; l<N_a; l++) 
-        { 
-          for (int p=0; p<N_k_hankel; p++) 
+      for (int l=0; l<N_a; l++) 
+      { 
+        for (int p=0; p<N_k_hankel; p++) 
+        {
+          const double aa = amin + l*da;
+          const double zz = 1.0/aa - 1.0;
+          const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);
+          const double B1_1 = weighted_B1(i, zz);
+          for(int j=i; j<N_l; j++)
           {
-            const double aa = amin + l*da;
-            const double zz = 1.0/aa - 1.0;
-            const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);
-            const double B1_1 = weighted_B1(i, zz);
             const double B1_2 = (i == j) ? B1_1 : weighted_B1(j, zz);
             lP[i][j][l][p] = kk*sqrt(kk)*Pdelta(kk, aa)*B1_1*B1_2;
           }
@@ -2250,37 +2170,49 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
       {
         for (int l=0; l<N_a; l++) 
         { 
-          const int nsize = N_k_hankel;
-          plan[i][j][l]  = fftw_plan_dft_r2c_1d(nsize, lP[i][j][l], f_lP[i][j][l], FFTW_ESTIMATE);
-          plan1[i][j][l] = fftw_plan_dft_c2r_1d(nsize, conv[i][j][l], lP[i][j][l], FFTW_ESTIMATE);
+          plan[i][j][l] = 
+            fftw_plan_dft_r2c_1d(N_k_hankel, lP[i][j][l], flP[i][j][l], FFTW_ESTIMATE);
         }
       }
     }
-    #pragma omp parallel for collapse(3)
+    #pragma omp parallel for collapse(2)
     for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<N_l; j++)
+      for (int l=0; l<N_a; l++) 
       {
-        for (int l=0; l<N_a; l++) 
-        { 
+        for(int j=i; j<N_l; j++)
+        {
           fftw_execute(plan[i][j][l]);
         }
       }
     }
-    #pragma omp parallel for collapse(3)
     for(int i=0; i<N_l; i++)
     {
       for(int j=i; j<N_l; j++)
       {
         for (int l=0; l<N_a; l++) 
         { 
+          fftw_destroy_plan(plan[i][j][l]);
+          plan1[i][j][l] = 
+            fftw_plan_dft_c2r_1d(N_k_hankel, conv[i][j][l], lP[i][j][l], FFTW_ESTIMATE);
+        }
+      }
+    }
+    #pragma omp parallel for collapse(2)
+    for(int i=0; i<N_l; i++)
+    {
+      for (int l=0; l<N_a; l++) 
+      {
+        for(int j=i; j<N_l; j++)
+        { 
           for(int p=0; p<N_k_hankel/2+1; p++) 
           {            
             fftw_complex  kernel;
+            
             hankel_kernel_FT_3D(2.0*M_PI*p/((double) N_k_hankel*dlnk_hankel), &kernel, arg, 2);
             
-            conv[i][j][l][p][0] = f_lP[i][j][l][p][0]*kernel[0] - f_lP[i][j][l][p][1]*kernel[1];
-            conv[i][j][l][p][1] = f_lP[i][j][l][p][1]*kernel[0] + f_lP[i][j][l][p][0]*kernel[1];
+            conv[i][j][l][p][0] = flP[i][j][l][p][0]*kernel[0] - flP[i][j][l][p][1]*kernel[1];
+            conv[i][j][l][p][1] = flP[i][j][l][p][1]*kernel[0] + flP[i][j][l][p][0]*kernel[1];
           }
 
           conv[i][j][l][0][1] = 0;            
@@ -2303,7 +2235,6 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
       {
         for (int l=0; l<N_a; l++) 
         { 
-          fftw_destroy_plan(plan[i][j][l]);
           fftw_destroy_plan(plan1[i][j][l]);
         }
       }
@@ -2311,14 +2242,14 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
     // ---------------------------------------------------------------------------------------------
     // STEP 3: exclusion_filter
     // ---------------------------------------------------------------------------------------------
-    #pragma omp parallel for collapse(4)
+    #pragma omp parallel for collapse(3)
     for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<N_l; j++)
+      for (int p=0; p<N_k_hankel; p++) 
       {
         for (int l=0; l<N_a; l++) 
         {
-          for (int p=0; p<N_k_hankel; p++) 
+          for(int j=i; j<N_l; j++)
           {
             const double aa = amin + l*da;
             const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);     
@@ -2337,21 +2268,17 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
             { // Baldauf 2013 eq. 43
               if (R > 0) 
               {
-                const double sigma = 0.0387;
-                const double tmp = log(rr/R)/(M_SQRT2*sigma);
-                  
-                double tmp2;
-                int status = gsl_sf_erf_e(tmp, &tmp2);
+                double tmp;
+                int status = gsl_sf_erf_e(log(rr/R)/(M_SQRT2*0.0387), &tmp);
                 if (status)
                 {
                   log_fatal(gsl_strerror(status));
                   exit(1);
                 }
-
-                lP[i][j][l][p] = 0.5*(1.0 + tmp2)*(lP[i][j][l][p] + 1.0) - 1.0;
+                lP[i][j][l][p] = 0.5*(1.0 + tmp)*(lP[i][j][l][p] + 1.0) - 1.0;
               }
             }
-            else // code to be executed if n doesn't match any cases
+            else
             {  
               log_fatal("excusion type : %d  not implemented", type); 
               exit(1);
@@ -2363,17 +2290,17 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
     // ---------------------------------------------------------------------------------------------
     // STEP 4: - xi_to_pk
     // ---------------------------------------------------------------------------------------------
-    #pragma omp parallel for collapse(4)
+    #pragma omp parallel for collapse(3)
     for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<N_l; j++)
-      {
+      for (int p=0; p<N_k_hankel; p++) 
+      {    
         for (int l=0; l<N_a; l++) 
         { 
-          for (int p=0; p<N_k_hankel; p++) 
-          { 
-            const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);    
-            const double rr = 1.0/kk;
+          const double kk = exp(ln_k_min_hankel + p*dlnk_hankel);    
+          const double rr = 1.0/kk;
+          for(int j=i; j<N_l; j++)
+          {
             lP[i][j][l][p] = rr*sqrt(rr)*lP[i][j][l][p];
           }
         }
@@ -2385,39 +2312,48 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
       {
         for (int l=0; l<N_a; l++) 
         { 
-          const int nsize = N_k_hankel;
-          plan[i][j][l]  = fftw_plan_dft_r2c_1d(nsize, lP[i][j][l], f_lP[i][j][l], FFTW_ESTIMATE);
-          plan1[i][j][l] = fftw_plan_dft_c2r_1d(nsize, conv[i][j][l], lP[i][j][l], FFTW_ESTIMATE);
+          plan[i][j][l] = fftw_plan_dft_r2c_1d(N_k_hankel, lP[i][j][l], flP[i][j][l], FFTW_ESTIMATE);
         }
       }
     }
-    #pragma omp parallel for collapse(3)
+    #pragma omp parallel for collapse(2)
+    for(int i=0; i<N_l; i++)
+    {
+      for (int l=0; l<N_a; l++) 
+      { 
+        for(int j=i; j<N_l; j++)
+        { 
+          fftw_execute(plan[i][j][l]);  
+        }
+      }
+    }
     for(int i=0; i<N_l; i++)
     {
       for(int j=i; j<N_l; j++)
       {
         for (int l=0; l<N_a; l++) 
-        {      
-          fftw_execute(plan[i][j][l]);
+        { 
+          fftw_destroy_plan(plan[i][j][l]);
+          plan1[i][j][l] = fftw_plan_dft_c2r_1d(N_k_hankel, conv[i][j][l], lP[i][j][l], FFTW_ESTIMATE);
         }
       }
     }
-    #pragma omp parallel for collapse(3)
+    #pragma omp parallel for collapse(2)
     for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<N_l; j++)
-      {
-        for (int l=0; l<N_a; l++) 
-        {    
+      for (int l=0; l<N_a; l++) 
+      { 
+        for(int j=i; j<N_l; j++)
+        {           
           for(int p=0; p<N_k_hankel/2+1; p++) 
-          { // TODO: ok for dlnR < 0 in the denom? (original code is neg)
+          { // TODO: ok for dR < 0 in the denom? (original code is neg)
             const double rr = 2.0*M_PI*p/((double) N_k_hankel*(-1.0*dlnk_hankel)); 
 
             fftw_complex  kernel;
             hankel_kernel_FT_3D(rr, &kernel, arg, 2);
             
-            conv[i][j][l][p][0] = f_lP[i][j][l][p][0]*kernel[0] - f_lP[i][j][l][p][1]*kernel[1];
-            conv[i][j][l][p][1] = f_lP[i][j][l][p][1]*kernel[0] + f_lP[i][j][l][p][0]*kernel[1];
+            conv[i][j][l][p][0] = flP[i][j][l][p][0]*kernel[0] - flP[i][j][l][p][1]*kernel[1];
+            conv[i][j][l][p][1] = flP[i][j][l][p][1]*kernel[0] + flP[i][j][l][p][0]*kernel[1];
           }
 
           conv[i][j][l][0][1] = 0;            
@@ -2431,8 +2367,7 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
             lP[i][j][l][p] = pow(2*M_PI*kk, -1.5)*lP[i][j][l][p]/((double) N_k_hankel);
             
             // normalization 
-            const double TwoPiCubed = 8*M_PI*M_PI*M_PI;
-            lP[i][j][l][p] *= TwoPiCubed;
+            lP[i][j][l][p] *= 2.0*2.0*2.0*M_PI*M_PI*M_PI;
 
             // for interpolation
             lP[i][j][l][p] = log(kk*kk*kk*lP[i][j][l][p] + 1.0E5); // 1E5 avoid negs inside ln()
@@ -2446,7 +2381,6 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
       {
         for (int l=0; l<N_a; l++) 
         { 
-          fftw_destroy_plan(plan[i][j][l]);
           fftw_destroy_plan(plan1[i][j][l]);
         }
       }
@@ -2454,14 +2388,14 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
     // ---------------------------------------------------------------------------------------------
     // Step 5 - Evaluate binned_p_cc_incl_halo_exclusion in the interpolation table
     // ---------------------------------------------------------------------------------------------
-    #pragma omp parallel for collapse(4)
+    #pragma omp parallel for collapse(3)
     for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<N_l; j++)
+      for (int p=0; p<N_k; p++) 
       {
         for (int l=0; l<N_a; l++) 
         {
-          for (int p=0; p<N_k; p++) 
+          for(int j=i; j<N_l; j++)
           {
             const double aa = amin + l*da;
             const double kk = exp(ln_k_min + p*dlnk);
@@ -2473,24 +2407,33 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
 
             // RedMaPPer exclusion radius (comoving) (Rykoff et al. 2014  eq4) in units coverH0
             const double R = 1.5*pow(0.25*(Cluster.N_min[i] + Cluster.N_min[j] + 
-                Cluster.N_max[i] + Cluster.N_max[j])/100., 0.2)/cosmology.coverH0/aa;
+                Cluster.N_max[i] + Cluster.N_max[j])/100.0, 0.2)/cosmology.coverH0/aa;
 
             const double xx = kk*R;
+
             const double V_EXCL = 4.0*M_PI*(sin(xx) - xx*cos(xx))/(kk*kk*kk);
 
             if (xx > CO)
             {
               const double kk_CO = CO/R;
+              
+              const double ln_kk_CO = log(kk_CO);
+              if (ln_kk_CO < ln_k_min || ln_kk_CO > ln_k_max)
+              {
+                log_fatal(
+                "k = %e outside look-up table range [%e,%e]", kk_CO, exp(ln_k_min), exp(ln_k_max));
+                exit(1);
+              } 
+
+              const double PKB1B2_CO =  Pdelta(kk_CO, aa)*B1B2;
+              
+              const double V_EXCL_CO =  4.0*M_PI*(sin(CO) - CO*cos(CO))/(kk_CO*kk_CO*kk_CO);
 
               const double tmp = interpol(lP[i][j][l], N_k_hankel, ln_k_min_hankel, 
                 ln_k_max_hankel, dlnk_hankel, log(kk_CO), 1.0, 1.0);
-              const double PK_HALO_EXCL_CO = (exp(tmp) -1.0E5)/(kk_CO*kk_CO*kk_CO);
-
-              const double V_EXCL_CO =  4.0*M_PI*(sin(CO) - CO*cos(CO))/(kk_CO*kk_CO*kk_CO);
+              const double PK_HALO_EXCL_CO = (exp(tmp) - 1.0E5)/(kk_CO*kk_CO*kk_CO);
 
               const double P_EXCL_CO = (PK_HALO_EXCL_CO + V_EXCL_CO)*B1B2 - V_EXCL_CO;
-
-              const double PKB1B2_CO =  Pdelta(kk_CO, aa)*B1B2;
 
               const double ENV = pow(kk/kk_CO, -0.7);
 
@@ -2503,15 +2446,18 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
             }
             else
             {
+              const double ln_kk = kk;
+ 
               const double tmp = interpol(lP[i][j][l], N_k_hankel, ln_k_min_hankel, 
                 ln_k_max_hankel, dlnk_hankel, log(kk), 1.0, 1.0);
+              
               const double PK_HALO_EXCL = (exp(tmp) - 1.0E5)/(kk_CO*kk_CO*kk_CO);
 
               table[i][j][l][p] = (PK_HALO_EXCL + V_EXCL)*B1B2 - V_EXCL;
             }
             
             // for interpolation
-            table[i][j][l][p] =  log(kk*kk*kk*sqrt(aa)*table[i][j][l][p] + 1.E8);  
+            table[i][j][l][p] =  log(kk*kk*kk*sqrt(aa)*table[i][j][l][p] + 1.E8);
             table[j][i][l][p] =  table[i][j][l][p];
           }
         }
@@ -2522,37 +2468,38 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
     // ---------------------------------------------------------------------------------------------
     for(int i=0; i<N_l; i++)
     {
-      for(int j=i; j<N_l; j++)
+      for(int j=0; j<N_l; j++)
       {
         for (int l=0; l<N_a; l++) 
         { 
-          fftw_free(f_lP[i][j][l]); 
+          fftw_free(flP[i][j][l]); 
           fftw_free(conv[i][j][l]);  
           fftw_free(lP[i][j][l]);   
         }
         free(plan[i][j]);
         free(plan1[i][j]);
-        free(f_lP[i][j]);
+        free(flP[i][j]);
         free(conv[i][j]);
         free(lP[i][j]);
       }
       free(plan[i]);
       free(plan1[i]);
-      free(f_lP[i]);
+      free(flP[i]);
       free(conv[i]);
       free(lP[i]);
     }
     free(plan);
     free(plan1);
-    free(f_lP);
+    free(flP);
     free(conv);
     free(lP);
-
+    // ---------------------------------------------------------------------------------------------
+    // Step 7 Update cosmo and nuisance param classes
+    // ---------------------------------------------------------------------------------------------    
     update_cosmopara(&C);
     update_nuisance(&N);
   }
-
-  if (nl1 < 0 || nl1 > N_l -1 || nl2 < 0 || nl2 > N_l -1)
+  if (nl1 < 0 || nl1 > N_l - 1 || nl2 < 0 || nl2 > N_l - 1)
   {
     log_fatal("invalid bin input (nl1, nl2) = (%d, %d)", nl1, nl2);
     exit(1);
@@ -2568,8 +2515,8 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
     log_fatal("k = %e outside look-up table range [%e,%e]", k, exp(ln_k_min), exp(ln_k_max));
     exit(1);
   } 
-  const double val = 
-    interpol2d(table[nl1][nl2], N_a, amin, amax, da, a, N_k, ln_k_min, ln_k_max, dlnk, lnk, 1., 1.);
+  const double val = interpol2d(table[nl1][nl2], N_a, amin, amax, da, a, N_k, ln_k_min, ln_k_max, 
+    dlnk, lnk, 1.0, 1.0);
   return (exp(val) - 1.E8)/(k*k*k*sqrt(a));
 }
 
@@ -2593,11 +2540,10 @@ double binned_p_cg(const double k, const double a, const int nl, const int nj,
   const double z = 1.0/a - 1.0;
   const double cluster_bias = weighted_B1(nl, z);
   const double PK = use_linear_ps == 1 ? p_lin(k, a) : Pdelta(k, a);
-  
   const double PCG = cluster_bias * gbias.b1_function(z, nj) * PK;
 
   double PCG_1L = 0.;
-  if ((has_b2_galaxies() || Cluster.nonlinear_bias == 1) && use_linear_ps != 1)
+  if (has_b2_galaxies() && Cluster.nonlinear_bias == 1 && use_linear_ps != 1)
   {
     const double g = growfac(a);
     const double g4 = g*g*g*g;
@@ -2616,7 +2562,6 @@ double binned_p_cg(const double k, const double a, const int nl, const int nj,
       + b1g*b3nl_from_b1(b1c))*PT_d1d3(k);
     PCG_1L *= g4;
   }
-
   // Cosmolike: this makes the code much much faster like 1000 times faster
   return (PCG + PCG_1L) < 0 ? 0.0 : (PCG + Pcg_1l)
 }
@@ -2656,6 +2601,7 @@ double int_for_binned_p_cm(double lnM, void* params)
   return (PCM_1H + PCM_2H)*dndlnM_times_binned_P_lambda_obs_given_M(lnM, (void*) params_in);
 }
 
+// nl = lambda_obs bin
 double binned_p_cm_nointerp(const double k, const double a, const int nl, 
   const int include_1h_term, const int use_linear_ps, const int init_static_vars_only)
 {
@@ -2679,7 +2625,9 @@ double binned_p_cm_nointerp(const double k, const double a, const int nl,
       GSL_WORKSPACE_SIZE)/norm; 
 }
 
-double binned_p_cm(double k, double a, int nl, int ni, int include_1h_term, int use_linear_ps)
+// nl = lambda_obs bin, ni = cluster redshift bin
+double binned_p_cm(const double k, const double a, const int nl, const int ni, 
+const int include_1h_term, const int use_linear_ps)
 {
   static cosmopara C;
   static nuisancepara N;
@@ -2689,14 +2637,11 @@ double binned_p_cm(double k, double a, int nl, int ni, int include_1h_term, int 
   static double* da = 0;
 
   const int N_l = Cluster.N200_Nbin;
-
   const int N_z = tomo.cluster_Nbin;
-
   const int N_k = Ntable.N_ell;
   const double ln_k_min = log(limits.k_min_cH0);
   const double ln_k_max = log(limits.k_max_cH0);
   const double dlnk = (ln_k_max - ln_k_min)/((double) N_k - 1.0);
-
   const int N_a = Ntable.binned_p_cm_size_a_table;
 
   if (table == 0)
@@ -2714,7 +2659,6 @@ double binned_p_cm(double k, double a, int nl, int ni, int include_1h_term, int 
         }
       }
     }
-
     amin = (double*) malloc(sizeof(double)*N_z);
     amax = (double*) malloc(sizeof(double)*N_z);
     da = (double*) malloc(sizeof(double)*N_z);
@@ -2728,9 +2672,14 @@ double binned_p_cm(double k, double a, int nl, int ni, int include_1h_term, int 
     }
   }
   if (recompute_clusters(C, N))
-  {
-    binned_p_cm_nointerp(exp(ln_k_min), amin[0], 0, include_1h_term, use_linear_ps, 1); //init static
-                                                                                        //vars only
+  { 
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {    
+      double init_static_vars_only = binned_p_cm_nointerp(exp(ln_k_min), amin[0], 0, 
+        include_1h_term, use_linear_ps, 1); 
+    }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(4)
     for(int i=0; i<N_l; i++)
     {
@@ -2749,15 +2698,14 @@ double binned_p_cm(double k, double a, int nl, int ni, int include_1h_term, int 
     update_cosmopara(&C);
     update_nuisance(&N);   
   }
-  
-  if(!(a>0) || !(a<1)) 
-  {
-    log_fatal("a>0 and a<1 not true");
-    exit(1);
-  }
-  if(ni < 0 || ni > N_z -1 || nl < 0 || nl > N_l -1)
+  if (ni < 0 || ni > N_z - 1 || nl < 0 || nl > N_l - 1)
   {
     log_fatal("invalid bin input (nl, ni) = (%d, %d)", nl, ni);
+    exit(1);
+  }
+  if (a < amin[ni] || a > amax[ni])
+  {
+    log_fatal("a = %e outside look-up table range [%e,%e]", a, amin[ni], amax[ni]);
     exit(1);
   }
   const double lnk = log(k);
@@ -2786,9 +2734,8 @@ void setup_get_area(int* io_nz, double** io_z, double** io_A, int io)
   static double* z = NULL;
   static double* A = NULL;
 
-  // IO == 1 IMPLES THAT IO_A(Z) WILL COPIED TO LOCAL A(Z)
   if (io == 1)
-  {
+  { // IO == 1 IMPLES THAT IO_A(Z) WILL COPIED TO LOCAL A(Z)
     if (z != NULL)
     {
       free(z);
@@ -2797,14 +2744,12 @@ void setup_get_area(int* io_nz, double** io_z, double** io_A, int io)
     {
       free(A);
     }
-
     nz = (*io_nz);
     if (!(nz > 5))
     {
       log_fatal("array to small");
       exit(1);
     }
-
     z = (double*) malloc(nz*sizeof(double));
     A = (double*) malloc(nz*sizeof(double));
     if (z == NULL || A == NULL)
@@ -2812,7 +2757,6 @@ void setup_get_area(int* io_nz, double** io_z, double** io_A, int io)
       log_fatal("fail allocation");
       exit(1);
     }
-
     for (int i=0; i<nz; i++)
     {
       z[i] = (*io_z)[i];
@@ -2820,14 +2764,12 @@ void setup_get_area(int* io_nz, double** io_z, double** io_A, int io)
     }
   }
   else
-  {
-    // IO != 1 IMPLES THAT LOCAL A(Z) WILL BE COPIED TO IO_A(Z)
+  { // IO != 1 IMPLES THAT LOCAL A(Z) WILL BE COPIED TO IO_A(Z)
     if (z == NULL || A == NULL)
     {
       log_fatal("array/pointer not allocated");
       exit(1);
     }
-
     if((*io_z) != NULL)
     {
       free((*io_z));
@@ -2838,7 +2780,6 @@ void setup_get_area(int* io_nz, double** io_z, double** io_A, int io)
       free((*io_A));
       (*io_A) = NULL;
     }
-
     (*io_z) = (double*) malloc(nz*sizeof(double));
     (*io_A) = (double*) malloc(nz*sizeof(double));
     if((*io_z) == NULL || (*io_A) == NULL) 
@@ -2846,7 +2787,6 @@ void setup_get_area(int* io_nz, double** io_z, double** io_A, int io)
       log_fatal("fail allocation");
       exit(1);
     }
-
     for (int i=0; i<nz; i++)
     {
       (*io_z)[i] = z[i];
@@ -2857,16 +2797,16 @@ void setup_get_area(int* io_nz, double** io_z, double** io_A, int io)
 
 double get_area(const double zz, const int interpolate_survey_area)
 {
+  static gsl_spline* fA = NULL;
+
   if(interpolate_survey_area == 1)
   {
-    static gsl_spline* fA = NULL;
-
     if (fA == NULL)
     {
+      int nz;
       double** z = (double**) malloc(1*sizeof(double*));
       double** A = (double**) malloc(1*sizeof(double*));
-      int nz;   
-      
+         
       if (z == NULL || A == NULL)
       {
         log_fatal("fail allocation");
@@ -2895,8 +2835,11 @@ double get_area(const double zz, const int interpolate_survey_area)
         log_fatal(gsl_strerror(status));
         exit(1);
       }
+      free(z[0]); // spline makes a copy of the data
+      free(A[0]); // spline makes a copy of the data
+      free(z);    // spline makes a copy of the data
+      free(A);    // spline makes a copy of the data
     }
-
     double res;
     int status = gsl_spline_eval_e(fA, zz, NULL, &res);
     if (status) 

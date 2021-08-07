@@ -159,8 +159,10 @@ lim limits =
   .halo_exclusion_k_max = 3E6,
   .halo_exclusion_k_min_hankel = 5.0E-4,
   .halo_exclusion_k_max_hankel = 1.0E8,
-  w_l_min = 0.0001,
-  w_l_max = 5.0e6
+  .halo_exclusion_R_min = 0.0,
+  .halo_exclusion_R_max = 15.0/2997, 
+  .w_l_min = 0.0001,
+  .w_l_max = 5.0e6
 };
 
 Ntab Ntable = 
@@ -177,8 +179,9 @@ Ntab Ntable =
   .NL_Nell_block = 10,                // Cosmo2D - NL = NonLimber (NL_Nell_block)
   .NL_Nchi - 500,                     // Cosmo2D - NL = NonLimber (NL_Nchi)
   .N_a_halo_exclusion = 100,          // N_a for binned_p_cc_incl_halo_exclusion (cluster_util.c)
-  .N_k_halo_exclusion = 1000,         // N_k for binned_p_cc_incl_halo_exclusion (cluster_util.c)
+  .N_k_halo_exclusion = 100,          // N_k for binned_p_cc_incl_halo_exclusion (cluster_util.c)
   .N_k_hankel_halo_exclusion = 3192,  // N for 3D Hankel Transform (pk_to_xi and xi_to_pk) 
+  .N_R_halo_exclusion = 64,
   .binned_P_lambda_obs_given_M_size_z_table = 10,
   .binned_P_lambda_obs_given_M_size_M_table = 50,
   .binned_p_cm_size_a_table = 30
