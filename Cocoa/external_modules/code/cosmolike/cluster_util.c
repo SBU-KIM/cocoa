@@ -1390,7 +1390,7 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion(double lnM1, void* params
 {
   static cosmopara C;
   static nuisancepara N;
-  static double***** table = 0; // table = PK_HALO_EXCL interpolation
+  static double***** table = 0; // table -> PK_HALO_EXCL interpolation
 
   const int N_l = Cluster.N200_Nbin;
 
@@ -1608,7 +1608,6 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion(double lnM1, void* params
         {
           for (int p=0; p<N_R; p++) 
           {
-            const double aa = amin + k*da;
             const double kk = exp(ln_k_min_hankel + q*dlnk_hankel);     
             const double rr = 1.0/kk;
             const double R = R_min + p*dR
