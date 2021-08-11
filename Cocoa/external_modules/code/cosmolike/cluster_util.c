@@ -2024,9 +2024,7 @@ double binned_p_cc_incl_halo_exclusion(const double k, const double a, const int
           {
             const double aa = amin + l*da;
             const double kk = exp(ln_k_min + p*dlnk);
-
-            table[i][j][l][p] = binned_p_cc_incl_halo_exclusion_nointerp(i, j, l, p, 0);
-            
+            table[i][j][l][p] = binned_p_cc_incl_halo_exclusion_nointerp(i, j, l, p, 0);   
             // for interpolation
             table[i][j][l][p] = log(kk*kk*kk*sqrt(aa)*table[i][j][l][p] + 1.E8); 
             table[j][i][l][p] = table[i][j][l][p];
