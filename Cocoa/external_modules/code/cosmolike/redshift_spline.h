@@ -35,40 +35,50 @@ int test_zoverlap(int zl, int zs); // test whether source bin zs is behind lens 
 int test_zoverlap_c(int zc, int zs); // test whether source bin zs is behind lens bin zl (clusters)
 
 
-int ZL(int Nbin); // find zlens bin of tomo combination (galaxy-galaxy lensing)
+int ZL(const int Nbin); // find zlens bin of tomo combination (galaxy-galaxy lensing)
 
-int ZS(int Nbin); // find zsource bin of tomo combination (galaxy-galaxy lensing)
+int ZS(const int Nbin); // find zsource bin of tomo combination (galaxy-galaxy lensing)
 
-int N_ggl(int zl, int zs); // find tomo bin number tomography combination
-
-
-int ZCL(int Nbin); // find zlens bin of tomo combination (cluster-galaxy lensing)
-
-int ZCS(int Nbin); // find zsource bin of tomo combination (cluster-galaxy lensing)
-
-int N_cgl(int zl, int zs); // find tomo bin number tomography combination
+int N_ggl(const int zl, const int zs); // find tomo bin number tomography combination
 
 
-int Z1(int Nbin); // find z1 bin of tomo combination 
+int ZCL(const int Nbin); // find zlens bin of tomo combination (cluster-galaxy lensing)
 
-int Z2(int Nbin); // find z2 bin of tomo combination 
+int ZCS(const int Nbin); // find zsource bin of tomo combination (cluster-galaxy lensing)
 
-int N_shear(int z1, int z2); // find tomo bin number tomography combination
-
-
-int ZCL1(int Nbin); // find z1 bin of tomo combination (cluster-galaxy clustering)
-
-int ZCL2(int Nbin); // find z2 bin of tomo combination (cluster-galaxy clustering)
-
-int N_CL(int z1, int z2); // find tomo bin number tomography combination (cluster-galaxy clustering)
+int N_cgl(const int zl, const int zs); // find tomo bin number tomography combination
 
 
-int ZCCL1(int Nbin); // find z1 bin of tomo combination (cluster-cluster clustering)
+int Z1(const int Nbin); // find z1 bin of tomo combination (cosmic shear)
 
-int ZCCL2(int Nbin); // find z2 bin of tomo combination (cluster-cluster clustering)
+int Z2(const int Nbin); // find z2 bin of tomo combination (cosmic shear)
 
-// find tomo bin number tomography combination (cluster-cluster clustering)
-int N_CCL(int z1, int z2); 
+// find tomo bin number tomography combination (cosmic shear)
+int N_shear(const int z1, const int z2);
+
+
+int ZCL1(const int Nbin); // find z1 bin of tomo combination (galaxy clustering)
+
+int ZCL2(const int Nbin); // find z2 bin of tomo combination (galaxy clustering)
+
+// find tomo bin number tomography combination (galaxy clustering)
+int N_CL(const int z1, const int z2);
+
+
+int ZCCL1(const int Nbin); // find z1 bin of tomo combination (cluster clustering)
+
+int ZCCL2(const int Nbin); // find z2 bin of tomo combination (cluster clustering)
+
+// find tomo bin number tomography combination (cluster clustering)
+int N_CCL(const int z1, const int z2);
+
+
+int ZCGCL1(const int ni); // find z1 bin of tomo combination (cluster-galaxy cross clustering)
+
+int ZCGCL2(const int nj); // find z2 bin of tomo combination (cluster-galaxy cross clustering)
+
+// find tomo bin number tomography combination (cluster-galaxy cross clustering)
+int N_CGCL(const int ni, const int nj); // ni = Cluster Nbin, nj = Galaxy Nbin
 
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------

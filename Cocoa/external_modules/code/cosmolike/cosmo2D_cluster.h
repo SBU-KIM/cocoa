@@ -37,7 +37,7 @@ double w_cc_tomo(const int nt, const int nl1, const int nl2, const int ni, const
 const int limber);
 
 // nl = lambda_obs bin, ni = cluster redshift bin, nj = galaxy redshift bin
-double w_cg_tomo(int nt, int nl, int ni, int nj, int limber);
+double w_cg_tomo(const int nt, const int nl, const int ni, const int nj, const int limber);
 
 // -------------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------------

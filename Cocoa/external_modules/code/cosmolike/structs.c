@@ -74,15 +74,16 @@ clusterpara Cluster =
   .bias_model = 0,
   .hmf_model = 0,
   .nonlinear_bias = 0,
-  .N200_min = 0.0;
-  .N200_max = 0.0;
-  .N200_Nbin = 0;
+  .N200_min = 0.0,
+  .N200_max = 0.0,
+  .N200_Nbin = 0,
   .N_min = {0},
-  .N_max = {0}
+  .N_max = {0},
   .lbin = 0,
   .l_min = 0.0,
   .l_max = 0.0,
-  .model = "default"
+  .model = "default",
+  .external_selection_cg_clustering = {0}
 };
 
 pdeltapara pdeltaparams =

@@ -36,7 +36,7 @@ static int has_b2_galaxies()
   int res = 0;
   for(int i=0; i<tomo.clustering_Nbin; i++) 
   {
-    if(gbias.b2[i])
+    if (gbias.b2[i])
     {
       res = 1;
     }
@@ -146,7 +146,7 @@ int* io_natsrgm, double** io_atsrgm, double** io_alpha, double** io_sigma, int i
     atsrgm = (double*) malloc(natsrgm*sizeof(double));
     alpha = (double*) malloc(natsrgm*nintrinsic_sigma*sizeof(double));
     sigma = (double*) malloc(natsrgm*nintrinsic_sigma*sizeof(double));
-    if(intrinsic_sigma == NULL || atsrgm == NULL || alpha == NULL || sigma == NULL) 
+    if (intrinsic_sigma == NULL || atsrgm == NULL || alpha == NULL || sigma == NULL)
     {
       log_fatal("fail allocation");
       exit(1);
@@ -174,22 +174,22 @@ int* io_natsrgm, double** io_atsrgm, double** io_alpha, double** io_sigma, int i
       log_fatal("array/pointers not allocated\n");
       exit(1);
     }
-    if((*io_intrinsic_sigma) != NULL)
+    if ((*io_intrinsic_sigma) != NULL)
     {
       free((*io_intrinsic_sigma));
       (*io_intrinsic_sigma) = NULL;
     }
-    else if((*io_atsrgm) != NULL)
+    else if ((*io_atsrgm) != NULL)
     {
       free((*io_atsrgm));
       (*io_atsrgm) = NULL;
     }
-    else if((*io_alpha) != NULL)
+    else if ((*io_alpha) != NULL)
     {
       free((*io_alpha));
       (*io_alpha) = NULL;
     }
-    else if((*io_sigma) != NULL)
+    else if ((*io_sigma) != NULL)
     {
       free((*io_sigma));
       (*io_sigma) = NULL;
@@ -199,7 +199,7 @@ int* io_natsrgm, double** io_atsrgm, double** io_alpha, double** io_sigma, int i
     (*io_atsrgm) = (double*) malloc(natsrgm*sizeof(double));
     (*io_alpha) = (double*) malloc(nintrinsic_sigma*natsrgm*sizeof(double));
     (*io_sigma) = (double*) malloc(nintrinsic_sigma*natsrgm*sizeof(double));
-    if(*io_intrinsic_sigma == NULL || *io_atsrgm == NULL || *io_alpha == NULL || *io_sigma == NULL) 
+    if (*io_intrinsic_sigma == NULL || *io_atsrgm == NULL || *io_alpha == NULL || *io_sigma == NULL)
     {
       log_fatal("fail allocation");
       exit(1);
@@ -226,10 +226,9 @@ double SDSS_P_true_lambda_given_mass(const double true_lambda, const double mass
   static int first = 0;
   static gsl_spline2d* falpha = NULL; // skewness of the skew-normal distribution
   static gsl_spline2d* fsigma = NULL; // variance of the skew-normal distribution
-  if(first == 0) 
+  if (first == 0)
   {
     first = 1;
-    
     int nintrinsic_sigma;
     int natsrgm;
     double** intrinsic_sigma;
@@ -267,7 +266,6 @@ double SDSS_P_true_lambda_given_mass(const double true_lambda, const double mass
       log_fatal("fail allocation");
       exit(1);
     }
-
     { // we don't want to guess the appropriate GSL z array ordering in z = f(x, y) BEGINS
       alpha = (double*) malloc(nintrinsic_sigma*natsrgm*sizeof(double));
       sigma = (double*) malloc(nintrinsic_sigma*natsrgm*sizeof(double));
@@ -352,7 +350,6 @@ double SDSS_P_true_lambda_given_mass(const double true_lambda, const double mass
     log_fatal(gsl_strerror(status));
     exit(1);
   }
-
   double sigma = 0.0;
   status = gsl_spline2d_eval_e(fsigma, intrinsic_sigma, atsrgm, NULL, NULL, &sigma);
   if (status) 
@@ -361,18 +358,17 @@ double SDSS_P_true_lambda_given_mass(const double true_lambda, const double mass
     exit(1);
   }
 
-  const double x = 1.0/(M_SQRT2*abs(sigma));
-  const double result = exp(-(true_lambda - atsrgm)*(true_lambda - atsrgm)*x*x)*x/M_SQRTPI;
-  
+  const double y = 1.0/(M_SQRT2*abs(sigma));
+  const double x = (true_lambda - atsrgm)*y;
+  const double result1 = exp(-x*x)*y/M_SQRTPI;
   double result2;
-  status = gsl_sf_erfc_e(-alpha*(true_lambda - atsrgm)*x, &result2);
+  status = gsl_sf_erfc_e(-alpha*x, &result2);
   if (status) 
   {
     log_fatal(gsl_strerror(status));
     exit(1);
   }  
-  
-  return result*result2;
+  return result1*result2;
 }
 
 // Cocoa: we try to avoid reading of files in the cosmolike_core code 
@@ -443,7 +439,6 @@ double** io_fprj, int io)
       log_fatal("fail allocation");
       exit(1);
     }
-
     for (int i=0; i<nz; i++)
     {
       z[i] = (*io_z)[i];
@@ -471,37 +466,37 @@ double** io_fprj, int io)
       log_fatal("array/pointer not allocated");
       exit(1);
     }
-    if((*io_z) != NULL)
+    if ((*io_z) != NULL)
     {
       free((*io_z));
       (*io_z) = NULL;
     }
-    else if((*io_lambda) != NULL)
+    else if ((*io_lambda) != NULL)
     {
       free((*io_lambda));
       (*io_lambda) = NULL;
     }
-    else if((*io_tau) != NULL)
+    else if ((*io_tau) != NULL)
     {
       free((*io_tau));
       (*io_tau) = NULL;
     }
-    else if((*io_mu) != NULL)
+    else if ((*io_mu) != NULL)
     {
       free((*io_mu));
       (*io_mu) = NULL;
     }
-    else if((*io_sigma) != NULL)
+    else if ((*io_sigma) != NULL)
     {
       free((*io_sigma));
       (*io_sigma) = NULL;
     }
-    else if((*io_fmask) != NULL)
+    else if ((*io_fmask) != NULL)
     {
       free((*io_fmask));
       (*io_fmask) = NULL;
     }   
-    else if((*io_fprj) != NULL)
+    else if ((*io_fprj) != NULL)
     {
       free((*io_fprj));
       (*io_fprj) = NULL;
@@ -515,13 +510,12 @@ double** io_fprj, int io)
     (*io_fmask)   = (double*) malloc(nz*nlambda*sizeof(double));
     (*io_fprj)    = (double*) malloc(nz*nlambda*sizeof(double));
 
-    if((*io_z) == NULL || (*io_lambda) == NULL || (*io_tau) == NULL || (*io_mu) == NULL ||
+    if ((*io_z) == NULL || (*io_lambda) == NULL || (*io_tau) == NULL || (*io_mu) == NULL ||
        (*io_sigma) == NULL || (*io_fmask) == NULL || (*io_fprj) == NULL) 
     {
       log_fatal("fail allocation");
       exit(1);
     }
-
     for (int i=0; i<nz; i++)
     {
       (*io_z)[i] = z[i];
@@ -551,10 +545,9 @@ const double zz)
   static gsl_spline2d* ffmask;
   static gsl_spline2d* ffprj;
 
-  if(first == 0) 
+  if (first == 0)
   {
     first = 1;
-
     int nz;
     int nlambda;
     double** tmp_tau;
@@ -884,8 +877,13 @@ double binned_P_lambda_obs_given_M(const int nl, const double M, const double z)
   }
   if (recompute_clusters(C, N))
   { 
-    // init static vars
-    binned_P_lambda_obs_given_M_nointerp(pow(10.0, limits.cluster_util_log_M_min), zmin, 1); 
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      const double MM = pow(10.0, limits.cluster_util_log_M_min);
+      double init_static_vars_only = binned_P_lambda_obs_given_M_nointerp(0, MM, zmin, 1);
+    }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(3)
     for (int i=0; i<N_l; i++) 
     {
@@ -935,13 +933,13 @@ double dndlnM_times_binned_P_lambda_obs_given_M(double lnM, void* params)
 {
   double* ar = (double*) params; 
   const int nl = (int) ar[0];
-  if(nl < 0 || nl > Cluster.N200_Nbin - 1)
+  if (nl < 0 || nl > Cluster.N200_Nbin - 1)
   {
     log_fatal("invalid bin input nl = %d", nl);
     exit(1);
   }
   const double z = ar[1];
-  if(!(z>0))
+  if (!(z>0))
   {
     log_fatal("invalid redshift input z = %d", z);
     exit(1);
@@ -963,7 +961,7 @@ double dndlnM_times_binned_P_lambda_obs_given_M(double lnM, void* params)
     log_fatal("massfunc model %i not implemented", Cluster.hmf_model);
     exit(1); 
   }
-  return mfunc*M*binned_P_lambda_obs_given_M(nl, M , z);
+  return mfunc*M*binned_P_lambda_obs_given_M(nl, M, z);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1055,7 +1053,7 @@ double int_for_weighted_B1(double lnM, void* params)
 {
   double* ar = (double*) params; // {nl, z}
   const double z = ar[1];
-  if(!(z>0))
+  if (!(z>0))
   {
     log_fatal("invalid redshift input z = %d", z);
     exit(1);
@@ -1072,7 +1070,7 @@ double weighted_B1_nointerp(const int nl, const double z, const int init_static_
  
   double param[2] = {(double) nl, z};
 
-  if(int init_static_vars_only == 1)
+  if (int init_static_vars_only == 1)
   {
     const double r1 = int_for_weighted_B1(ln_M_min, (void*) param);
     const double r2 = dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) param);
@@ -1137,7 +1135,7 @@ double weighted_B1(const int nl, const double z)
     log_fatal("a = %e outside look-up table range [%e,%e]", a, amin, amax);
     exit(1);
   } 
-  if(nl < 0 || nl > N_l - 1)
+  if (nl < 0 || nl > N_l - 1)
   {
     log_fatal("invalid bin input nl = %d", nl);
     exit(1);
@@ -1149,7 +1147,7 @@ double int_for_weighted_B2(double lnM, void* params)
 {
   double* ar = (double*) params; //nl, z
   const double z = ar[1];
-  if(!(z>0))
+  if (!(z>0))
   {
     log_fatal("invalid redshift input z = %d", z);
     exit(1);
@@ -1166,7 +1164,7 @@ double weighted_B2_nointerp(const int nl, const double z, const int init_static_
  
   double param[2] = {(double) nl, z};
 
-  if(int init_static_vars_only == 1)
+  if (int init_static_vars_only == 1)
   {
     const double r1 = int_for_weighted_B2(ln_M_min, (void*) param);
     const double r2 = dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) param);
@@ -1233,7 +1231,7 @@ double weighted_B2(const int nl, const double z)
     log_fatal("a = %e outside look-up table range [%e,%e]", a, amin, amax);
     exit(1);
   } 
-  if(nl < 0 || nl > N_l - 1)
+  if (nl < 0 || nl > N_l - 1)
   {
     log_fatal("invalid bin input nl1 = %d", nl);
     exit(1);
@@ -1245,7 +1243,7 @@ double int_for_weighted_B1M1(double lnM, void* params)
 {
   double* ar = (double*) params;
   const double z = ar[1];
-  if(!(z>0))
+  if (!(z>0))
   {
     log_fatal("invalid redshift input z = %d", z);
     exit(1);
@@ -1328,7 +1326,7 @@ double weighted_B1M1(const int nl, const double z)
     log_fatal("a = %e outside look-up table range [%e,%e]", a, amin, amax);
     exit(1);
   } 
-  if(nl < 0 || nl > N_l - 1)
+  if (nl < 0 || nl > N_l - 1)
   {
     log_fatal("invalid bin input nl = %d", nl);
     exit(1);
@@ -1348,12 +1346,12 @@ double weighted_B1M1(const int nl, const double z)
 double binned_p_cc(const double k, const double a, const int nl1, const int nl2, 
   const int use_linear_ps)
 { // binned in lambda_obs (nl1, nl2 = lambda_obs bin (cluster 1 and 2))
-  if(!(a>0) || !(a<1)) 
+  if (!(a>0) || !(a<1))
   {
     log_fatal("a>0 and a<1 not true");
     exit(1);
   }
-  if(nl1 < 0 || nl1 > Cluster.N200_Nbin - 1 || nl2 < 0 || nl2 > Cluster.N200_Nbin - 1)
+  if (nl1 < 0 || nl1 > Cluster.N200_Nbin - 1 || nl2 < 0 || nl2 > Cluster.N200_Nbin - 1)
   {
     log_fatal("invalid bin input (nl1,nl2) = (%d,%d)", nl1, nl2);
     exit(1);
@@ -1419,7 +1417,7 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion(double lnM1, void* params
   arg[0] = 0;     // bias
   arg[1] = 0.5;   // order of Bessel function 
 
-  if(table == 0)
+  if (table == 0)
   {
     table = (double*****) malloc(sizeof(double****)*N_l);
     for(int i=0; i<N_l; i++)
@@ -1614,7 +1612,7 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion(double lnM1, void* params
 
             if (Cluster.halo_exclusion_model == 0)
             {
-              if(rr < R) 
+              if (rr < R)
               {
                 for(int j=i; j<N_l; j++)
                 {
@@ -1840,17 +1838,17 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion(double lnM1, void* params
   const int nk = ar[2]; 
   const int na = ar[3];
   const double lnM2 = ar[4];
-  if(nl1 < 0 || nl1 > N_l -1 || nl2 < 0 || nl2 > N_l -1)
+  if (nl1 < 0 || nl1 > N_l -1 || nl2 < 0 || nl2 > N_l -1)
   {
     log_fatal("invalid bin input (nl1, nl2) = (%d, %d)", nl1, nl2);
     exit(1);
   }
-  if(nk < 0 || nk > N_k - 1)
+  if (nk < 0 || nk > N_k - 1)
   {
     log_fatal("invalid bin input nk = %d", nk);
     exit(1);
   }
-  if(na < 0 || na > N_a - 1)
+  if (na < 0 || na > N_a - 1)
   {
     log_fatal("invalid bin input na = %d", na);
     exit(1);
@@ -1925,13 +1923,13 @@ double binned_p_cc_incl_halo_exclusion_nointerp(const int nl1, const int nl2, co
     exit(1);
   }  
   const int N_k = Ntable.N_k_halo_exclusion;
-  if(nk < 0 || nk > N_k - 1)
+  if (nk < 0 || nk > N_k - 1)
   {
     log_fatal("invalid bin input nk = %d", nk);
     exit(1);
   }
   const int N_a = Ntable.N_a_halo_exclusion;
-  if(na < 0 || na > N_a - 1)
+  if (na < 0 || na > N_a - 1)
   {
     log_fatal("invalid bin input na = %d", na);
     exit(1);
@@ -1989,7 +1987,7 @@ double binned_p_cc_incl_halo_exclusion(const double k, const double a, const int
   const double amax = 1.0/(1.0 + tomo.cluster_zmin[0]) + 0.01;
   const double da = (amax - amin)/((double) N_a - 1.0);
 
-  if(table == 0)
+  if (table == 0)
   {
     table = (double****) malloc(sizeof(double***)*N_l);
     for(int i=0; i<N_l; i++)
@@ -2084,7 +2082,7 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
   arg[0] = 0;     // bias
   arg[1] = 0.5;   // order of Bessel function  
 
-  if(table == 0)
+  if (table == 0)
   {
     table = (double****) malloc(sizeof(double***)*N_l);
     for(int i=0; i<N_l; i++)
@@ -2256,7 +2254,7 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
             
             if (Cluster.halo_exclusion_model == 0)
             {
-              if(rr < R) 
+              if (rr < R)
               {
                 lP[i][j][l][p] = -1; 
               } 
@@ -2529,7 +2527,7 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
 double binned_p_cg(const double k, const double a, const int nl, const int nj, 
   const int use_linear_ps)
 { // binend in lambda_obs
-  if(!(a>0) || !(a<1)) 
+  if (!(a>0) || !(a<1))
   {
     log_fatal("a>0 and a<1 not true");
     exit(1);
@@ -2582,7 +2580,7 @@ double int_for_binned_p_cm(double lnM, void* params)
   
   const double M = exp(lnM); 
   const double a = 1.0/(1.0 + z);
-  if(!(a>0) || !(a<1)) 
+  if (!(a>0) || !(a<1))
   {
     log_fatal("a>0 and a<1 not true");
     exit(1);
@@ -2602,7 +2600,7 @@ double int_for_binned_p_cm(double lnM, void* params)
 double binned_p_cm_nointerp(const double k, const double a, const int nl, 
   const int include_1h_term, const int use_linear_ps, const int init_static_vars_only)
 {
-  if(!(a>0) || !(a<1)) 
+  if (!(a>0) || !(a<1))
   {
     log_fatal("a>0 and a<1 not true");
     exit(1);
@@ -2767,19 +2765,19 @@ void setup_get_area(int* io_nz, double** io_z, double** io_A, int io)
       log_fatal("array/pointer not allocated");
       exit(1);
     }
-    if((*io_z) != NULL)
+    if ((*io_z) != NULL)
     {
       free((*io_z));
       (*io_z) = NULL;
     }
-    else if((*io_A) != NULL)
+    else if ((*io_A) != NULL)
     {
       free((*io_A));
       (*io_A) = NULL;
     }
     (*io_z) = (double*) malloc(nz*sizeof(double));
     (*io_A) = (double*) malloc(nz*sizeof(double));
-    if((*io_z) == NULL || (*io_A) == NULL) 
+    if ((*io_z) == NULL || (*io_A) == NULL)
     {
       log_fatal("fail allocation");
       exit(1);
@@ -2796,7 +2794,7 @@ double get_area(const double zz, const int interpolate_survey_area)
 {
   static gsl_spline* fA = NULL;
 
-  if(interpolate_survey_area == 1)
+  if (interpolate_survey_area == 1)
   {
     if (fA == NULL)
     {

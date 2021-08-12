@@ -41,7 +41,7 @@ const int limber)
     log_fatal("like.Ntheta not initialized");
     exit(1);
   }
-  if(nt > like.Ntheta - 1)
+  if (nt > like.Ntheta - 1)
   {
     log_fatal("error in selecting bin number");
     exit(1); 
@@ -52,16 +52,16 @@ const int limber)
   static galpara G;
   static double** Pl = 0;
   static double* w_vec = 0;
-  
-  const int ngammat_size = tomo.cgl_Npowerspectra;
-  const int NSIZE = nlsize*ngammat_size;
+
   const int nell = limits.LMAX;
   const int ntheta = like.Ntheta;
+  const int ngammat_size = tomo.cgl_Npowerspectra;
+  const int NSIZE = nlsize*ngammat_size;
 
   if (Pl == 0)
   {    
     Pl = (double**) malloc(sizeof(double*)*ntheta);
-    for(int i=0; i<ntheta; i++) 
+    for (int i=0; i<ntheta; i++)
     {
       Pl[i] = (double*) malloc(sizeof(double)*nell);
     }
@@ -100,17 +100,24 @@ const int limber)
   if (recompute_cs(C, G, N))
   {
     double** Cl = malloc(NSIZE*sizeof(double*));
-    for (int i = 0; i<NSIZE; i++)
+    for (int i=0; i<NSIZE; i++)
     {
       Cl[i] = calloc(nell, sizeof(double));
     }
-    C_cs_tomo_limber(limits.P_2_s_min + 1, i, ZCL(0), ZCS(0)); // init static vars 
-    if(limber == 1)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      const int ZC = ZCL(0);
+      const int ZSC = ZCS(0);
+      double init_static_vars_only = C_cs_tomo_limber(limits.P_2_s_min + 1, i, ZC, ZSC);
+    }
+    #pragma GCC diagnostic pop
+    if (limber == 1)
     { 
       #pragma omp parallel for collapse(3) 
-      for(int i=0; i<nlsize; i++)
+      for (int i=0; i<nlsize; i++)
       {  
-        for(int j=0; j<ngammat_size; j++)
+        for (int j=0; j<ngammat_size; j++)
         { 
           for (int l=2; l<nell; l++)
           {
@@ -128,9 +135,9 @@ const int limber)
       log_fatal("NonLimber not implemented");
       exit(1);     
       /*
-      for(int i=0; i<nlsize; i++) // NON LIMBER PART
+      for (int i=0; i<nlsize; i++) // NON LIMBER PART
       { 
-        for(int j=0; j<ngammat_size; j++) 
+        for (int j=0; j<ngammat_size; j++)
         { 
           const int L = 1;
           const double tol = 0.0075;    // required fractional accuracy in C(l)
@@ -143,9 +150,9 @@ const int limber)
         }
       }
       #pragma omp parallel for collapse(3) 
-      for(int i=0; i<nlsize; i++) // LIMBER PART
+      for (int i=0; i<nlsize; i++) // LIMBER PART
       { 
-        for(int j=0; j<ngammat_size; j++)
+        for (int j=0; j<ngammat_size; j++)
         { 
           for (int l=limits.LMAX_NOLIMBER+1; l<nell; l++)
           {
@@ -159,9 +166,9 @@ const int limber)
       */ 
     }
     #pragma omp parallel for collapse(3)
-    for(int i=0; i<nlsize; i++)
+    for (int i=0; i<nlsize; i++)
     {
-      for(int j=0; j<ngammat_size; j++)
+      for (int j=0; j<ngammat_size; j++)
       { 
         for (int p=0; p<ntheta; p++)
         {
@@ -185,18 +192,20 @@ const int limber)
     update_galpara(&G);
     update_nuisance(&N);
   }
-
-  if (!test_zoverlap_c(ni, nj)) 
+  const int ntomo = N_cgl(ni, nj);
+  if (!(ntomo>0))
   {
     return 0.0;
   }
-  const int q = (nl*ngammat_size + N_cgl(ni, nj))*ntheta + nt;
-  if(q > NSIZE*ntheta - 1)
   {
-    log_fatal("error in selecting bin number");
-    exit(1);
+    const int q = (nl*ngammat_size + ntomo)*ntheta + nt;
+    if (q > NSIZE*ntheta - 1)
+    {
+      log_fatal("error in selecting bin number");
+      exit(1);
+    }
+    return w_vec[q];
   }
-  return w_vec[q];
 }
 
 
@@ -208,7 +217,7 @@ const int limber)
     log_fatal("like.Ntheta not initialized");
     exit(1);
   }
-  if(nt > like.Ntheta - 1)
+  if (nt > like.Ntheta - 1)
   {
     log_fatal("error in selecting bin number");
     exit(1); 
@@ -229,7 +238,7 @@ const int limber)
   if (Pl == 0)
   {
     Pl = (double**) malloc(sizeof(double*)*ntheta);
-    for(int i=0; i<ntheta; i++) 
+    for (int i=0; i<ntheta; i++)
     {
       Pl[i] = (double*) malloc(sizeof(double)*nell);
     }
@@ -282,17 +291,24 @@ const int limber)
       Cl[i] = calloc(nell, sizeof(double));
     
     }
-    C_cc_tomo_limber(limits.P_2_s_min+1, i, j, 0, 0); // init static vars   
-    if(limber == 1)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      const int ZCCL1 = 0;
+      const int ZCCL2 = 0;
+      double init_static_vars_only = C_cc_tomo_limber(limits.P_2_s_min+1, i, j, ZCCL1, ZCCL2);
+    }
+    #pragma GCC diagnostic pop
+    if (limber == 1)
     { 
+      #pragma omp parallel for collapse(3)
       for (int i=0; i<nlsize; i++) 
       {
-        #pragma omp parallel for collapse(3)
-        for (int j=i; j<nlsize; j++)  
-        {    
-          for (int k=0; k<nccl_size; k++)  
+        for (int k=0; k<nccl_size; k++)
+        {
+          for (int l=1; l<nell; l++)
           {
-            for (int l=1; l<nell; l++)
+            for (int j=i; j<nlsize; j++)
             {
               const int q     = i*nlsize*nccl_size + j*nccl_size + k;
               const int qstar = j*nlsize*nccl_size + i*nccl_size + k;
@@ -315,24 +331,24 @@ const int limber)
           for (int k=0; k<nccl_size; k++)  
           {
             const int L = 1;
-            const double tol = 0.01; // required fractional accuracy in C(l)
-            const double dev = 10. * tol; // will be diff  exact vs Limber init to
-                                          // large value in order to start while loop
-            const int ZCCL1 = k; // cross redshift bin not supported so not using ZCCL1(k)
-            const int ZCCL2 = k; // cross redshift bin not supported so not using ZCCL2(k)
+            const double tol = 0.01;      // required fractional accuracy in C(l)
+            const double dev = 10.0 * tol;// will be diff exact vs Limber init to large value in
+                                          // order to start while loop
+            const int ZCCL1 = k;          // cross redshift bin not supported so not using ZCCL1(k)
+            const int ZCCL2 = k;          // cross redshift bin not supported so not using ZCCL2(k)
             const int q = i*nlsize*nccl_size + j*nccl_size + k;
             C_cc_tomo(L, i, j, ZCCL1, ZCCL2, Cl[q], dev, tol); // can't openmp
           }
         }
       }
+      #pragma omp parallel for collapse(3)
       for (int i=0; i<nlsize; i++) // LIMBER PART
-      { 
-        #pragma omp parallel for collapse(3)
-        for (int j=i; j<nlsize; j++)  
-        { 
-          for (int k=0; k<nccl_size; k++)  
+      {
+        for (int k=0; k<nccl_size; k++)
+        {
+          for (int l=limits.LMAX_NOLIMBER+1; l<nell; l++)
           {
-            for (int l=limits.LMAX_NOLIMBER+1; l<nell; l++)
+            for (int j=i; j<nlsize; j++)
             {
               const int q = i*nlsize*nccl_size + j*nccl_size + k;
               const int ZCCL1 = k; // cross redshift bin not supported so not using ZCCL1(k)
@@ -342,14 +358,14 @@ const int limber)
           }
         }
       }
-      for (int i=0; i<nlsize; i++) //  Cl[qstar][l] = Cl[q][l]
-      { 
-        #pragma omp parallel for collapse(3)
-        for (int j=i; j<nlsize; j++)  
-        { 
-          for (int k=0; k<nccl_size; k++)  
+      #pragma omp parallel for collapse(3)
+      for (int i=0; i<nlsize; i++)
+      {
+        for (int k=0; k<nccl_size; k++)
+        {
+          for (int l=1; l<nell; l++)
           {
-            for (int l=1; l<nell; l++)
+            for (int j=i; j<nlsize; j++)
             {
               const int q     = i*nlsize*nccl_size + j*nccl_size + k;
               const int qstar = j*nlsize*nccl_size + i*nccl_size + k;
@@ -360,7 +376,7 @@ const int limber)
       } 
     }
     #pragma omp parallel for collapse(4)
-    for (int i=0; i<nlsize; i++) // w_vec[q] += Pl[p][l]*Cl[nz][l];
+    for (int i=0; i<nlsize; i++)
     { 
       for (int j=0; j<nlsize; j++)  
       {
@@ -387,7 +403,6 @@ const int limber)
     update_cosmopara(&C);
     update_nuisance(&N);
   }
-
   if (ni != nj)
   {
     log_fatal("ni != nj tomography not supported");
@@ -396,7 +411,7 @@ const int limber)
   const int q = (nl1*nlsize*nccl_size + nl2*nccl_size + ni)*ntheta + nt; // cross redshift bin not 
                                                                          // supported so not using 
                                                                          // N_CCL(ni, nj)
-  if(q > NSIZE*ntheta - 1)
+  if (q > NSIZE*ntheta - 1)
   {
     log_fatal("error in selecting bin number");
     exit(1);
@@ -404,15 +419,14 @@ const int limber)
   return w_vec[q];
 }
 
-/*
-double w_cg_tomo(int nt, int nl, int ni, int nj, int limber)
+double w_cg_tomo(const int nt, const int nl, const int ni, const int nj, const int limber)
 {
   if (like.Ntheta == 0)
   {
     log_fatal("like.Ntheta not initialized");
     exit(1);
   }
-  if(nt > like.Ntheta - 1)
+  if (nt > like.Ntheta - 1)
   {
     log_fatal("error in selecting bin number");
     exit(1); 
@@ -426,11 +440,14 @@ double w_cg_tomo(int nt, int nl, int ni, int nj, int limber)
 
   const int nell = limits.LMAX;
   const int ntheta = like.Ntheta;
+  const int nlsize = Cluster.N200_Nbin;
+  const int ncg_size = tomo.cg_clustering_Npowerspectra;
+  const int NSIZE = nlsize*ncg_size;
 
   if (Pl == 0)
   {
     Pl = (double**) malloc(sizeof(double*)*ntheta);
-    for(int i=0; i<ntheta; i++) 
+    for (int i=0; i<ntheta; i++)
     {
       Pl[i] = (double*) malloc(sizeof(double)*nell);
     }
@@ -475,28 +492,81 @@ double w_cg_tomo(int nt, int nl, int ni, int nj, int limber)
     free(Pmin);
     free(Pmax);
   }
-
   if (recompute_cg(C, G, N))
   {
+    if (limber == 1)
+    {
+      #pragma GCC diagnostic push
+      #pragma GCC diagnostic ignored "-Wunused-variable"
+      {
+        const double Z1 = ZCGCL1(0);
+        const double Z2 = ZCGCL2(0);
+        double init_static_vars_only = C_cg_tomo_limber(limits.P_2_s_min+1, 0, Z1, Z2);
+      }
+      #pragma GCC diagnostic pop
+      #pragma omp parallel for collapse(3)
+      for (int i=0; i<nlsize; i++)
+      {
+        for (int j=0; j<ncg_size; j++)
+        {
+          for (int l=1; l<nell; l++)
+          {
+            const int q = i*ncg_size+ j;
+            const double Z1 = ZCGCL1(j);
+            const double Z2 = ZCGCL2(j);
+            Cl[q][l] = (l > limits.P_2_s_min) ? C_cg_tomo_limber(l, i, Z1, Z2) :
+              C_cg_tomo_limber_nointerp(l, i, Z1, Z2, use_linear_ps_limber, 0);
+          }
+        }
+      }
+    }
+    else
+    {
+      log_fatal("NonLimber not implemented");
+      exit(1);
+    }
+    #pragma omp parallel for collapse(3)
+    for (int i=0; i<nlsize; i++)
+    {
+      for (int j=0; j<ntomo; j++)
+      {
+        for (int p=0; p<ntheta; p++)
+        {
+          const int nz = i*ncg_size + j;
+          const int q  = nz*ntheta + p;
+          w_vec[q] = 0;
+          for (int l=1; l<nell; l++)
+          {
+            w_vec[q] += Pl[p][l]*Cl[nz][l];
+          }
+        }
+      }
+    }
     for (int i=0; i<NSIZE; i++)
     {
       free(Cl[i]);
     }
     free(Cl);
-
     update_cosmopara(&C);
     update_galpara(&G);
     update_nuisance(&N);
   } 
-
-  if(q > NSIZE*ntheta - 1)
+  const int ntomo = N_CGCL(ni, nj);
+  if (!(ntomo>0))
   {
-    log_fatal("error in selecting bin number");
-    exit(1);
+    return 0.0;
   }
-  return w_vec[q];
+  else
+  {
+    const int q = nl*ncg_size + ntomo;
+    if (q > NSIZE-1)
+    {
+      log_fatal("error in selecting bin number");
+      exit(1);
+    }
+    return w_vec[q];
+  }
 }
-*/
 
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
@@ -535,7 +605,7 @@ const int nj, const int limber)
   if (table == 0)
   {
     table = (double**) malloc(sizeof(double*)*NSIZE);
-    for(int i=0; i<NSIZE; i++)
+    for (int i=0; i<NSIZE; i++)
     {
       table[i] = (double*) malloc(sizeof(double)*ntheta);
     }
@@ -558,16 +628,25 @@ const int nj, const int limber)
         plan[j] = fftw_plan_dft_r2c_1d(ntheta, lP[j], flP[j], FFTW_ESTIMATE);
       }
 
-      // Power spectrum on logarithmic bins
-      C_cs_tomo_limber(limits.P_2_s_min + 1, i, ZCL(0), ZCS(0)); // init static vars
+      // ------------------------------------------------------------------------
+      // Power spectrum on logarithmic bins begins
+      // ------------------------------------------------------------------------
+      #pragma GCC diagnostic push
+      #pragma GCC diagnostic ignored "-Wunused-variable"
+      {
+        const int ZC = ZCL(0);
+        const int ZSC = ZCS(0);
+        double init_static_vars_only = C_cs_tomo_limber(limits.P_2_s_min+1, i, ZC, ZSC);
+      }
+      #pragma GCC diagnostic pop
       if (limber == 1)
       { 
         #pragma omp parallel for collapse (3);
-        for(int i=0; i<nlsize; i++) 
+        for (int i=0; i<nlsize; i++)
         {
-          for(int j=0; j<ngammat_size; j++)
+          for (int j=0; j<ngammat_size; j++)
           { 
-            for(int p=0; p<ntheta; p++)
+            for (int p=0; p<ntheta; p++)
             {
               const int ZC = ZCL(j);
               const int ZSC = ZCS(j);
@@ -584,14 +663,15 @@ const int nj, const int limber)
         log_fatal("NonLimber not implemented");
         exit(1);
       }
+      // ------------------------------------------------------------------------
       // Power spectrum on logarithmic ends
+      // ------------------------------------------------------------------------
       
       #pragma omp parallel for
       for (int j=0; j<NSIZE; j++)
       { // Execute FFTW in parallel (thread-safe)
         fftw_execute(plan[j]); 
       }
-      
       for (int j=0; j<NSIZE; j++)
       {
         fftw_free(lP[j]);
@@ -613,12 +693,11 @@ const int nj, const int limber)
       conv[j] = (fftwZ*) fftw_malloc((ntheta/2+1)*sizeof(fftwZ));
       plan[j] = fftw_plan_dft_c2r_1d(ntheta, conv[j], lP[j], FFTW_ESTIMATE);
       tab[j] = (double**) malloc(sizeof(double*)*1);
-      for(int i=0; i<1; i++) 
+      for (int i=0; i<1; i++)
       {
         tab[j][i] = (double*) malloc(sizeof(double)*ntheta);
       }
     }
-
     #pragma omp parallel for
     for (int j=0; j<NSIZE; j++)
     { 
@@ -626,7 +705,7 @@ const int nj, const int limber)
       arg[0] = 0; // bias
       arg[1] = 2; // order of Bessel function
 
-      for(int i=0; i<(ntheta/2+1); i++)
+      for (int i=0; i<(ntheta/2+1); i++)
       {
         const double kk = 2*M_PI*i/(dlnl*ntheta);
         hankel_kernel_FT(kk, kernel[j], arg, 2);
@@ -640,7 +719,7 @@ const int nj, const int limber)
 
       fftw_execute(plan[j]); // Execute FFTW in parallel (thread-safe)
 
-      for(int k=0; k<ntheta; k++)
+      for (int k=0; k<ntheta; k++)
       {
         const double t = exp((nc-k)*dlnl-lnrc); 
         tab[j][0][ntheta-k-1] = lP[j][k]/(t*2*M_PI*ntheta);
@@ -669,26 +748,29 @@ const int nj, const int limber)
     update_cosmopara(&C);
     update_nuisance(&N);
   } 
-  
-  if (!test_zoverlap_c(ni, nj)) 
+  const int ntomo = N_cgl(ni, nj);
+  if (!(ntomo>0))
   {
     return 0.0;
   }
-  if (lntheta < lnthetamin || lntheta > lnthetamax)
+  else
   {
-    const double theta = exp(lntheta);
-    const double theta_min = exp(lnthetamin);
-    const double theta_max = exp(lnthetamax);
-    log_fatal("theta = %e outside look-up table range [%e, %e]", theta, theta_min, theta_max);
-    exit(1);
+    if (lntheta < lnthetamin || lntheta > lnthetamax)
+    {
+      const double theta = exp(lntheta);
+      const double theta_min = exp(lnthetamin);
+      const double theta_max = exp(lnthetamax);
+      log_fatal("theta = %e outside look-up table range [%e, %e]", theta, theta_min, theta_max);
+      exit(1);
+    }
+    const int q = nl*ngammat_size + ntomo;
+    if (q > NSIZE - 1)
+    {
+      log_fatal("error in selecting bin number");
+      exit(1);
+    }
+    return interpol(table[q], ntheta, lnthetamin, lnthetamax, dlntheta, lntheta, 0, 0);
   }
-  const int q = nl*ngammat_size + N_cgl(ni, nj);
-  if(q > NSIZE - 1)
-  {
-    log_fatal("error in selecting bin number");
-    exit(1);
-  }
-  return interpol(table[q], ntheta, lnthetamin, lnthetamax, dlntheta, lntheta, 0, 0);
 }
 
 double w_cc_tomo_flatsky(const double theta, const int nl1, const int nl2, const int ni, 
@@ -719,7 +801,7 @@ const int nj, const int limber)
   if (table == 0)
   {
     table = (double**) malloc(sizeof(double*)*NSIZE);
-    for(int i=0; i<NSIZE; i++)
+    for (int i=0; i<NSIZE; i++)
     {
       table[i] = (double*) malloc(sizeof(double)*ntheta);
     }
@@ -749,12 +831,17 @@ const int nj, const int limber)
       double* ll = (limber == 1) ? NULL : calloc(limits.LMAX_NOLIMBER, sizeof(double));
       if (limber != 1)
       { 
-        for(int i=0; i<limits.LMAX_NOLIMBER; i++)
+        for (int i=0; i<limits.LMAX_NOLIMBER; i++)
         {
           ll[i] = i;
         }
       }
-      C_cc_tomo_limber(limits.P_2_s_min+1, i, j, 0, 0); // init static vars
+      #pragma GCC diagnostic push
+      #pragma GCC diagnostic ignored "-Wunused-variable"
+      {
+        double init_static_vars_only = C_cc_tomo_limber(limits.P_2_s_min+1, i, j, 0, 0);
+      }
+      #pragma GCC diagnostic pop
       for (int i=0; i<nlsize; i++) 
       { 
         gsl_spline*** fCL_NL = 
@@ -808,7 +895,7 @@ const int nj, const int limber)
         {
           for (int k=0; k<nccl_size; k++)  
           {
-            for(int p=0; p<ntheta; p++)
+            for (int p=0; p<ntheta; p++)
             {
               const int q     = i*nlsize*nccl_size + j*nccl_size + k;
               const int qstar = j*nlsize*nccl_size + i*nccl_size + k;
@@ -858,7 +945,6 @@ const int nj, const int limber)
       // ------------------------------------------------------------------------
       // Power spectrum on logarithmic bins ends
       // ------------------------------------------------------------------------
-
       #pragma omp parallel for
       for (int j=0; j<NSIZE; j++)
       {
@@ -873,7 +959,6 @@ const int nj, const int limber)
       free(lP);
       free(plan);
     }
-    
     double** lP = (double**) malloc(sizeof(double*)*NSIZE);
     fftwZ** kernel = (fftwZ**) fftw_malloc(sizeof(fftwZ*)*NSIZE);
     fftwZ** conv = (fftwZ**) fftw_malloc(sizeof(fftwZ*)*NSIZE);
@@ -886,7 +971,7 @@ const int nj, const int limber)
       conv[j] = (fftwZ*) fftw_malloc((ntheta/2+1)*sizeof(fftwZ));
       plan[j] = fftw_plan_dft_c2r_1d(ntheta, conv[j], lP[j], FFTW_ESTIMATE);
       tab[j] = (double**) malloc(sizeof(double*)*1);
-      for(int i=0; i<1; i++) 
+      for (int i=0; i<1; i++)
       {
         tab[j][i] = (double*) malloc(sizeof(double)*ntheta);
       }
@@ -898,7 +983,7 @@ const int nj, const int limber)
       arg[0] = 0; // bias
       arg[1] = 0; // order of Bessel function
 
-      for(int i=0; i<(ntheta/2+1); i++)
+      for (int i=0; i<(ntheta/2+1); i++)
       {
         const double kk = 2*M_PI*i/(dlnl*ntheta);
         hankel_kernel_FT(kk, kernel[j], arg, 2);
@@ -912,7 +997,7 @@ const int nj, const int limber)
 
       fftw_execute(plan[j]); // Execute FFTW in parallel (thread-safe)
 
-      for(int k=0; k<ntheta; k++)
+      for (int k=0; k<ntheta; k++)
       {
         const double t = exp((nc-k)*dlnl-lnrc); 
         tab[j][0][ntheta-k-1] = lP[j][k]/(t*2*M_PI*ntheta);
@@ -954,9 +1039,9 @@ const int nj, const int limber)
     log_fatal("theta = %e outside look-up table range [%e, %e]", theta, theta_min, theta_max);
     exit(1);
   }
-  const int q = i*nlsize*nccl_size + j*nccl_size + k; // cross redshift bin not supported so not
-                                                      // using N_CCL(ni, nj) instead of ni
-  if(q > NSIZE - 1)
+  const int q = nl1*nlsize*nccl_size + nl2*nccl_size + ni; // cross redshift bin not supported so
+                                                           // not using N_CCL(ni, nj) instead of ni
+  if (q > NSIZE - 1)
   {
     log_fatal("error in selecting bin number");
     exit(1);
@@ -964,7 +1049,6 @@ const int nj, const int limber)
   return interpol(table[q], ntheta, lnthetamin, lnthetamax, dlntheta, lntheta, 0, 0);
 }
 
-/*
 double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
 { // nl = lambda_obs bin, ni = cluster bin, nj = galaxy bin
   static cosmopara C;
@@ -973,9 +1057,8 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
   static double** table;
 
   const int nlsize = Cluster.N200_Nbin;
-  const int ncd = tomo.cluster_Nbin;
-  const int njsize = tomo.clustering_Nbin;
-  const int NSIZE = nlsize*nisize*njsize;
+  const int ncg_size = tomo.cg_clustering_Npowerspectra;
+  const int NSIZE = nlsize*ncg_size;
   const int ntheta = Ntable.N_thetaH;
 
   const double l_min = limits.w_l_min;
@@ -984,8 +1067,7 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax-lnlmin)/(1.0*ntheta-1.);
   const double lnrc = 0.5*(lnlmax + lnlmin);
-  const double nc = ntheta/2+1;
-
+  const double nc = ntheta/2 + 1;
   const double lnthetamin = (nc-ntheta+1)*dlnl-lnrc;
   const double lnthetamax = nc*dlnl-lnrc;
   const double dlntheta = (lnthetamax - lnthetamin)/((double) ntheta);
@@ -994,7 +1076,7 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
   if (table == 0)
   {
     table = (double**) malloc(sizeof(double*)*NSIZE);
-    for(int i=0; i<NSIZE; i++)
+    for (int i=0; i<NSIZE; i++)
     {
       table[i] = (double*) malloc(sizeof(double)*ntheta);
     }
@@ -1019,34 +1101,41 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
           lP[j] = (double*) malloc(ntheta*sizeof(double));
           plan[j] = fftw_plan_dft_r2c_1d(ntheta, lP[j], flP[j], FFTW_ESTIMATE);
         }
-
+        // ----------------------------------------------------------------------------------
         // Power spectrum on logarithmic bins (begins)
-        C_cg_tomo_limber(limits.P_2_s_min, 0, 0, 0); // init static vars
+        // ----------------------------------------------------------------------------------
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wunused-variable"
+        {
+          const double Z1 = ZCGCL1(0);
+          const double Z2 = ZCGCL2(0);
+          double init_static_vars_only = C_cg_tomo_limber(limits.P_2_s_min, 0, Z1, Z2);
+        }
+        #pragma GCC diagnostic pop
         #pragma omp parallel for collapse(3)
         for (int i=0; i<nlsize; i++)  
         { 
-          for (int j=0; j<nisize; j++)  
+          for (int j=0; j<ncg_size; j++)
           {
-            for (int k=0; k<njsize; k++)  
+            for (int p=0; p<ntheta; p++)
             {
-              const int q = i*nisize*njsize+ j*njsize + k;
-              for(int p=0; p<ntheta; p++)
-              {
-                const double l = exp(lnrc + (p - nc)*dlnl);
-                lP[q][p] = (l > limits.P_2_s_min) ? l*C_cg_tomo_limber(l, i, j, k) :
-                  l*C_cg_tomo_limber_nointerp(l, i, j, k, use_linear_ps_limber, 0);
-              }
+              const int q = i*ncg_size+ j;
+              const double Z1 = ZCGCL1(j);
+              const double Z2 = ZCGCL2(j);
+              const double l = exp(lnrc + (p - nc)*dlnl);
+              lP[q][p] = (l > limits.P_2_s_min) ? l*C_cg_tomo_limber(l, i, Z1, Z2) :
+                l*C_cg_tomo_limber_nointerp(l, i, Z1, Z2, use_linear_ps_limber, 0);
             }
           }
         }
+        // ----------------------------------------------------------------------------------
         // Power spectrum on logarithmic bins (ends)
-
+        // ----------------------------------------------------------------------------------
         #pragma omp parallel for
         for (int j=0; j<NSIZE; j++)
         {
           fftw_execute(plan[j]); // Execute FFTW in parallel (thread-safe)
         }
-        
         for (int j=0; j<NSIZE; j++)
         {
           fftw_free(lP[j]);
@@ -1055,7 +1144,6 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
         free(lP);
         free(plan);
       }
-      
       double** lP = (double**) malloc(sizeof(double*)*NSIZE);
       fftwZ** kernel = (fftwZ**) fftw_malloc(sizeof(fftwZ*)*NSIZE);
       fftwZ** conv = (fftwZ**) fftw_malloc(sizeof(fftwZ*)*NSIZE);
@@ -1068,12 +1156,11 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
         conv[j] = (fftwZ*) fftw_malloc((ntheta/2+1)*sizeof(fftwZ));
         plan[j] = fftw_plan_dft_c2r_1d(ntheta, conv[j], lP[j], FFTW_ESTIMATE);
         tab[j] = (double**) malloc(sizeof(double*)*1);
-        for(int i=0; i<1; i++) 
+        for (int i=0; i<1; i++)
         {
           tab[j][i] = (double*) malloc(sizeof(double)*ntheta);
         }
       }
-
       #pragma omp parallel for
       for (int j=0; j<NSIZE; j++)
       {
@@ -1081,7 +1168,7 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
         arg[0] = 0; // bias
         arg[1] = 0; // order of Bessel function
 
-        for(int i=0; i<(ntheta/2+1); i++)
+        for (int i=0; i<(ntheta/2+1); i++)
         {
           const double kk = 2*M_PI*i/(dlnl*ntheta);
           hankel_kernel_FT(kk, kernel[j], arg, 2);
@@ -1095,7 +1182,7 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
 
         fftw_execute(plan[j]); // Execute FFTW in parallel (thread-safe)
 
-        for(int k=0; k<ntheta; k++)
+        for (int k=0; k<ntheta; k++)
         {
           const double t = exp((nc-k)*dlnl-lnrc); 
           tab[j][0][ntheta-k-1] = lP[j][k]/(t*2*M_PI*ntheta);
@@ -1105,7 +1192,6 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
           table[j][k] = tab[j][0][k];
         }
       }
-      
       for (int j=0; j<NSIZE; j++)
       {
         fftw_free(flP[j]);
@@ -1131,7 +1217,6 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
     update_cosmopara(&C);
     update_nuisance(&N);
   }
-
   if (lntheta < lnthetamin || lntheta > lnthetamax)
   {
     const double theta = exp(lntheta);
@@ -1140,15 +1225,22 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
     log_fatal("theta = %e outside look-up table range [%e, %e]", theta, theta_min, theta_max);
     exit(1);
   }
-  const int q = nlsize*nl + nlsize*nisize*ni + nj;
-  if(q > NSIZE-1)
+  const int ntomo = N_CGCL(ni, nj);
+  if (!(ntomo>0))
   {
-    log_fatal("error in selecting bin number");
-    exit(1);
+    return 0.0;
   }
-  return interpol(table[q], ntheta, lnthetamin, lnthetamax, dlntheta, lntheta, 0, 0);
+  else
+  {
+    const int q = nl*ncg_size + ntomo;
+    if (q > NSIZE-1)
+    {
+      log_fatal("error in selecting bin number");
+      exit(1);
+    }
+    return interpol(table[q], ntheta, lnthetamin, lnthetamax, dlntheta, lntheta, 0, 0);
+  }
 }
-*/
 
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
@@ -1165,7 +1257,7 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
 
 double int_for_C_cs_tomo_limber(double a, void* params)
 { 
-  if(!(a>0) || !(a<1)) 
+  if (!(a>0) || !(a<1))
   {
     log_fatal("a>0 and a<1 not true");
     exit(1);
@@ -1199,7 +1291,7 @@ const int use_linear_ps, const int init_static_vars_only)
   const double amin = 1./(1. + zmax);
   const double amax = 1./(1. + zmin);
   
-  if(init_static_vars_only == 1)
+  if (init_static_vars_only == 1)
   {
     return int_for_C_cs_tomo_limber(amin, (void*) ar);
   }
@@ -1218,10 +1310,11 @@ double C_cs_tomo_limber(const double l, const int nl, const int ni, const int nj
   static nuisancepara N;
   static double** table = 0;
 
-  const int nell = Ntable.N_ell;
   const int nlsize = Cluster.N200_Nbin;
   const int ngammat_size = tomo.cgl_Npowerspectra;
   const int NSIZE = nlsize*ngammat_size;
+
+  const int nell = Ntable.N_ell;
   const double lnlmin = log(limits.P_2_s_min);
   const double lnlmax = log(limits.P_2_s_max);
   const double dlnl = (lnlmax - lnlmin)/(nell-1);
@@ -1229,19 +1322,26 @@ double C_cs_tomo_limber(const double l, const int nl, const int ni, const int nj
   if (table == 0)
   {
     table = (double**) malloc(sizeof(double*)*NSIZE);
-    for(int i=0; i<NSIZE; i++)
+    for (int i=0; i<NSIZE; i++)
     {
       table[i] = (double*) malloc(sizeof(double)*nell);
     }
   }
   if (recompute_cs(C, G, N))
   {
-    C_cs_tomo_limber_nointerp(exp(lnlmin), 0, ZCL(0), ZCS(0), use_linear_ps_limber, 1) // init static 
-                                                                                       // vars only
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      const int ZC = ZCL(0);
+      const int ZS = ZCS(0);
+      const double ll = exp(lnlmin);
+      double init_static_vars_only = C_cs_tomo_limber_nointerp(ll, 0, ZC, ZS, use_linear_ps_limber, 1);
+    }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(3)
-    for(int i=0; i<nlsize; i++)
+    for (int i=0; i<nlsize; i++)
     { 
-      for(int j=0; j<ngammat_size; j++)
+      for (int j=0; j<ngammat_size; j++)
       {
         for (int p=0; p<nell; p++)
         {
@@ -1249,14 +1349,14 @@ double C_cs_tomo_limber(const double l, const int nl, const int ni, const int nj
           const int ZS = ZCS(j);
           const int q = i*ngammat_size + j;
           const double lnl = lnlmin + p*dlnl;
-          table[q][p] = log(C_cs_tomo_limber_nointerp(exp(lnl), i, ZC, ZS, use_linear_ps_limber, 0));
+          const double ll = exp(lnl);
+          table[q][p] = log(C_cs_tomo_limber_nointerp(ll, i, ZC, ZS, use_linear_ps_limber, 0));
         }
       }
     }
     update_cosmopara(&C);
     update_nuisance(&N);
   }
-  
   if (!test_zoverlap_c(ni, nj)) 
   {
     return 0.0;
@@ -1268,7 +1368,7 @@ double C_cs_tomo_limber(const double l, const int nl, const int ni, const int nj
     exit(1);
   }
   const int q = nl*ngammat_size + N_cgl(ni, nj);
-  if(q > NSIZE - 1)
+  if (q > NSIZE - 1)
   {
     log_fatal("error in selecting bin number");
     exit(1);
@@ -1284,7 +1384,7 @@ double C_cs_tomo_limber(const double l, const int nl, const int ni, const int nj
 
 double int_for_C_cc_tomo_limber(double a, void* params)
 {
-  if(!(a>0) || !(a<1)) 
+  if (!(a>0) || !(a<1))
   {
     log_fatal("a>0 and a<1 not true");
     exit(1);
@@ -1317,7 +1417,7 @@ const int nj, const int use_linear_ps, const int init_static_vars_only)
   const double amin = 1./(1. + zmax);
   const double amax = 1./(1. + zmin);
 
-  if(init_static_vars_only == 1)
+  if (init_static_vars_only == 1)
   {
     return int_for_C_cc_tomo_limber(amin, (void*) ar)
   }
@@ -1346,28 +1446,33 @@ const int nj)
   if (table == 0)
   { 
     table = (double**) malloc(sizeof(double*)*NSIZE);
-    for(int i=0; i<NSIZE; i++)
+    for (int i=0; i<NSIZE; i++)
     {
       table[i] = (double*) malloc(sizeof(double)*nell);
     }   
   }
   if (recompute_cc(C, N))
   {
-    C_cc_tomo_limber_nointerp(exp(lnlmin), 0, 0, 0, 0, use_linear_ps_limber, 1); // init static 
-                                                                                 // vars only
-    for (int i=0; i<nlsize; i++) 
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
     {
-      #pragma omp parallel for collapse(3)
-      for (int j=i; j<nlsize; j++) 
+      double init_static_vars_only =
+        C_cc_tomo_limber_nointerp(exp(lnlmin), 0, 0, 0, 0, use_linear_ps_limber, 1);
+    }
+    #pragma GCC diagnostic pop
+    #pragma omp parallel for collapse(3)
+    for (int i=0; i<nlsize; i++)
+    {
+      for (int k=0; k<nccl_size; k++)
       {
-        for (int k=0; k<nccl_size; k++)
+        for (int p=0; p<nell; ++p)
         {
-          for (int p=0; p<nell; ++p)
+          for (int j=i; j<nlsize; j++)
           {
-            const int ZCCL1 = k; // cross redshift bin not supported so not using ZCCL1(k)
-            const int ZCCL2 = k; // cross redshift bin not supported so not using ZCCL2(k)
-            const int q     = i*nlsize*nccl_size + j*nccl_size + k;
-            const int qstar = j*nlsize*nccl_size + i*nccl_size + k;
+            const int ZCCL1  = k; // cross redshift bin not supported so not using ZCCL1(k)
+            const int ZCCL2  = k; // cross redshift bin not supported so not using ZCCL2(k)
+            const int q      = i*nlsize*nccl_size + j*nccl_size + k;
+            const int qstar  = j*nlsize*nccl_size + i*nccl_size + k;
             const double lnl = lnlmin + p*dl;
             table[q][p] = 
               log(C_cc_tomo_limber_nointerp(exp(lnl), i, j, ZCCL1, ZCCL2, use_linear_ps_limber, 0));
@@ -1379,7 +1484,6 @@ const int nj)
     update_cosmopara(&C);
     update_nuisance(&N);
   }
-
   if (ni != nj)
   {
     log_fatal("ni != nj tomography not supported");
@@ -1393,7 +1497,7 @@ const int nj)
   } 
   const int q = nl1*nlsize*nccl_size + nl2*nccl_size + ni; // cross redshift bin not supported so 
                                                            // not using N_CCL(ni, nj)
-  if(q > NSIZE-1)
+  if (q > NSIZE-1)
   {
     log_fatal("error in selecting bin number");
     exit(1);
@@ -1410,7 +1514,7 @@ const int nj)
 
 double int_for_C_cg_tomo_limber(double a, void* params)
 {
-  if(!(a>0) || !(a<1)) 
+  if (!(a>0) || !(a<1))
   {
     log_fatal("a>0 and a<1 not true");
     exit(1);
@@ -1445,17 +1549,17 @@ const int use_linear_ps)
 }
 
 double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj)
-{ // TODO: external ni, nj pairs
+{
   static cosmopara C;
   static galpara G;
   static nuisancepara N;
   static double** table = 0;
 
-  const int nell = Ntable.N_ell;
   const int nlsize = Cluster.N200_Nbin;
-  const int nisize = tomo.cluster_Nbin;
-  const int njsize = tomo.clustering_Nbin;
-  const int NSIZE = nlsize*nisize*njsize;
+  const int ncg_size = tomo.cg_clustering_Npowerspectra;
+  const int NSIZE = nlsize*ncg_size;
+
+  const int nell = Ntable.N_ell;
   const double lnlmin = log(limits.P_2_s_min);
   const double lnlmax = log(limits.P_2_s_max);
   const double dl = (lnlmax - lnlmin)/(nell-1);
@@ -1463,27 +1567,35 @@ double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj
   if (table == 0)
   { 
     table = (double**) malloc(sizeof(double*)*NSIZE);
-    for(int i=0; i<NSIZE; i++)
+    for (int i=0; i<NSIZE; i++)
     {
       table[i] = (double*) malloc(sizeof(double)*nell);
     }      
   }
   if (recompute_cg(C, G, N))
   {
-    C_cg_tomo_limber_nointerp(exp(lnl), 0, 0, 0, use_linear_ps_limber, 1); // init static vars only
-    #pragma omp parallel for collapse(4)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      const double Z1 = ZCGCL1(0);
+      const double Z2 = ZCGCL2(0);
+      const double ll = exp(lnlmin);
+      double init_static_vars_only = C_cg_tomo_limber_nointerp(ll, 0, Z1, Z2, use_linear_ps_limber, 1)
+    }
+    #pragma GCC diagnostic pop
+    #pragma omp parallel for collapse(3)
     for (int i=0; i<nlsize; i++) 
     {
-      for (int j=0; j<nisize; j++)  
+      for (int j=0; j<ncg_size; j++)
       {
-        for (int k=0; k<njsize; k++)  
+        for (int p=0; p<nell; ++p)
         {
-          for (int p=0; p<nell; ++p)
-          {
-            const int q = i*nisize*njsize + j*njsize + k;
-            const double lnl = lnlmin + p*dl;
-            table[q][p] = log(C_cg_tomo_limber_nointerp(exp(lnl), i, j, k, use_linear_ps_limber, 0));
-          }
+          const double Z1 = ZCGCL1(j);
+          const double Z2 = ZCGCL2(j);
+          const int q = i*ncg_size + j;
+          const double lnl = lnlmin + p*dl;
+          const double ll = exp(lnl);
+          table[q][p] = log(C_cg_tomo_limber_nointerp(ll, i, Z1, Z2, use_linear_ps_limber, 0));
         }
       }
     }
@@ -1497,24 +1609,30 @@ double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj
     log_fatal("l = %e outside look-up table range [%e, %e]", l, exp(lnlmin), exp(lnlmax));
     exit(1);
   } 
-  const int q = i*nisize*njsize + j*njsize + k;
-  if(q > NSIZE-1)
+  const int ntomo = N_CGCL(ni, nj);
+  if (!(ntomo>0))
   {
-    log_fatal("error in selecting bin number");
-    exit(1);
+    return 0.0;
   }
-  const double f1 = exp(interpol(table[q], nell, lnlmin, lnlmax, dl, lnl, 1, 1));
-  return isnan(f1) ? 0.0 : f1;
+  else
+  {
+    const int q = nl*ncg_size + ntomo;
+    if (q > NSIZE-1)
+    {
+      log_fatal("error in selecting bin number");
+      exit(1);
+    }
+    const double f1 = exp(interpol(table[q], nell, lnlmin, lnlmax, dl, lnl, 1, 1));
+    return isnan(f1) ? 0.0 : f1;
+  }
 }
 
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------
 // Non Limber (Angular Power Spectrum)
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-
+// ------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------
 
 void f_chi_for_Psi_cluster_cl(double* chi, const int Nchi, double* fchi, const int ni, 
@@ -1530,7 +1648,7 @@ const int nl, const double zmax)
     fchi[i] = chi[i]*pf*growfac(a)*weighted_bias(nl, z)*hoverh0(a)/real_coverH0;
     if ((z < zmin) || (z > zmax))
     {
-      fchi[i] = 0.;
+      fchi[i] = 0.0;
     }
   }
   #pragma omp parallel for
@@ -1543,7 +1661,7 @@ const int nl, const double zmax)
     fchi[i] = chi[i]*pf*growfac(a)*weighted_bias(nl, z)*hoverh0(a)/real_coverH0;
     if ((z < zmin) || (z > zmax))
     {
-      fchi[i] = 0.;
+      fchi[i] = 0.0;
     }
   }
 }
@@ -1566,7 +1684,7 @@ const int nl, const double zmax)
     }
   }
   #pragma omp parallel for
-  for(int i=1; i<Nchi; i++) 
+  for (int i=1; i<Nchi; i++)
   {
     const double a = a_chi(chi[i]/real_coverH0 /* convert unit to c/H0 */);
     const double z = 1./a - 1.;
@@ -1593,13 +1711,13 @@ const int nl, const double zmax)
     const double wmag = W_mag_cluster(a, fK, ni, nl);
     const double window_M = wmag/fK/(real_coverH0*real_coverH0);
     fchi[i] = window_M*growfac(a); // unit [Mpc^-2]    
-    if(z > zmax)
+    if (z > zmax)
     {
       fchi[i] = 0.;
     }
   }
   #pragma omp parallel for
-  for(int i=1; i<Nchi; i++) 
+  for (int i=1; i<Nchi; i++)
   {
     const double a = a_chi(chi[i]/real_coverH0 /* convert unit to c/H0 */);
     const double z = 1.0/a - 1.0;
@@ -1607,7 +1725,7 @@ const int nl, const double zmax)
     const double wmag = W_mag_cluster(a, fK, ni, nl);
     const double window_M = wmag/fK/(real_coverH0*real_coverH0);
     fchi[i] = window_M*growfac(a); // unit [Mpc^-2]    
-    if(z > zmax)
+    if (z > zmax)
     {
       fchi[i] = 0.;
     }
@@ -1641,12 +1759,12 @@ double dev, const double tol)
   double f1_chi_Mag[Nchi];
   double f2_chi_Mag[Nchi];
   const double real_coverH0 = cosmology.coverH0 / cosmology.h0;
-  const double chi_min = chi(1./(1.+0.002))*real_coverH0; // DIMENSIONELESS
-  const double chi_max = chi(1./(1.+4.))*real_coverH0;    // DIMENSIONELESS
+  const double chi_min = chi(1.0/(1.0 + 0.002))*real_coverH0; // DIMENSIONELESS
+  const double chi_max = chi(1.0/(1.0 + 4.0))*real_coverH0;    // DIMENSIONELESS
   const double dlnchi = log(chi_max/chi_min) / (Nchi - 1.);
   const double dlnk = dlnchi;
 
-  if(k1 == 0)
+  if (k1 == 0)
   { 
     k1 = (double**) malloc(Nell_block * sizeof(double*));
     k2 = (double**) malloc(Nell_block * sizeof(double*));
@@ -1666,7 +1784,7 @@ double dev, const double tol)
     chi_ar = (double*) malloc(Nchi * sizeof(double));
   }
   for (int i=0; i<Nchi; i++)
-  {  // chi_min and chi_max may be cosmology dependent  
+  { // chi_min and chi_max may be cosmology dependent
     chi_ar[i] = chi_min * exp(dlnchi * i);
   }
   #pragma omp parallel for collapse(2)
@@ -1729,12 +1847,12 @@ double dev, const double tol)
     
   while ((fabs(dev) > tol) & (L < limits.LMAX_NOLIMBER))
   { 
-    for(int i=0; i<Nell_block; i++) 
+    for (int i=0; i<Nell_block; i++)
     {
       ell_ar[i]=i+i_block*Nell_block;
     }
     i_block++;
-    if(L >= limits.LMAX_NOLIMBER - Nell_block)
+    if (L >= limits.LMAX_NOLIMBER - Nell_block)
     { //Xiao: break before memory leak in next iteration
       break;
     }
@@ -1742,12 +1860,12 @@ double dev, const double tol)
 
     cfftlog_ells(chi_ar, f1_chi, Nchi, &cfg, ell_ar, Nell_block, k1, Fk1);
     cfftlog_ells_increment(chi_ar, f1_chi_RSD, Nchi, &cfg_RSD, ell_ar, Nell_block, k1, Fk1);
-    if(nl1 != nl2) 
+    if (nl1 != nl2)
     {
       cfftlog_ells(chi_ar, f2_chi, Nchi, &cfg, ell_ar, Nell_block, k2, Fk2);
       cfftlog_ells_increment(chi_ar, f2_chi_RSD, Nchi, &cfg_RSD, ell_ar, Nell_block, k2, Fk2);
     }
-    if(INCLUDE_MAG_IN_C_CC_NONLIMBER == 1)
+    if (INCLUDE_MAG_IN_C_CC_NONLIMBER == 1)
     {
       cfftlog_ells(chi_ar, f1_chi_Mag, Nchi, &cfg_Mag, ell_ar, Nell_block, k1, Fk1_Mag);
       if (nl1 != nl2) 
@@ -1755,16 +1873,20 @@ double dev, const double tol)
         cfftlog_ells(chi_ar, f2_chi_Mag, Nchi, &cfg_Mag, ell_ar, Nell_block, k2, Fk2_Mag);
       }
     }
-
-    p_lin(k1[0][0]*real_coverH0, 1.0); // init static vars only
-    C_cc_tomo_limber_nointerp((double) ell_ar[0], nl1, nl2, ni, ni, 0, 1); // init static vars only
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      double init_static_vars_only = p_lin(k1[0][0]*real_coverH0, 1.0);
+      init_static_vars_only = C_cc_tomo_limber_nointerp((double) ell_ar[0], nl1, nl2, ni, ni, 0, 1);
+    }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for
-    for(int i=0; i<Nell_block; i++) 
+    for (int i=0; i<Nell_block; i++)
     {
       cl_temp = 0.;
-      for(int j=0; j<Nchi; j++) 
+      for (int j=0; j<Nchi; j++)
       {
-        if(INCLUDE_MAG_IN_C_CC_NONLIMBER == 1)
+        if (INCLUDE_MAG_IN_C_CC_NONLIMBER == 1)
         {
           const double ell_prefactor = ell_ar[i]*(ell_ar[i]+1.);
           Fk1[i][j] += ell_prefactor*Fk1_Mag[i][j]/(k1[i][j]*k1[i][j]); 
@@ -1830,7 +1952,7 @@ const double tol)
   const double dlnchi = log(chi_max/chi_min) / (Nchi - 1.);
   const double dlnk = dlnchi;
 
-  if(k1 == 0)
+  if (k1 == 0)
   { // COCOA: no need to create/destroy arrays with same size at every call
     k1 = (double**) malloc(Nell_block * sizeof(double*));
     k2 = (double**) malloc(Nell_block * sizeof(double*));
@@ -1873,14 +1995,14 @@ const double tol)
 
   f_chi_for_Psi_cluster_cl(chi_ar, Nchi, f1_chi, ni, Nlambda1, zmin, zmax);
   f_chi_for_Psi_cluster_cl_RSD(chi_ar, Nchi, f1_chi_RSD_ar, ni, Nlambda1, zmin, zmax);
-  if(INCLUDE_MAG_IN_C_CC_NONLIMBER)
+  if (INCLUDE_MAG_IN_C_CC_NONLIMBER)
   {
     f_chi_for_Psi_cluster_cl_Mag(chi_ar, Nchi, f1_chi_Mag, ni, Nlambda1, zmin, zmax);
   }
   
   f_chi_for_Psi_cl(chi_ar, Nchi, f2_chi, nj, zmin, zmax);
   f_chi_for_Psi_cl_RSD(chi_ar, Nchi, f2_chi_RSD_ar, nj, zmin, zmax);
-  if(INCLUDE_MAG_IN_C_CC_NONLIMBER)
+  if (INCLUDE_MAG_IN_C_CC_NONLIMBER)
   {
     f_chi_for_Psi_cl_Mag(chi_ar, Nchi, f2_chi_Mag, nj, zmin, zmax);
   }
@@ -1913,12 +2035,12 @@ const double tol)
     
   while ((fabs(dev) > tol) & (L < limits.LMAX_NOLIMBER))
   { 
-    for(int i=0; i<Nell_block; i++) 
+    for (int i=0; i<Nell_block; i++)
     {
       ell_ar[i]=i+i_block*Nell_block;
     } 
     i_block++;  
-    if(L >= limits.LMAX_NOLIMBER - Nell_block)
+    if (L >= limits.LMAX_NOLIMBER - Nell_block)
     { //Xiao: break before memory leak in next iteration
       break;
     }
@@ -1928,21 +2050,26 @@ const double tol)
     cfftlog_ells_increment(chi_ar, f1_chi_RSD_ar, Nchi, &cfg_RSD, ell_ar, Nell_block, k1, Fk1);
     cfftlog_ells(chi_ar, f2_chi, Nchi, &cfg, ell_ar, Nell_block, k2, Fk2);
     cfftlog_ells_increment(chi_ar, f2_chi_RSD_ar, Nchi, &cfg_RSD, ell_ar, Nell_block, k2, Fk2);
-    if(INCLUDE_MAG_IN_C_CC_NONLIMBER)
+    if (INCLUDE_MAG_IN_C_CC_NONLIMBER)
     {
       cfftlog_ells(chi_ar, f1_chi_Mag, Nchi, &cfg_Mag, ell_ar, Nell_block, k1, Fk1_Mag);
       cfftlog_ells(chi_ar, f2_chi_Mag, Nchi, &cfg_Mag, ell_ar, Nell_block, k2, Fk2_Mag);
     }
 
-    p_lin(k1[0][0]*real_coverH0, 1.0); // init static vars only
-    C_cg_tomo_limber_nointerp((double) ell_ar[0], nl, ni, nj, 0, 1); // init static vars only
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      double init_static_vars_only = p_lin(k1[0][0]*real_coverH0, 1.0);
+      init_static_vars_only = C_cg_tomo_limber_nointerp((double) ell_ar[0], nl, ni, nj, 0, 1);
+    }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for
-    for(int i=0; i<Nell_block; i++) 
+    for (int i=0; i<Nell_block; i++)
     {
       double cl_temp = 0.;
-      for(int j=0; j<Nchi; j++) 
+      for (int j=0; j<Nchi; j++)
       {
-        if(INCLUDE_MAG_IN_C_CC_NONLIMBER)
+        if (INCLUDE_MAG_IN_C_CC_NONLIMBER)
         {
           const double ell_prefactor = ell_ar[i]*(ell_ar[i]+1.);
           Fk1[i][j] += (ell_prefactor/(k1[i][j]*k1[i][j])*Fk1_Mag[i][j]);
@@ -1982,9 +2109,7 @@ double binned_Ndensity_nointerp(const int nl, const double z, const int init_sta
 {
   const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E;
   const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E;
-
   double params[2] = {(double) nl, z};
-  
   return (init_static_vars_only == 1) ? 
     dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) params) :
     int_gsl_integrate_low_precision(dndlnM_times_binned_P_lambda_obs_given_M, (void*) params, 
@@ -1998,7 +2123,6 @@ double binned_Ndensity(const int nl, const double z)
   static double** table;
 
   const int N_l = Cluster.N200_Nbin;
-
   const int N_a = Ntable.N_a;
   const double zmin = fmax(tomo.cluster_zmin[0] - 0.05, 0.01); 
   const double zmax = tomo.cluster_zmax[tomo.cluster_Nbin - 1] + 0.05;
@@ -2009,21 +2133,26 @@ double binned_Ndensity(const int nl, const double z)
   if (table == 0)
   {
     table = (double**) malloc(sizeof(double*)*N_l);
-    for(int i=0; i<N_l; i++)
+    for (int i=0; i<N_l; i++)
     {
       table[i] = (double*) malloc(sizeof(double)*N_a);
     }
   }
   if (recompute_clusters(C, N))
   {
-    binned_n_nointerp(0, 1.0/amin - 1.0, 1); // init static vars only
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      double init_static_vars_only = binned_Ndensity_nointerp(0, 1.0/amin - 1.0, 1);
+    }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(2)
     for (int i=0; i<N_l; i++)
     {
       for (int j=0; j<N_a; j++)
       {
         const double aa = amin + j*da;
-        table[i][j] = binned_n_nointerp(i, 1.0/aa - 1.0, 0);
+        table[i][j] = binned_Ndensity_nointerp(i, 1.0/aa - 1.0, 0);
       }
     }
     update_cosmopara(&C);
@@ -2044,7 +2173,7 @@ double binned_Ndensity(const int nl, const double z)
 
 double int_for_binned_N(double a, void* params)
 {
-  if(!(a>0)) 
+  if (!(a>0))
   {
     log_fatal("a > 0 not true");
     exit(1);
@@ -2053,7 +2182,6 @@ double int_for_binned_N(double a, void* params)
   const int nl = (int) ar[0];
   const int nz = (int) ar[1];
   const int interpolate_survey_area = (int) ar[2];
-
   const double z = 1.0/a - 1.0 ;
   const double dzda = 1.0/(a*a); 
   const double norm = get_area(z, interpolate_survey_area);  
@@ -2067,7 +2195,6 @@ const int init_static_vars_only)
   const double tmp = 4.0*M_PI/41253.0;
   const double amin = 1.0/(1.0 + tomo.cluster_zmax[nz]);
   const double amax = 1.0/(1.0 + tomo.cluster_zmin[nz])
-
   return (init_static_vars_only == 1) ? int_for_binned_N(amin, (void*) params) :
     tmp*int_gsl_integrate_low_precision(int_for_binned_N, (void*) params, amin, amax, NULL, 
       GSL_WORKSPACE_SIZE);
@@ -2081,17 +2208,23 @@ double binned_N(const int nl, const int nz)
 
   const int N_l = Cluster.N200_Nbin;
   const int N_z = tomo.cluster_Nbin;
+
   if (table == 0)
   {
     table = (double**) malloc(sizeof(double*)*N_l);
-    for(int i=0; i<N_l; i++)
+    for (int i=0; i<N_l; i++)
     {
       table[i] = (double*) malloc(sizeof(double)*N_z);
     }
   }
   if (recompute_clusters(C, N))
   {
-    binned_N_nointerp(0, 0, Cluster.interpolate_survey_area, 1); // init static vars only
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      double init_static_vars_only = binned_N_nointerp(0, 0, Cluster.interpolate_survey_area, 1);
+    }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(2)
     for (int i=0; i<N_l; i++)
     {

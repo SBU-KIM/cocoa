@@ -129,7 +129,8 @@ typedef struct
   double cluster_zmax[MAX_SIZE_ARRAYS];
   double cluster_zmin[MAX_SIZE_ARRAYS];
 
-  int** external_selection_cg_clustering;
+  // we assume cluster bin = galaxy bin (no cross)
+  int external_selection_cg_clustering[MAX_SIZE_ARRAYS];
 } tomopara;
 
 typedef struct

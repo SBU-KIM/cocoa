@@ -29,7 +29,7 @@ static double SQRT2 = 1.41421356237;
 
 double amin_source(const int ni) 
 {
-  if(ni < -1 || ni > tomo.shear_Nbin - 1)
+  if (ni < -1 || ni > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -52,16 +52,9 @@ double amin_source(const int ni)
   }
 }
 
-/*
-double amax_source(int i __attribute__((unused))) 
-{
-  return 1. / (1. + fmax(redshift.shear_zdistrpar_zmin, 0.001));
-}
-*/
-
 double amax_source(const int ni) 
 {
-  if(ni < -1 || ni > tomo.shear_Nbin - 1)
+  if (ni < -1 || ni > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -86,7 +79,7 @@ double amax_source(const int ni)
 
 double amin_lens(const int ni) 
 {
-  if(ni < -1 || ni > tomo.clustering_Nbin - 1)
+  if (ni < -1 || ni > tomo.clustering_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -96,26 +89,26 @@ double amin_lens(const int ni)
   
   if (ni == -1 || photoz == 1 || photoz == 2) 
   {
-    return 1. / (redshift.clustering_zdistrpar_zmax + 1.);
+    return 1.0 / (redshift.clustering_zdistrpar_zmax + 1.);
   }
   else if (photoz == 0) 
   {
-    return 1. / (1 + tomo.clustering_zmax[ni]);
+    return 1.0 / (1 + tomo.clustering_zmax[ni]);
   }
   else if (photoz == 4) 
   {
-    return 1. / (1 + tomo.clustering_zmax[ni] + 2. * fabs(nuisance.bias_zphot_clustering[ni]));
+    return 1.0 / (1 + tomo.clustering_zmax[ni] + 2. * fabs(nuisance.bias_zphot_clustering[ni]));
   } 
   else
   {
-    return 1. / (1 + fmin(tomo.clustering_zmax[ni] + 5. * nuisance.sigma_zphot_clustering[ni] +
+    return 1.0 / (1 + fmin(tomo.clustering_zmax[ni] + 5. * nuisance.sigma_zphot_clustering[ni] +
       fabs(nuisance.bias_zphot_clustering[ni]), redshift.clustering_zdistrpar_zmax));
   }
 }
 
 double amax_lens(const int ni) 
 {
-  if(ni < -1 || ni > tomo.clustering_Nbin - 1)
+  if (ni < -1 || ni > tomo.clustering_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -155,10 +148,9 @@ double amax_lens(const int ni)
 // ----------------------------------------------------------------------------------
 // ----------------------------------------------------------------------------------
 
-// test whether the (l, ni) bin is in the linear clustering regime
-int test_kmax(double l, int ni) // return 1 if true, 0 otherwise
+int test_kmax(double l, int ni)
 {
-  if(ni < -1 || ni > tomo.clustering_Nbin - 1)
+  if (ni < -1 || ni > tomo.clustering_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -190,7 +182,7 @@ int test_kmax(double l, int ni) // return 1 if true, 0 otherwise
 
 int test_zoverlap(int ni, int nj) // test whether source bin nj is behind lens bin ni
 { 
-  if(ni < 0 || ni > tomo.clustering_Nbin - 1 || nj < 0 || nj > tomo.shear_Nbin - 1)
+  if (ni < 0 || ni > tomo.clustering_Nbin - 1 || nj < 0 || nj > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input (ni, nj) = (%d, %d)", ni, nj);
     exit(1);
@@ -227,7 +219,7 @@ int test_zoverlap(int ni, int nj) // test whether source bin nj is behind lens b
 
 int ZL(int ni) 
 {
-  static int N[100] = {-42};
+  static int N[MAX_SIZE_ARRAYS*MAX_SIZE_ARRAYS] = {-42};
   if (N[0] < -1) 
   {
     int n = 0;
@@ -243,7 +235,7 @@ int ZL(int ni)
       }
     }
   }
-  if(ni < 0 || ni > tomo.ggl_Npowerspectra - 1)
+  if (ni < 0 || ni > tomo.ggl_Npowerspectra - 1)
   {
     log_fatal("invalid bin input ni = %d (max %d)", ni, tomo.ggl_Npowerspectra);
     exit(1);
@@ -253,7 +245,7 @@ int ZL(int ni)
 
 int ZS(int nj) 
 {
-  static int N[100] = {-42};
+  static int N[MAX_SIZE_ARRAYS*MAX_SIZE_ARRAYS] = {-42};
   if (N[0] < -1) 
   {
     int n = 0;
@@ -269,7 +261,7 @@ int ZS(int nj)
       }
     }
   }
-  if(nj < 0 || nj > tomo.ggl_Npowerspectra - 1)
+  if (nj < 0 || nj > tomo.ggl_Npowerspectra - 1)
   {
     log_fatal("invalid bin input nj = %d (max %d)", nj, tomo.ggl_Npowerspectra);
     exit(1);
@@ -279,7 +271,7 @@ int ZS(int nj)
 
 int N_ggl(int ni, int nj) 
 { // ni = redshift bin of the lens, nj = redshift bin of the source
-  static int N[10][10] = {{-42}};
+  static int N[MAX_SIZE_ARRAYS][MAX_SIZE_ARRAYS] = {{-42}};
   if (N[0][0] < 0) 
   {
     int n = 0;
@@ -299,7 +291,7 @@ int N_ggl(int ni, int nj)
       }
     }
   }
-  if(ni < 0 || ni > tomo.clustering_Nbin - 1 || nj < 0 || nj > tomo.shear_Nbin - 1)
+  if (ni < 0 || ni > tomo.clustering_Nbin - 1 || nj < 0 || nj > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input (ni, nj) = (%d, %d)", ni, nj);
     exit(1);
@@ -328,9 +320,9 @@ int test_zoverlap_c(int zc, int zs) // test whether source bin zs is behind lens
   return 0;
 }
 
-int ZCL(int ni) 
+int ZCL(const int ni)
 {
-  static int N[100] = {-42};
+  static int N[MAX_SIZE_ARRAYS*MAX_SIZE_ARRAYS] = {-42};
   if (N[0] < -1) 
   {
     int n = 0;
@@ -346,7 +338,7 @@ int ZCL(int ni)
       }
     }
   }
-  if(ni < 0 || ni > tomo.cgl_Npowerspectra - 1)
+  if (ni < 0 || ni > tomo.cgl_Npowerspectra - 1)
   {
     log_fatal("invalid bin input ni = %d (max %d)", ni, tomo.cgl_Npowerspectra);
     exit(1);
@@ -354,9 +346,9 @@ int ZCL(int ni)
   return N[ni];
 }
 
-int ZCS(int nj) 
+int ZCS(const int nj)
 {
-  static int N[100] = {-42};
+  static int N[MAX_SIZE_ARRAYS*MAX_SIZE_ARRAYS] = {-42};
   if (N[0] < -1) 
   {
     int n = 0;
@@ -372,7 +364,7 @@ int ZCS(int nj)
       }
     }
   }
-  if(nj < 0 || nj > tomo.cgl_Npowerspectra - 1)
+  if (nj < 0 || nj > tomo.cgl_Npowerspectra - 1)
   {
     log_fatal("invalid bin input nj = %d (max %d)", nj, tomo.cgl_Npowerspectra);
     exit(1);
@@ -380,9 +372,9 @@ int ZCS(int nj)
   return N[nj];
 }
 
-int N_cgl(int ni, int nj) 
+int N_cgl(const int ni, const int nj)
 {
-  static int N[10][10] = {{-42}};
+  static int N[MAX_SIZE_ARRAYS][MAX_SIZE_ARRAYS] = {{-42}};
   if (N[0][0] < 0) 
   {
     int n = 0;
@@ -402,7 +394,7 @@ int N_cgl(int ni, int nj)
       }
     }
   }
-  if(ni < 0 || ni > tomo.cluster_Nbin - 1 || nj < 0 || nj > tomo.shear_Nbin - 1)
+  if (ni < 0 || ni > tomo.cluster_Nbin - 1 || nj < 0 || nj > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input (ni, nj) = (%d, %d)", ni, nj);
     exit(1);
@@ -419,9 +411,9 @@ int N_cgl(int ni, int nj)
 // ----------------------------------------------------------------------------------
 
 // find z1 of tomography combination (z1, z2) constituting shear tomo bin Nbin
-int Z1(int ni) 
+int Z1(const int ni)
 {
-  static int N[55] = {-42};
+  static int N[MAX_SIZE_ARRAYS*MAX_SIZE_ARRAYS] = {-42};
   if (N[0] < -1) 
   {
     int n = 0;
@@ -434,7 +426,7 @@ int Z1(int ni)
       }
     }
   }
-  if(ni < 0 || ni > tomo.shear_Npowerspectra - 1)
+  if (ni < 0 || ni > tomo.shear_Npowerspectra - 1)
   {
     log_fatal("invalid bin input ni = %d (max = %d)", ni, tomo.shear_Npowerspectra);
     exit(1);
@@ -442,9 +434,9 @@ int Z1(int ni)
   return N[ni];
 }
 
-int Z2(int nj) 
+int Z2(const int nj)
 { // find z2 of tomography combination (z1,z2) constituting shear tomo bin Nbin
-  static int N[55] = {-42};
+  static int N[MAX_SIZE_ARRAYS*MAX_SIZE_ARRAYS] = {-42};
   if (N[0] < -1) 
   {
     int n = 0;
@@ -457,7 +449,7 @@ int Z2(int nj)
       }
     }
   }
-  if(nj < 0 || nj > tomo.shear_Npowerspectra - 1)
+  if (nj < 0 || nj > tomo.shear_Npowerspectra - 1)
   {
     log_fatal("invalid bin input nj = %d (max = %d)", nj, tomo.shear_Npowerspectra);
     exit(1);
@@ -465,9 +457,9 @@ int Z2(int nj)
   return N[nj];
 }
 
-int N_shear(int ni, int nj) 
+int N_shear(const int ni, const int nj)
 { // find shear tomography bin number N_shear of tomography combination (z1, z2)
-  static int N[10][10] = {{-42}};
+  static int N[MAX_SIZE_ARRAYS][MAX_SIZE_ARRAYS] = {{-42}};
   if (N[0][0] < -1) 
   {
     int n = 0;
@@ -481,7 +473,7 @@ int N_shear(int ni, int nj)
       }
     }
   }
-  if(ni < 0 || ni > tomo.shear_Nbin - 1 || nj < 0 || nj > tomo.shear_Nbin - 1)
+  if (ni < 0 || ni > tomo.shear_Nbin - 1 || nj < 0 || nj > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input (ni, nj) = (%d, %d) (max = %d)", ni, nj, tomo.shear_Nbin);
     exit(1);
@@ -497,9 +489,9 @@ int N_shear(int ni, int nj)
 // ----------------------------------------------------------------------------------
 // ----------------------------------------------------------------------------------
 
-int ZCL1(int ni) 
-{ // find ZCL1 of tomography combination (zcl1,zcl2) constituting g-clustering tomo bin Nbin
-  static int N[55] = {-42};
+int ZCL1(const int ni)
+{ // find ZCL1 of tomography combination (zcl1, zcl2) constituting g-clustering tomo bin Nbin
+  static int N[MAX_SIZE_ARRAYS*MAX_SIZE_ARRAYS] = {-42};
   if (N[0] < -1) 
   {
     int n = 0;
@@ -512,7 +504,7 @@ int ZCL1(int ni)
       }
     }
   }
-  if(ni < 0 || ni > tomo.clustering_Npowerspectra - 1)
+  if (ni < 0 || ni > tomo.clustering_Npowerspectra - 1)
   {
     log_fatal("invalid bin input ni = %d (max %d)", ni, tomo.clustering_Npowerspectra);
     exit(1);
@@ -520,9 +512,9 @@ int ZCL1(int ni)
   return N[ni];
 }
 
-int ZCL2(int nj) 
+int ZCL2(const int nj)
 { // find ZCL2 of tomography combination (zcl1, zcl2) constituting g-clustering tomo bin Nbin
-  static int N[55] = {-42};
+  static int N[MAX_SIZE_ARRAYS*MAX_SIZE_ARRAYS] = {-42};
   if (N[0] < -1) 
   {
     int n = 0;
@@ -535,7 +527,7 @@ int ZCL2(int nj)
       }
     }
   }
-  if(nj < 0 || nj > tomo.clustering_Npowerspectra - 1)
+  if (nj < 0 || nj > tomo.clustering_Npowerspectra - 1)
   {
     log_fatal("invalid bin input nj = %d (max %d)", nj, tomo.clustering_Npowerspectra);
     exit(1);
@@ -543,9 +535,9 @@ int ZCL2(int nj)
   return N[nj];
 }
 
-int N_CL(int ni, int nj) 
+int N_CL(const int ni, const int nj)
 {
-  static int N[10][10] = {{-42}};
+  static int N[MAX_SIZE_ARRAYS][MAX_SIZE_ARRAYS] = {{-42}};
   if (N[0][0] < -1) 
   {
     int n = 0;
@@ -559,7 +551,7 @@ int N_CL(int ni, int nj)
       }
     }
   }
-  if(ni < 0 || ni > tomo.clustering_Nbin - 1 || nj < 0 || nj > tomo.clustering_Nbin - 1)
+  if (ni < 0 || ni > tomo.clustering_Nbin - 1 || nj < 0 || nj > tomo.clustering_Nbin - 1)
   {
     log_fatal("invalid bin input (ni, nj) = (%d, %d)", ni, nj);
     exit(1);
@@ -575,9 +567,9 @@ int N_CL(int ni, int nj)
 // ----------------------------------------------------------------------------------
 // ----------------------------------------------------------------------------------
 
-int ZCCL1(int ni) 
+int ZCCL1(const int ni)
 { // find ZCCL1 of tomography combination (zccl1, zccl2) constituting c-clustering tomo bin Nbin
-  static int N[55] = {-42};
+  static int N[MAX_SIZE_ARRAYS*MAX_SIZE_ARRAYS] = {-42};
   if (N[0] < -1) 
   {
     int n = 0;
@@ -590,7 +582,7 @@ int ZCCL1(int ni)
       }
     }
   }
-  if(ni < 0 || ni > tomo.cc_clustering_Npowerspectra - 1)
+  if (ni < 0 || ni > tomo.cc_clustering_Npowerspectra - 1)
   {
     log_fatal("invalid bin input ni = %d (max %d)", ni, tomo.cc_clustering_Npowerspectra);
     exit(1);
@@ -598,9 +590,9 @@ int ZCCL1(int ni)
   return N[ni];
 }
 
-int ZCCL2(int nj) 
+int ZCCL2(const int nj)
 { // find ZCCL2 of tomography combination (zcl1, zcl2) constituting c-clustering tomo bin Nbin
-  static int N[55] = {-42};
+  static int N[MAX_SIZE_ARRAYS*MAX_SIZE_ARRAYS] = {-42};
   if (N[0] < -1) 
   {
     int n = 0;
@@ -613,7 +605,7 @@ int ZCCL2(int nj)
       }
     }
   }
-  if(nj < 0 || nj > tomo.cc_clustering_Npowerspectra - 1)
+  if (nj < 0 || nj > tomo.cc_clustering_Npowerspectra - 1)
   {
     log_fatal("invalid bin input nj = %d (max %d)", nj, tomo.cc_clustering_Npowerspectra);
     exit(1);
@@ -621,9 +613,9 @@ int ZCCL2(int nj)
   return N[nj];
 }
 
-int N_CCL(int ni, int nj) 
+int N_CCL(const int ni, const int nj)
 {
-  static int N[10][10] = {{-42}};
+  static int N[MAX_SIZE_ARRAYS][MAX_SIZE_ARRAYS] = {{-42}};
   if (N[0][0] < -1) 
   {
     int n = 0;
@@ -637,9 +629,80 @@ int N_CCL(int ni, int nj)
       }
     }
   }
-  if(ni < 0 || ni > tomo.cluster_Nbin - 1 || nj < 0 || nj > tomo.cluster_Nbin - 1)
+  if (ni < 0 || ni > tomo.cluster_Nbin - 1 || nj < 0 || nj > tomo.cluster_Nbin - 1)
   {
     log_fatal("invalid bin input (ni, nj) = (%d, %d)", ni, nj);
+    exit(1);
+  }
+  return N[ni][nj];
+}
+
+// ----------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------
+// Cluster-Galaxy Cross Clustering
+// ----------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------
+
+int ZCGCL1(const int ni)
+{
+  if (ni < 0 || ni > tomo.cg_clustering_Npowerspectra - 1)
+  {
+    log_fatal("invalid bin input ni = %d (max %d)", ni, tomo.cg_clustering_Npowerspectra);
+    exit(1);
+  }
+  // we assume cluster bin = galaxy bin (no cross)
+  return Cluster.external_selection_cg_clustering[ni];
+}
+
+int ZCGCL2(const int nj)
+{
+  if (nj < 0 || nj > tomo.cg_clustering_Npowerspectra - 1)
+  {
+    log_fatal("invalid bin input ni = %d (max %d)", nj, tomo.cg_clustering_Npowerspectra);
+    exit(1);
+  }
+  // we assume cluster bin = galaxy bin (no cross)
+  return Cluster.external_selection_cg_clustering[nj];
+}
+
+// ni = Cluster Nbin, nj = Galaxy Nbin
+int N_CGCL(const int ni, const int nj)
+{
+  static int N[MAX_SIZE_ARRAYS][MAX_SIZE_ARRAYS] = {{-42}};
+  if (N[0][0] < 0)
+  {
+    int n = 0;
+    for (int i=0; i<tomo.cluster_Nbin; i++)
+    {
+      for (int j=0; j<tomo.clustering_Nbin; j++)
+      {
+        if (i == j) // we are not considering cross spectrum
+        {
+          for (int k=0; k<tomo.cg_clustering_Npowerspectra; k++)
+          {
+            if (i == Cluster.external_selection_cg_clustering[k])
+            {
+              N[i][j] = n;
+              n++;
+            }
+            else
+            {
+              N[i][j] = -1;
+            }
+          }
+        }
+        else
+        {
+          N[i][j] = -1;
+        }
+      }
+    }
+  }
+  if (ni < 0 || ni > tomo.cluster_Nbin - 1 || nj < 0 || nj > tomo.clustering_Nbin - 1)
+  {
+    log_fatal("invalid bin input (ni (cluster nbin), nj (galaxy nbin)) = (%d, %d)", ni, nj);
     exit(1);
   }
   return N[ni][nj];
@@ -655,7 +718,7 @@ int N_CCL(int ni, int nj)
 
 double bias_zphot_shear(double z, int ni) 
 {
-  if(ni < 0 || ni > tomo.shear_Nbin - 1)
+  if (ni < 0 || ni > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -665,7 +728,7 @@ double bias_zphot_shear(double z, int ni)
 
 double sigma_zphot_shear(double z, int ni) 
 {
-  if(ni < 0 || ni > tomo.shear_Nbin - 1)
+  if (ni < 0 || ni > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -701,7 +764,7 @@ double zdistr_histo_1(double z, void* params __attribute__((unused)))
       p++;
       if (i > 0) 
       {
-        if(z_v[i] < z_v[i - 1]) 
+        if (z_v[i] < z_v[i - 1])
         {
           break;
         }
@@ -724,7 +787,7 @@ double zdistr_histo_1(double z, void* params __attribute__((unused)))
   {
     const int ni = (int) floor((z - zhisto_min) / dz);
     
-    if(ni < 0 || ni > nimax - 1)
+    if (ni < 0 || ni > nimax - 1)
     {
       log_fatal("invalid bin input ni = %d", ni);
       exit(1);
@@ -747,7 +810,7 @@ double zdistr_histo_n(double z, void* params)
     int zbins = line_count(redshift.shear_REDSHIFT_FILE);
     njmax = zbins;
     table = (double**) malloc(sizeof(double*)*tomo.shear_Nbin);
-    for(int i=0; i<tomo.shear_Nbin; i++)
+    for (int i=0; i<tomo.shear_Nbin; i++)
     {
       table[i] = (double*) malloc(sizeof(double)*zbins);
     }
@@ -767,7 +830,7 @@ double zdistr_histo_n(double z, void* params)
       p++;
       if (i > 0) 
       {
-        if(z_v[i] < z_v[i - 1])
+        if (z_v[i] < z_v[i - 1])
         {
           break;
         }
@@ -834,7 +897,7 @@ double zdistr_histo_n(double z, void* params)
     const int ni = (int) ar[0];
     const int nj = (int) floor((z - zhisto_min) / dz);
     
-    if(ni < 0 || ni > tomo.shear_Nbin - 1 || nj < 0 || nj > njmax - 1)
+    if (ni < 0 || ni > tomo.shear_Nbin - 1 || nj < 0 || nj > njmax - 1)
     {
       log_fatal("invalid bin input (ni, nj) = (%d, %d)", ni, nj);
       exit(1);
@@ -884,7 +947,7 @@ double zdistr_photoz(double zz, int nj)
       }
       
       table = (double**) malloc(sizeof(double*)*(tomo.shear_Nbin+1));
-      for(int i=0; i<(tomo.shear_Nbin+1); i++)
+      for (int i=0; i<(tomo.shear_Nbin+1); i++)
       {
         table[i] = (double*) malloc(sizeof(double)*zbins);
       }
@@ -917,7 +980,7 @@ double zdistr_photoz(double zz, int nj)
           p++;
           if (i > 0) 
           {
-            if(z_v[i] < z_v[i - 1])
+            if (z_v[i] < z_v[i - 1])
             {
               break;
             }
@@ -1200,7 +1263,7 @@ double zdistr_photoz(double zz, int nj)
 
 double bias_zphot_clustering(double z, int ni) 
 {
-  if(ni < 0 || ni > tomo.clustering_Nbin - 1)
+  if (ni < 0 || ni > tomo.clustering_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -1210,7 +1273,7 @@ double bias_zphot_clustering(double z, int ni)
 
 double sigma_zphot_clustering(double z, int ni) 
 {
-  if(ni < 0 || ni > tomo.clustering_Nbin - 1)
+  if (ni < 0 || ni > tomo.clustering_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -1244,7 +1307,7 @@ double pf_histo(double z, void* params __attribute__((unused)))
       p++;
       if (i > 0) 
       {
-        if(z_v[i] < z_v[i - 1])
+        if (z_v[i] < z_v[i - 1])
         {
           break;
         }
@@ -1272,7 +1335,7 @@ double pf_histo(double z, void* params __attribute__((unused)))
   {
     const int ni = (int) floor((z - zhisto_min) / dz);
     
-    if(ni < 0 || ni > tomo.clustering_Nbin - 1)
+    if (ni < 0 || ni > tomo.clustering_Nbin - 1)
     {
       log_fatal("invalid bin input ni = %d", ni);
       exit(1);
@@ -1295,7 +1358,7 @@ double pf_histo_n(double z, void* params)
     const int zbins = line_count(redshift.clustering_REDSHIFT_FILE);
     njmax = zbins;
     table = (double**) malloc(sizeof(double*)*tomo.clustering_Nbin);
-    for(int i=0; i<tomo.clustering_Nbin; i++)
+    for (int i=0; i<tomo.clustering_Nbin; i++)
     {
       table[i] = (double*) malloc(sizeof(double)*zbins);
     }
@@ -1315,7 +1378,7 @@ double pf_histo_n(double z, void* params)
       p++;
       if (i > 0) 
       {
-        if(z_v[i] < z_v[i - 1])
+        if (z_v[i] < z_v[i - 1])
         {
           break;
         }
@@ -1381,7 +1444,7 @@ double pf_histo_n(double z, void* params)
     const int ni = (int) ar[0];
     const int nj = (int) floor((z - zhisto_min) / dz);
     
-    if(ni < 0 || ni > tomo.clustering_Nbin - 1 || nj < 0 || nj > njmax - 1)
+    if (ni < 0 || ni > tomo.clustering_Nbin - 1 || nj < 0 || nj > njmax - 1)
     {
       log_fatal("invalid bin input (ni, nj) = (%d, %d)", ni, nj);
       exit(1);
@@ -1419,7 +1482,7 @@ double pf_photoz(double zz, int nj)
       } // upsample if convolving with analytic photo-z model
       
       table = (double**) malloc(sizeof(double*)*(tomo.clustering_Nbin+1));
-      for(int i=0; i<(tomo.clustering_Nbin+1); i++)
+      for (int i=0; i<(tomo.clustering_Nbin+1); i++)
       {
         table[i] = (double*) malloc(sizeof(double)*zbins);
       }
@@ -1451,7 +1514,7 @@ double pf_photoz(double zz, int nj)
           p++;
           if (i > 0) 
           {
-            if(z_v[i] < z_v[i - 1]) 
+            if (z_v[i] < z_v[i - 1])
             {
               break;
             }
@@ -1746,7 +1809,7 @@ double pf_cluster_histo_n(double z,  void* params)
     const int zbins = line_count(redshift.clusters_REDSHIFT_FILE);
     njmax = zbins;
     table = (double**) malloc(sizeof(double*)*tomo.cluster_Nbin);
-    for(int i=0; i<tomo.cluster_Nbin; i++)
+    for (int i=0; i<tomo.cluster_Nbin; i++)
     {
       table[i] = (double*) malloc(sizeof(double)*zbins);
     }
@@ -1826,7 +1889,7 @@ double pf_cluster_histo_n(double z,  void* params)
     const int ni = (int) array[0];
     const int nj = (int) floor((z - zhisto_min)/dz);
 
-    if(ni < 0 || ni > tomo.cluster_Nbin - 1 || nj < 0 || nj > njmax - 1)
+    if (ni < 0 || ni > tomo.cluster_Nbin - 1 || nj < 0 || nj > njmax - 1)
     {
       log_fatal("invalid bin input (ni, nj) = (%d, %d)", ni, nj);
       exit(1);
@@ -1843,7 +1906,7 @@ double pz_cluster(double zz, int nz)
   static int zbins = -1;
   static gsl_spline* photoz_splines[MAX_SIZE_ARRAYS];
 
-  if(nz < -1 || nz > tomo.cluster_Nbin - 1) 
+  if (nz < -1 || nz > tomo.cluster_Nbin - 1)
   {
     log_fatal("invalid bin input nz = %d (max %d)", nz, tomo.cluster_Nbin);
     exit(1);
@@ -1866,7 +1929,7 @@ double pz_cluster(double zz, int nz)
     zbins = line_count(redshift.clusters_REDSHIFT_FILE);
  
     table = (double**) malloc(sizeof(double*)*(tomo.cluster_Nbin+1));
-    for(int i=0; i<(tomo.cluster_Nbin+1); i++)
+    for (int i=0; i<(tomo.cluster_Nbin+1); i++)
     {
       table[i] = (double*) malloc(sizeof(double)*zbins);
     }
@@ -2014,7 +2077,7 @@ double norm_z_cluster(const int nz)
   {
     table = (double*) malloc(sizeof(double)*N_z);
   }
-  if(recompute_cosmo3D(C))
+  if (recompute_cosmo3D(C))
   {
     { // init static vars only 
       double params[1] = {0.0};
@@ -2104,7 +2167,7 @@ double nsource(int ni) // ni =-1 -> no tomography; ni>= 0 -> tomography bin ni
     }
     table[0] = survey.n_gal;
   }
-  if(ni < -1 || ni > tomo.shear_Nbin - 1)
+  if (ni < -1 || ni > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2161,7 +2224,7 @@ double nlens(int ni) // ni =-1 -> no tomography; ni>= 0 -> tomography bin ni
     }
     table[0] = survey.n_lens;
   }
-  if(ni < -1 || ni > tomo.clustering_Nbin - 1)
+  if (ni < -1 || ni > tomo.clustering_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2173,7 +2236,7 @@ double int_for_zmean(double z, void* params)
 {
   double* ar = (double*) params;
   const int ni = (int) ar[0];
-  if(ni < -1 || ni > tomo.clustering_Nbin - 1)
+  if (ni < -1 || ni > tomo.clustering_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2185,7 +2248,7 @@ double norm_for_zmean(double z, void* params)
 {
   double* ar = (double*) params;
   const int ni = (int) ar[0];
-  if(ni < -1 || ni > tomo.clustering_Nbin - 1)
+  if (ni < -1 || ni > tomo.clustering_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2216,7 +2279,7 @@ double zmean(int ni)
         tomo.clustering_zmax[i], NULL, GSL_WORKSPACE_SIZE);
     }
   }
-  if(ni < -1 || ni > tomo.clustering_Nbin - 1)
+  if (ni < -1 || ni > tomo.clustering_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2228,7 +2291,7 @@ double int_for_zmean_source(double z, void* params)
 {
   double* ar = (double*) params;
   const int ni = (int) ar[0];
-  if(ni < -1 || ni > tomo.shear_Nbin - 1)
+  if (ni < -1 || ni > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2257,7 +2320,7 @@ double zmean_source(int ni)
         tomo.shear_zmin[i], tomo.shear_zmax[i], NULL, GSL_WORKSPACE_SIZE);
     }
   }
-  if(ni < 0 || ni > tomo.shear_Nbin - 1)
+  if (ni < 0 || ni > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2271,9 +2334,9 @@ double max_g_tomo(int zs)
   double max = 0;
   for (double z=0.; z<tomo.shear_zmax[zs]; z += tomo.shear_zmax[zs] / 50.) 
   {
-    if(i != 0)
+    if (i != 0)
     {
-      if(!fabs(z>0)) 
+      if (!fabs(z>0))
       {
         log_fatal("z = 0 with 1/z needed");
         exit(1);
@@ -2303,14 +2366,14 @@ double max_g_tomo(int zs)
 
 double int_for_g_tomo(double aprime, void* params) 
 {
-  if(!(aprime>0) || !(aprime<1)) 
+  if (!(aprime>0) || !(aprime<1))
   {
     log_fatal("a>0 and a<1 not true");
     exit(1);
   }
   double *ar = (double*)params;
   const int ni = (int) ar[0];
-  if(ni < -1 || ni > tomo.shear_Nbin - 1)
+  if (ni < -1 || ni > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2336,7 +2399,7 @@ double g_tomo(const double a, const int ni) // for tomography bin ni
   if (table == 0) 
   {
     table = (double**) malloc(sizeof(double*)*(N_z+1));
-    for(int i=0; i<(N_z+1); i++)
+    for (int i=0; i<(N_z+1); i++)
     {
       table[i] = (double*) malloc(sizeof(double)*N_a);
     }
@@ -2370,7 +2433,7 @@ double g_tomo(const double a, const int ni) // for tomography bin ni
     update_nuisance(&N);
     update_cosmopara(&C);
   }
-  if(ni < -1 || ni > N_z - 1)
+  if (ni < -1 || ni > N_z - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2385,14 +2448,14 @@ double g_tomo(const double a, const int ni) // for tomography bin ni
 
 double int_for_g2_tomo(double aprime, void* params) 
 { // \int n(z') W(z,z')^2 routines for source clustering
-  if(!(aprime>0) || !(aprime<1)) 
+  if (!(aprime>0) || !(aprime<1))
   {
     log_fatal("a>0 and a<1 not true");
     exit(1);
   }
   double *ar = (double*) params;
   const int ni = (int) ar[0];
-  if(ni < -1 || ni > tomo.shear_Nbin - 1)
+  if (ni < -1 || ni > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2418,7 +2481,7 @@ double g2_tomo(const double a, const int ni)
   if (table == 0) 
   {
     table = (double**) malloc(sizeof(double*)*(N_z+1));
-    for(int i=0; i<(N_z+1); i++)
+    for (int i=0; i<(N_z+1); i++)
     {
       table[i] = (double*) malloc(sizeof(double)*N_a);
     }
@@ -2452,7 +2515,7 @@ double g2_tomo(const double a, const int ni)
     update_nuisance(&N);
     update_cosmopara(&C);
   }
-  if(ni < -1 || ni > N_z - 1)
+  if (ni < -1 || ni > N_z - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2469,7 +2532,7 @@ double int_for_g_lens(double aprime, void* params)
 {
   double *ar = (double*) params;
   const int ni = (int) ar[0];
-  if(ni < -1 || ni > tomo.clustering_Nbin - 1)
+  if (ni < -1 || ni > tomo.clustering_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2495,7 +2558,7 @@ double g_lens(const double a, const int ni)
   if (table == 0) 
   {
     table = (double**) malloc(sizeof(double*)*(N_z+1));
-    for(int i=0; i<(N_z+1); i++)
+    for (int i=0; i<(N_z+1); i++)
     {
       table[i] = (double*) malloc(sizeof(double)*N_a);
     }
@@ -2529,7 +2592,7 @@ double g_lens(const double a, const int ni)
     update_nuisance(&N);
     update_cosmopara(&C);
   }
-  if(ni < -1 || ni > N_z - 1)
+  if (ni < -1 || ni > N_z - 1)
   {
     log_fatal("invalid bin input ni = %d", ni);
     exit(1);
@@ -2562,12 +2625,12 @@ double int_for_g_lens_cl(double aprime, void* params)
   const int ni = (int) ar[0];
   const double a = ar[1];
   const int nl = (int) ar[2];
-  if(ni < -1 || ni > tomo.cluster_Nbin - 1) 
+  if (ni < -1 || ni > tomo.cluster_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d (max %d)", ni, tomo.cluster_Nbin);
     exit(1);
   }
-  if(nl < 0 || nl > Cluster.N200_Nbin - 1) 
+  if (nl < 0 || nl > Cluster.N200_Nbin - 1)
   {
     log_fatal("invalid bin input ni = %d (max %d)", nl, Cluster.N200_Nbin);
     exit(1);
@@ -2585,7 +2648,7 @@ double g_lens_cluster(const double a, const int nz, const int nl)
 
   const int N_z = tomo.cluster_Nbin;
   const int N_l = Cluster.N200_Nbin;
-  if(nl < 0 || nl > N_l - 1) 
+  if (nl < 0 || nl > N_l - 1)
   {
     log_fatal("invalid bin input ni = %d (max %d)", nl, N_l);
     exit(1);
@@ -2598,7 +2661,7 @@ double g_lens_cluster(const double a, const int nz, const int nl)
   if (table == 0) 
   {
     table = (double**) malloc(sizeof(double*)*(tomo.cluster_Nbin + 1));
-    for(int i=0; i<tomo.cluster_Nbin+1; i++)
+    for (int i=0; i<tomo.cluster_Nbin+1; i++)
     {
       table[i] = (double*) malloc(sizeof(double)*na);
     }
@@ -2611,7 +2674,7 @@ double g_lens_cluster(const double a, const int nz, const int nl)
       ar[1] = amin;
       ar[2] = (double) 0;
       int_for_g_lens_cl(amin, (void*) ar);
-      if(N_z > 0)
+      if (N_z > 0)
       {
         ar[0] = (double) 0;
         int_for_g_lens_cl(amin, (void*) ar);
@@ -2633,7 +2696,7 @@ double g_lens_cluster(const double a, const int nz, const int nl)
     }  
     update_cosmopara(&C);
   }
-  if(nz < -1 || nz > N_z - 1) 
+  if (nz < -1 || nz > N_z - 1)
   {
     log_fatal("invalid bin input ni = %d (max %d)", nz, N_z);
     exit(1);
@@ -2656,7 +2719,7 @@ double g_lens_cluster(const double a, const int nz, const int nl)
 
 double int_for_ggl_efficiency(double z, void* params) 
 {
-  if(!fabs(z>0)) 
+  if (!fabs(z>0))
   {
     log_fatal("z = 0 with 1/z needed");
     exit(1);
@@ -2665,7 +2728,7 @@ double int_for_ggl_efficiency(double z, void* params)
   double* ar = (double*) params;
   const int ni = (int) ar[0];
   const int nj = (int) ar[1];
-  if(ni < -1 || ni > tomo.clustering_Nbin - 1 || nj < -1 || nj > tomo.shear_Nbin - 1)
+  if (ni < -1 || ni > tomo.clustering_Nbin - 1 || nj < -1 || nj > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input (ni, nj) = (%d, %d)", ni, nj);
     exit(1);
@@ -2690,7 +2753,7 @@ double ggl_efficiency(int ni, int nj)
     #pragma GCC diagnostic pop
     
     table = (double**) malloc(sizeof(double*)*(tomo.clustering_Nbin+1));
-    for(int i=0; i<(tomo.clustering_Nbin+1); i++)
+    for (int i=0; i<(tomo.clustering_Nbin+1); i++)
     {
       table[i] = (double*) malloc(sizeof(double)*(tomo.shear_Nbin+1));
     }
@@ -2730,7 +2793,7 @@ double ggl_efficiency(int ni, int nj)
     }
   }
 
-  if(ni < 0 || ni > tomo.clustering_Nbin - 1 || nj < 0 || nj > tomo.shear_Nbin - 1)
+  if (ni < 0 || ni > tomo.clustering_Nbin - 1 || nj < 0 || nj > tomo.shear_Nbin - 1)
   {
     log_fatal("invalid bin input (ni, nj) = (%d, %d)", ni, nj);
     exit(1);
