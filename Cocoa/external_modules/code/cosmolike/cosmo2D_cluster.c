@@ -434,11 +434,11 @@ double w_cg_tomo(const int nt, const int nl, const int ni, const int nj, const i
   static double** Pl = 0;
   static double* w_vec = 0;
 
-  const int nell = Ntable.N_ell;
   const int ntheta = like.Ntheta;
   const int nlsize = Cluster.N200_Nbin;
   const int ncg_size = tomo.cg_clustering_Npowerspectra;
   const int NSIZE = nlsize*ncg_size;
+  const int nell = Ntable.N_ell;
 
   if (Pl == 0)
   {
@@ -1370,8 +1370,7 @@ const int use_linear_ps, const int init_static_vars_only)
   } 
   const double amin = 1./(1. + zmax);
   const double amax = 1./(1. + zmin);
-  return (init_static_vars_only == 1) ? 
-    int_for_C_cs_tomo_limber(amin, (void*) ar) :
+  return (init_static_vars_only == 1) ? int_for_C_cs_tomo_limber(amin, (void*) ar) :
     int_gsl_integrate_low_precision(int_for_C_cs_tomo_limber, (void*) ar, amin, amax, NULL, 
       GSL_WORKSPACE_SIZE);
 }
@@ -1530,17 +1529,11 @@ const int nj, const int use_linear_ps, const int init_static_vars_only)
     log_fatal("error in selecting redshift range (zmin,zmax) = [%e,%e]", zmin, zmax);
     exit(1); 
   } 
-  const double amin = 1./(1. + zmax);
-  const double amax = 1./(1. + zmin);
-  if (init_static_vars_only == 1)
-  {
-    return int_for_C_cc_tomo_limber(amin, (void*) ar)
-  }
-  else
-  {
-    return (zmin > zmax) ? 0.0 : int_gsl_integrate_low_precision(int_for_C_cc_tomo_limber, 
-      (void*) ar, amin, amax, NULL, GSL_WORKSPACE_SIZE);
-  }
+  const double amin = 1.0/(1.0 + zmax);
+  const double amax = 1.0/(1.0 + zmin);
+  return (init_static_vars_only == 1) ? int_for_C_cc_tomo_limber(amin, (void*) ar) :
+    int_gsl_integrate_low_precision(int_for_C_cc_tomo_limber, (void*) ar, amin, amax, NULL,
+      GSL_WORKSPACE_SIZE);
 }
 
 double C_cc_tomo_limber(const double l, const int nl1, const int nl2, const int ni, 
@@ -1550,10 +1543,10 @@ const int nj)
   static nuisancepara N;
   static double** table = 0;
 
-  const int nell = Ntable.N_ell;
   const int nlsize = Cluster.N200_Nbin;
   const int nccl_size = tomo.cc_clustering_Npowerspectra; 
   const int NSIZE = nlsize*nlsize*nccl_size;
+  const int nell = Ntable.N_ell;
   const double lnlmin = log(fmax(limits.LMIN_tab, 1.0));
   const double lnlmax = log(limits.w_l_max);
   const double dlnl = (lnlmax - lnlmin)/((double) nell - 1.0); 

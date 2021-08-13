@@ -397,7 +397,6 @@ double w_gammat_tomo(int nt, int ni, int nj, int limber)
       free(Pmax);
     }
   }
-
   if (recompute_gs(C, G, N))
   {
     double** Cl = malloc(NSIZE*sizeof(double*));
@@ -472,7 +471,7 @@ double w_gammat_tomo(int nt, int ni, int nj, int limber)
   }
   if (nt < 0 || nt > like.Ntheta - 1)
   {
-    log_fatal("error in selecting bin number nt = %e (max %e)", nt, like.Ntheta);
+    log_fatal("error in selecting bin number nt = %d (max %d)", nt, like.Ntheta);
     exit(1); 
   }
   if (ni < -1 || ni > tomo.clustering_Nbin - 1 || nj < -1 || nj > tomo.shear_Nbin - 1)
@@ -551,7 +550,7 @@ double w_gg_tomo(int nt, int ni, int nj, int limber)
         Pmax[i][l] = r.Pmax;
       }
       Pl[i][0] = 1.0;
-      const double tmp = (1.0/(xmin[i] - xmax[i]))*(1. / (4. * M_PI));
+      const double tmp = (1.0/(xmin[i] - xmax[i]))*(1. / (4.0 * M_PI));
       for (int l=1; l<nell; l++)
       {
         Pl[i][l] = tmp*(Pmin[i][l + 1] - Pmax[i][l + 1] - Pmin[i][l - 1] + Pmax[i][l - 1]);
@@ -642,7 +641,7 @@ double w_gg_tomo(int nt, int ni, int nj, int limber)
   }
   if (nt < 0 || nt > like.Ntheta - 1)
   {
-    log_fatal("error in selecting bin number nt = %e (max %e)", nt, like.Ntheta);
+    log_fatal("error in selecting bin number nt = %d (max %d)", nt, like.Ntheta);
     exit(1); 
   }
   if (ni < -1 || ni > tomo.clustering_Nbin - 1 || nj < -1 || nj > tomo.clustering_Nbin - 1)
@@ -903,7 +902,7 @@ double w_ks_tomo(int nt, int ni, int limber)
   }
   if (nt < 0 || nt > like.Ntheta - 1)
   {
-    log_fatal("error in selecting bin number nt = %e (max %e)", nt, like.Ntheta);
+    log_fatal("error in selecting bin number nt = %d (max %d)", nt, like.Ntheta);
     exit(1); 
   }
   if (ni < -1 || ni > tomo.shear_Nbin - 1)
@@ -2073,35 +2072,36 @@ double int_for_C_ss_tomo_TATT_EE_limber(double a, void* params)
     log_fatal("a>0 and a<1 not true");
     exit(1);
   }
-  double* ar = (double* ) params;
-  if ( (int) ar[0] < 0 || (int) ar[0] > tomo.shear_Nbin -1 || 
-      (int) ar[1] < 0 || (int) ar[1] > tomo.shear_Nbin -1)
+  double* ar = (double*) params;
+  const int n1 = (int) ar[0]; // first source bin
+  const int n2 = (int) ar[1]; // second source bin
+  if (n1 < 0 || n1 > tomo.shear_Nbin - 1 || n2 < 0 || n2 > tomo.shear_Nbin - 1)
   {
     log_fatal("error in selecting bin number (ni, nj) = [%d,%d]", ni, nj);
     exit(1);
   }
-  
+  const double ell = ar[2] + 0.5;
+
   const double growfac_a = growfac(a);
   struct chis chidchi = chi_all(a);
   double hoverh0 = hoverh0v2(a, chidchi.dchida);
   const double PK = Pdelta(k, a);
 
-  const double ell = ar[2] + 0.5;
   const double fK = f_K(chidchi.chi);
   const double k = ell / fK;
 
-  const double ws1 = W_source(a, (int) ar[0], hoverh0); // radial n_z weight for first source bin
-  const double ws2 = W_source(a, (int) ar[1], hoverh0); // radial n_z weight for second source bin
-  const double wk1 = W_kappa(a, fK, (int) ar[0]); // radial lens efficiency for first source bin
-  const double wk2 = W_kappa(a, fK, (int) ar[1]); // radial lens efficiency for second source bin
+  const double ws1 = W_source(a, n1, hoverh0); // radial n_z weight for first source bin
+  const double ws2 = W_source(a, n2, hoverh0); // radial n_z weight for second source bin
+  const double wk1 = W_kappa(a, fK, n1); // radial lens efficiency for first source bin
+  const double wk2 = W_kappa(a, fK, n2); // radial lens efficiency for second source bin
 
-  const double C1 = C1_TA(a, (int) ar[0], growfac_a);   // IA parameters for first source bin
-  const double b_ta = b_TA(a, (int) ar[0]);             // IA parameters for first source bin
-  const double C2 = C2_TT(a, (int) ar[0], growfac_a);   // IA parameters for first source bin
+  const double C1 = C1_TA(a, n1, growfac_a);   // IA parameters for first source bin
+  const double b_ta = b_TA(a, n1);             // IA parameters for first source bin
+  const double C2 = C2_TT(a, n1, growfac_a);   // IA parameters for first source bin
 
-  const double C1_2 = C1_TA(a, (int) ar[1], growfac_a); // IA parameters for second source bin
-  const double b_ta_2 = b_TA(a,(int) ar[1]);            // IA parameters for second source bin
-  const double C2_2 = C2_TT(a, (int) ar[1], growfac_a); // IA parameters for second source bin
+  const double C1_2 = C1_TA(a, n2, growfac_a);  // IA parameters for second source bin
+  const double b_ta_2 = b_TA(a, n2);            // IA parameters for second source bin
+  const double C2_2 = C2_TT(a, n2, growfac_a);  // IA parameters for second source bin
   
   const double tmp1 = TATT_II_EE(k, a, C1, C2, b_ta, C1_2, C2_2, b_ta_2, growfac_a, PK);
   const double tmp2 = TATT_GI_E(k, a, C1, C2, b_ta, growfac_a, PK);
@@ -2118,10 +2118,10 @@ double int_for_C_ss_tomo_TATT_BB_limber(double a, void* params)
     log_fatal("a>0 and a<1 not true");
     exit(1);
   }
-  double* ar = (double* ) params;
+  double* ar = (double*) params;
   const int n1 = (int) ar[0]; // first source bin 
   const int n2 = (int) ar[1]; // second source bin
-  if (n1 < 0 || n1 > tomo.shear_Nbin -1 || n2 < 0 || n2 > tomo.shear_Nbin -1)
+  if (n1 < 0 || n1 > tomo.shear_Nbin - 1 || n2 < 0 || n2 > tomo.shear_Nbin - 1)
   {
     log_fatal("error in selecting bin number (ni, nj) = [%d,%d]", ni, nj);
     exit(1);
@@ -2157,12 +2157,12 @@ double C_ss_tomo_TATT_EE_limber_nointerp(double l, int ni, int nj, int init_stat
   }
   double ar[3] = {(double) ni, (double) nj, l};
   const double amin = fmax(amin_source(ni), amin_source(nj));
-  const double amax = amax_source(ni);
+  const double amax = 0.99999;
   if (!(amin>0) || !(amin<1) || !(amax>0) || !(amax<1)) 
   {
     log_fatal("0 < amin/amax < 1 not true");
     exit(1);
-  }   
+  }
   return (init_static_vars_only == 1) ? int_for_C_ss_tomo_TATT_EE_limber(amin, (void*) ar) :
     int_gsl_integrate_low_precision(int_for_C_ss_tomo_TATT_EE_limber, (void*) ar, amin, amax, NULL, 
       GSL_WORKSPACE_SIZE);
@@ -2177,12 +2177,12 @@ double C_ss_tomo_TATT_BB_limber_nointerp(double l, int ni, int nj, int init_stat
   }
   double ar[3] = {(double) ni, (double) nj, l};
   const double amin = fmax(amin_source(ni), amin_source(nj));
-  const double amax = amax_source(ni);
+  const double amax = 0.99999;
   if (!(amin>0) || !(amin<1) || !(amax>0) || !(amax<1)) 
   {
     log_fatal("0 < amin/amax < 1 not true");
     exit(1);
-  }  
+  }
   return (init_static_vars_only == 1) ? int_for_C_ss_tomo_TATT_BB_limber(amin, (void*) ar) :
     int_gsl_integrate_low_precision(int_for_C_ss_tomo_TATT_BB_limber, (void*) ar, amin, amax, NULL, 
       GSL_WORKSPACE_SIZE);
@@ -2420,7 +2420,7 @@ double int_for_C_ss_tomo_limber(double a, void* params)
     log_fatal("a>0 and a<1 not true");
     exit(1);
   }
-  double* ar = (double* ) params;
+  double* ar = (double*) params;
 
   const int n1 = (int) ar[0]; // first source bin 
   const int n2 = (int) ar[1]; // second source bin 
@@ -2492,19 +2492,8 @@ int init_static_vars_only)
     exit(1);
   }
   double ar[4] = {(double) ni, (double) nj, l, (double) use_linear_ps};
-  int j,k;
-  if (ni <= nj)
-  {
-    j = nj;
-    k = ni;
-  }
-  else
-  {
-    j = ni;
-    k = nj;
-  }
-  const double amin = amin_source(j);
-  const double amax = amax_source(k);
+  const double amin = fmax(amin_source(ni), amin_source(nj));
+  const double amax = 0.99999;
   if (!(amin>0) || !(amin<1) || !(amax>0) || !(amax<1)) 
   {
     log_fatal("0 < amin/amax < 1 not true");
@@ -2552,7 +2541,7 @@ double C_ss_tomo_limber(double l, int ni, int nj)
         const int Z1NZ = Z1(k);
         const int Z2NZ = Z2(k); 
         const double lnl = lnlmin + i*dlnl;
-        table[k][i]= log(C_ss_tomo_limber_nointerp(exp(lnl), Z1NZ, Z2NZ, use_linear_ps_limber, 0));
+        table[k][i] = log(C_ss_tomo_limber_nointerp(exp(lnl), Z1NZ, Z2NZ, use_linear_ps_limber, 0));
       }
     }
     update_cosmopara(&C);
@@ -2857,7 +2846,12 @@ int init_static_vars_only)
   {
     log_fatal("0 < amin/amax < 1 not true");
     exit(1);
-  } 
+  }
+  if (!(amin < amax))
+  {
+    log_fatal("amin < amax not true");
+    exit(1);
+  }
   double res;
   if (like.IA == 0 || like.IA == 1 || like.IA == 3 || like.IA == 4)
   {
@@ -3184,6 +3178,11 @@ int init_static_vars_only)
       log_fatal("0 < amin/amax < 1 not true");
       exit(1);
     }
+    if (!(amin < amax))
+    {
+      log_fatal("amin < amax not true");
+      exit(1);
+    }
     res = (init_static_vars_only == 1) ? int_for_C_gg_tomo_limber_withb2(amin, (void*) ar) :
       int_gsl_integrate_low_precision(int_for_C_gg_tomo_limber_withb2, (void*) ar, amin, amax, NULL, 
         GSL_WORKSPACE_SIZE);
@@ -3195,6 +3194,11 @@ int init_static_vars_only)
     if (!(amin>0) || !(amin<1) || !(amax>0) || !(amax<1)) 
     {
       log_fatal("0 < amin/amax < 1 not true");
+      exit(1);
+    }
+    if (!(amin < amax))
+    {
+      log_fatal("amin < amax not true");
       exit(1);
     }
     res = (init_static_vars_only == 1) ? int_for_C_gg_tomo_limber(amin_lens(nj), (void*) ar) :
@@ -3395,6 +3399,11 @@ double C_gk_tomo_limber_nointerp(double l, int ni, int use_linear_ps, int init_s
       log_fatal("0 < amin/amax < 1 not true");
       exit(1);
     }
+    if(!(amin < amax))
+    {
+      log_fatal("amin < amax not true");
+      exit(1);
+    }
     return (init_static_vars_only == 1) ? int_for_C_gk_limber_withb2(amin, (void*) ar) :
       int_gsl_integrate_medium_precision(int_for_C_gk_limber_withb2, (void*) ar, amin, amax, NULL, 
         GSL_WORKSPACE_SIZE);
@@ -3406,6 +3415,11 @@ double C_gk_tomo_limber_nointerp(double l, int ni, int use_linear_ps, int init_s
     if (!(amin>0) || !(amin<1) || !(amax>0) || !(amax<1)) 
     {
       log_fatal("0 < amin/amax < 1 not true");
+      exit(1);
+    }
+    if(!(amin < amax))
+    {
+      log_fatal("amin < amax not true");
       exit(1);
     }
     return (init_static_vars_only == 1) ? int_for_C_gk_limber(amin, (void*) array) :
