@@ -63,10 +63,10 @@ bin_avg set_bin_average(int i_theta, int j_L)
     dPmax = (double**) malloc(like.Ntheta*sizeof(double*));
     for(int i=0; i<like.Ntheta ; i++)
     {
-      Pmin[i] = (double*) calloc(limits.LMAX, sizeof(double));
-      Pmax[i] = (double*) calloc(limits.LMAX, sizeof(double));
-      dPmin[i] = (double*) calloc(limits.LMAX, sizeof(double));
-      dPmax[i] = (double*) calloc(limits.LMAX, sizeof(double));
+      Pmin[i] = (double*) calloc(limits.w_l_max, sizeof(double));
+      Pmax[i] = (double*) calloc(limits.w_l_max, sizeof(double));
+      dPmin[i] = (double*) calloc(limits.w_l_max, sizeof(double));
+      dPmax[i] = (double*) calloc(limits.w_l_max, sizeof(double));
     }
     xmin = (double*) calloc(like.Ntheta, sizeof(double));
     xmax = (double*) calloc(like.Ntheta, sizeof(double));
@@ -79,13 +79,13 @@ bin_avg set_bin_average(int i_theta, int j_L)
     #pragma omp parallel for
     for (int i=0; i<like.Ntheta; i++)
     {
-      int status = gsl_sf_legendre_Pl_deriv_array(limits.LMAX, xmin[i], Pmin[i], dPmin[i]);
+      int status = gsl_sf_legendre_Pl_deriv_array(limits.w_l_max, xmin[i], Pmin[i], dPmin[i]);
       if (status) 
       {
         log_fatal(gsl_strerror(status));
         exit(1);
       }
-      status = gsl_sf_legendre_Pl_deriv_array(limits.LMAX, xmax[i], Pmax[i], dPmax[i]);
+      status = gsl_sf_legendre_Pl_deriv_array(limits.w_l_max, xmax[i], Pmax[i], dPmax[i]);
       if (status) 
       {
         log_fatal(gsl_strerror(status));

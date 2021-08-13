@@ -24,10 +24,7 @@ typedef struct
   double k_max_cH0;
   double M_min;
   double M_max;
-  double P_2_s_min;
-  double P_2_s_max;
   int LMIN_tab;      // Cosmo2D
-  int LMAX;          // Cosmo2D
   int LMAX_NOLIMBER; // Cosmo2D
   double cluster_util_log_M_min;
   double cluster_util_log_M_max;
