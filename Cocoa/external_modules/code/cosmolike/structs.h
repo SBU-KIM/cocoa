@@ -24,8 +24,11 @@ typedef struct
   double k_max_cH0;
   double M_min;
   double M_max;
-  int LMIN_tab;      // Cosmo2D
-  int LMAX_NOLIMBER; // Cosmo2D
+  int LMIN_tab;
+  int LMAX_NOLIMBER;
+  int LMAX;
+  double LMIN_hankel;
+  double LMAX_hankel;
   double cluster_util_log_M_min;
   double cluster_util_log_M_max;
   double binned_P_lambda_obs_given_M_zmin_table;
@@ -38,8 +41,6 @@ typedef struct
   double halo_exclusion_k_max_hankel;
   double halo_exclusion_R_min;
   double halo_exclusion_R_max;
-  double w_l_min;
-  double w_l_max;
 } lim;
 
 typedef struct 

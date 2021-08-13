@@ -25,13 +25,13 @@ static int use_linear_ps_limber = 0; /* 0 or 1 */
 static INCLUDE_MAG_IN_C_CC_NONLIMBER = 0; /* 0 or 1 */
 static INCLUDE_MAG_IN_C_CG_NONLIMBER = 0; /* 0 or 1 */
 
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 // Correlation Functions (real Space) - Full Sky - bin average
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 
 double w_gammat_cluster_tomo(const int nt, const int nl, const int ni, const int nj, 
 const int limber)
@@ -584,13 +584,13 @@ double w_cg_tomo(const int nt, const int nl, const int ni, const int nj, const i
   }
 }
 
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 // Correlation Functions (real space) - flat sky
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 
 double w_gammat_cluster_tomo_flatsky(const double theta, const int nl, const int ni, 
 const int nj, const int limber) 
@@ -604,8 +604,8 @@ const int nj, const int limber)
   const int nlsize = Cluster.N200_Nbin;
   const int ngammat_size = tomo.cgl_Npowerspectra;
   const int NSIZE = nlsize*ngammat_size;
-  const double l_min = limits.w_l_min;
-  const double l_max = limits.w_l_max;
+  const double l_min = limits.LMIN_hankel;
+  const double l_max = limits.LMAX_hankel;
   const double lnlmax = log(l_max);
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax - lnlmin)/((double) ntheta - 1.0);
@@ -814,8 +814,8 @@ const int nj, const int limber)
                                            // tomo.cc_clustering_Npowerspectra
   const int NSIZE = nlsize*nlsize*nccl_size;
   const int ntheta = Ntable.N_thetaH;
-  const double l_min = limits.w_l_min;
-  const double l_max = limits.w_l_max;
+  const double l_min = limits.LMIN_hankel;
+  const double l_max = limits.LMAX_hankel;
   const double lnlmax = log(l_max);
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax - lnlmin)/((double) ntheta - 1.0);
@@ -1107,8 +1107,8 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
   const int ncg_size = tomo.cg_clustering_Npowerspectra;
   const int NSIZE = nlsize*ncg_size;
   const int ntheta = Ntable.N_thetaH;
-  const double l_min = limits.w_l_min;
-  const double l_max = limits.w_l_max;
+  const double l_min = limits.LMIN_hankel;
+  const double l_max = limits.LMAX_hankel;
   const double lnlmax = log(l_max);
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax - lnlmin)/((double) ntheta - 1.0);
@@ -1303,13 +1303,13 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber)
   }
 }
 
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 // Limber Approximation (Angular Power Spectrum)
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
 // cluster lensing 
@@ -1387,7 +1387,7 @@ double C_cs_tomo_limber(const double l, const int nl, const int ni, const int nj
   const int NSIZE = nlsize*ngammat_size;
   const int nell = Ntable.N_ell;
   const double lnlmin = log(fmax(limits.LMIN_tab, 1.0));
-  const double lnlmax = log(limits.w_l_max);
+  const double lnlmax = log(limits.LMAX);
   const double dlnl = (lnlmax - lnlmin)/((double) nell - 1.0);
 
   if (table == 0)
@@ -1444,6 +1444,11 @@ double C_cs_tomo_limber(const double l, const int nl, const int ni, const int nj
     log_fatal("error in selecting bin number nj = %d (max %d)", nj, tomo.shear_Nbin);
     exit(1); 
   }
+  const double lnl = log(l);
+  if (lnl < lnlmin)
+  {
+    log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
+  }
   const int ntomo = N_cgl(ni, nj);
   if (!(ntomo>0)) 
   {
@@ -1451,12 +1456,6 @@ double C_cs_tomo_limber(const double l, const int nl, const int ni, const int nj
   }
   else
   {
-    const double lnl = log(l);
-    if (lnl < lnlmin || lnl > lnlmax)
-    {
-      log_fatal("l = %e outside look-up table range [%e,%e]", l, exp(lnlmin), exp(lnlmax));
-      exit(1);
-    }
     const int q = nl*ngammat_size + ntomo;
     if (q > NSIZE - 1)
     {
@@ -1548,7 +1547,7 @@ const int nj)
   const int NSIZE = nlsize*nlsize*nccl_size;
   const int nell = Ntable.N_ell;
   const double lnlmin = log(fmax(limits.LMIN_tab, 1.0));
-  const double lnlmax = log(limits.w_l_max);
+  const double lnlmax = log(limits.LMAX);
   const double dlnl = (lnlmax - lnlmin)/((double) nell - 1.0); 
 
   if (table == 0)
@@ -1618,11 +1617,10 @@ const int nj)
     exit(1); 
   } 
   const double lnl = log(l);
-  if (lnl < lnlmin || lnl > lnlmax)
+  if (lnl < lnlmin)
   {
-    log_fatal("l = %e outside look-up table range [%e,%e]", l, exp(lnlmin), exp(lnlmax));
-    exit(1);
-  } 
+    log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
+  }
   const int q = nl1*nlsize*nccl_size + nl2*nccl_size + ni; // cross redshift bin not supported so 
                                                            // not using N_CCL(ni, nj)
   if (q > NSIZE - 1)
@@ -1630,7 +1628,7 @@ const int nj)
     log_fatal("internal logic error in selecting bin number");
     exit(1);
   }
-  const double f1 = exp(interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 1.0, 1.0));
+  const double f1 = exp(interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 1, 1));
   return isnan(f1) ? 0.0 : f1;
 }
 
@@ -1707,7 +1705,7 @@ double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj
   const int NSIZE = nlsize*ncg_size;
   const int nell = Ntable.N_ell;
   const double lnlmin = log(fmax(limits.LMIN_tab, 1.0));
-  const double lnlmax = log(limits.w_l_max);
+  const double lnlmax = log(limits.LMAX);
   const double dlnl = (lnlmax - lnlmin)/((double) nell - 1.0);
 
   if (table == 0)
@@ -1766,11 +1764,10 @@ double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj
     exit(1); 
   }
   const double lnl = log(l);
-  if (lnl < lnlmin || lnl > lnlmax)
+  if (lnl < lnlmin)
   {
-    log_fatal("l = %e outside look-up table range [%e,%e]", l, exp(lnlmin), exp(lnlmax));
-    exit(1);
-  } 
+    log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
+  }
   const int ntomo = N_CGCL(ni, nj);
   if (!(ntomo>0))
   {
@@ -1784,7 +1781,7 @@ double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj
       log_fatal("internal logic error in selecting bin number");
       exit(1);
     }
-    const double f1 = exp(interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 1.0, 1.0));
+    const double f1 = exp(interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 1, 1));
     return isnan(f1) ? 0.0 : f1;
   }
 }
@@ -2071,7 +2068,7 @@ double dev, const double tol)
   }   
   L++;
   
-  Cl[limits.LMAX_NOLIMBER+1] = C_cc_tomo_limber((double) limits.LMAX_NOLIMBER+1, nl1, nl2, ni, ni);
+  Cl[limits.LMAX_NOLIMBER] = C_cc_tomo_limber((double) limits.LMAX_NOLIMBER, nl1, nl2, ni, ni);
   #pragma omp parallel for
   for (int l=L; l<limits.LMAX_NOLIMBER; l++)
   {
@@ -2249,7 +2246,7 @@ const double tol)
   }   
   L++;
 
-  Cl[limits.LMAX_NOLIMBER + 1] = C_cg_tomo_limber((double) limits.LMAX_NOLIMBER + 1, nl, ni, nj);
+  Cl[limits.LMAX_NOLIMBER] = C_cg_tomo_limber((double) limits.LMAX_NOLIMBER, nl, ni, nj);
   #pragma omp parallel for
   for (int l=L; l<limits.LMAX_NOLIMBER; l++)
   {
@@ -2258,13 +2255,13 @@ const double tol)
   }
 }
 
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 // cluster number counts
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 // nl = lambda_obs bin, ni = cluster redshift bin
 
 double binned_Ndensity_nointerp(const int nl, const double z, const int init_static_vars_only)

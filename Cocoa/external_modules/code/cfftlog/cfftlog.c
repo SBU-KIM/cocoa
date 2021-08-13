@@ -20,7 +20,7 @@ void cfftlog(double* x, double* fx, long N, config* config, int ell, double* y, 
   long N_pad = config->N_pad;
   N += 2*N_pad;
 
-  if(N % 2) {printf("Please use even number of x !\n"); exit(0);}
+  if(N % 2) {printf("Please use even number of x !\n"); exit(1);}
   long halfN = N/2;
 
   double x0, y0;
@@ -103,7 +103,7 @@ double** Fy)
   if(N % 2) 
   {
     log_fatal("Please use even number of x !");
-    exit(0);
+    exit(1);
   }
   long halfN = N/2;
 
@@ -129,7 +129,7 @@ double** Fy)
     int sign;
     if(fx[0] == 0) 
     {
-      log_fatal("Can't log-extrapolate zero on the low side!\n");
+      log_fatal("Can't log-extrapolate zero on the low side\n");
       exit(1);
     }
     else if(fx[0] > 0) 
@@ -143,7 +143,7 @@ double** Fy)
     
     if(fx[1]/fx[0] <= 0) 
     {
-      log_fatal("Log-extrapolation on the low side fails due to sign change!\n");
+      log_fatal("Log-extrapolation on the low side fails due to sign change\n");
       exit(1);
     }
   
@@ -204,7 +204,7 @@ double** Fy)
   for(int j=0; j<Nell; j++) 
   {
     out_ifft[j] = malloc(sizeof(double)*N);
-    out_vary[j] = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * (halfN+1));
+    out_vary[j] = (fftw_complex*) fftw_malloc(sizeof(fftw_complex)*(halfN+1));
     plan_backward[j] = fftw_plan_dft_c2r_1d(N, out_vary[j], out_ifft[j], FFTW_ESTIMATE);
   }
 

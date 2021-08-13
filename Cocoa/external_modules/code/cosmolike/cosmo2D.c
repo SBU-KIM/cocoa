@@ -34,24 +34,24 @@ double beam_cmb(const double l)
   return exp(-0.5*l*l*sigma*sigma);
 }
 
-double C_gk_tomo_limber_nointerp_wrapper(double l, int ni, int use_linear_ps, 
-int init_static_vars_only)
+double C_gk_tomo_limber_nointerp_wrapper(const double l, const int ni, const int use_linear_ps,
+const int init_static_vars_only)
 {
   return C_gk_tomo_limber_nointerp(l, ni, use_linear_ps,init_static_vars_only)*beam_cmb(l);
 }
 
-double C_gk_tomo_limber_wrapper(double l, int ni)
+double C_gk_tomo_limber_wrapper(const double l, const int ni)
 {
   return C_gk_tomo_limber(l, ni)*beam_cmb(l);
 }
 
-double C_ks_tomo_limber_nointerp_wrapper(double l, int ni, int use_linear_ps, 
-int init_static_vars_only)
+double C_ks_tomo_limber_nointerp_wrapper(const double l, const int ni, const int use_linear_ps,
+const int init_static_vars_only)
 {
   return C_ks_tomo_limber_nointerp(l, ni, use_linear_ps, init_static_vars_only)*beam_cmb(l);
 }
 
-double C_ks_tomo_limber_wrapper(double l, int ni)
+double C_ks_tomo_limber_wrapper(const double l, const int ni)
 {
   return C_ks_tomo_limber(l, ni)*beam_cmb(l);
 }
@@ -69,15 +69,15 @@ static int has_b2_galaxies()
   return res 
 }
 
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 // Correlation Functions (real Space) - Full Sky - bin average
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 
-double xi_pm_tomo(int pm, int nt, int ni, int nj, int limber)
+double xi_pm_tomo(const int pm, const int nt, const int ni, const int nj, const int limber)
 {
   if (like.Ntheta == 0)
   {
@@ -340,7 +340,7 @@ double xi_pm_tomo(int pm, int nt, int ni, int nj, int limber)
 
 // ---------------------------------------------------------------------------
 
-double w_gammat_tomo(int nt, int ni, int nj, int limber)
+double w_gammat_tomo(const int nt, const int ni, const int nj, const int limber)
 {
   if (like.Ntheta == 0)
   {
@@ -498,7 +498,7 @@ double w_gammat_tomo(int nt, int ni, int nj, int limber)
 
 // ---------------------------------------------------------------------------
 
-double w_gg_tomo(int nt, int ni, int nj, int limber)
+double w_gg_tomo(const int nt, const int ni, const int nj, const int limber)
 {
   if (like.Ntheta == 0)
   {
@@ -665,7 +665,7 @@ double w_gg_tomo(int nt, int ni, int nj, int limber)
 
 // ---------------------------------------------------------------------------
 
-double w_gk_tomo(int nt, int ni, int limber)
+double w_gk_tomo(const int nt, const int ni, const int limber)
 {
   if (like.Ntheta == 0)
   {
@@ -792,7 +792,7 @@ double w_gk_tomo(int nt, int ni, int limber)
 
 // ---------------------------------------------------------------------------
 
-double w_ks_tomo(int nt, int ni, int limber)
+double w_ks_tomo(const int nt, const int ni, const int limber)
 {
   if (like.Ntheta ==0)
   {
@@ -919,15 +919,15 @@ double w_ks_tomo(int nt, int ni, int limber)
   return w_vec[q];
 }
 
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 // Correlation Functions (real space) - flat sky
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 
-double xi_pm_tomo_flatsky(int pm, double theta, int ni, int nj, int limber)
+double xi_pm_tomo_flatsky(const int pm, double theta, const int ni, const int nj, const int limber)
 {
   static cosmopara C;
   static nuisancepara N;
@@ -935,8 +935,8 @@ double xi_pm_tomo_flatsky(int pm, double theta, int ni, int nj, int limber)
 
   const int NSIZE = tomo.shear_Npowerspectra;
   const int ntheta = Ntable.N_thetaH;
-  const double l_min = limits.w_l_min;
-  const double l_max = limits.w_l_max;
+  const double l_min = limits.LMIN_hankel;
+  const double l_max = limits.LMAX_hankel;
   const double lnlmax = log(l_max);
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax - lnlmin)/(1.0*ntheta);
@@ -1129,12 +1129,12 @@ double xi_pm_tomo_flatsky(int pm, double theta, int ni, int nj, int limber)
     log_fatal("internal logic error in selecting bin number");
     exit(1);
   }
-  return interpol(table[q], ntheta, lnthetamin, lnthetamax, dlntheta, lntheta, 0, 0);
+  return interpol(table[q], ntheta, lnthetamin, lnthetamax, dlntheta, lntheta, 1, 1);
 }
 
 // ---------------------------------------------------------------------------
 
-double w_gammat_tomo_flatsky(double theta, int ni, int nj, int limber)
+double w_gammat_tomo_flatsky(double theta, const int ni, const int nj, const int limber)
 {
   static cosmopara C;
   static nuisancepara N;
@@ -1143,8 +1143,8 @@ double w_gammat_tomo_flatsky(double theta, int ni, int nj, int limber)
 
   const int NSIZE = tomo.ggl_Npowerspectra;
   const int ntheta = Ntable.N_thetaH;
-  const double l_min = limits.w_l_min;
-  const double l_max = limits.w_l_max;
+  const double l_min = limits.LMIN_hankel;
+  const double l_max = limits.LMAX_hankel;
   const double lnlmax = log(l_max);
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax - lnlmin)/((double) ntheta - 1.0);
@@ -1386,13 +1386,13 @@ double w_gammat_tomo_flatsky(double theta, int ni, int nj, int limber)
       log_fatal("internal logic error in selecting bin number");
       exit(1);
     }
-    return interpol(table[q], ntheta, lnthetamin, lnthetamax, dlntheta, lntheta, 0, 0);
+    return interpol(table[q], ntheta, lnthetamin, lnthetamax, dlntheta, lntheta, 1, 1);
   } 
 }
 
 // ---------------------------------------------------------------------------
 
-double w_gg_tomo_flatsky(double theta, int ni, int nj, int limber)
+double w_gg_tomo_flatsky(double theta, const int ni, const int nj, const int limber)
 {
   static cosmopara C;
   static nuisancepara N;
@@ -1401,10 +1401,10 @@ double w_gg_tomo_flatsky(double theta, int ni, int nj, int limber)
 
   const int NSIZE = tomo.clustering_Npowerspectra;
   const int ntheta = Ntable.N_thetaH;
-  const double lmin = limits.w_l_min;
-  const double lmax = limits.w_l_max;
-  const double lnlmax = log(lmax);
-  const double lnlmin = log(lmin);
+  const double l_min = limits.LMIN_hankel;
+  const double l_max = limits.LMAX_hankel;
+  const double lnlmax = log(l_max);
+  const double lnlmin = log(l_min);
   const double dlnl = (lnlmax - lnlmin)/((double) ntheta - 1.0);
   const double lnrc = 0.5*(lnlmax + lnlmin);
   const double nc = ntheta/2 + 1;
@@ -1650,7 +1650,7 @@ double w_gg_tomo_flatsky(double theta, int ni, int nj, int limber)
 
 // ---------------------------------------------------------------------------
 
-double w_gk_tomo_flatsky(double theta, int ni, int limber)
+double w_gk_tomo_flatsky(double theta, const int ni, const int limber)
 {
   static cosmopara C;
   static nuisancepara N;
@@ -1660,10 +1660,10 @@ double w_gk_tomo_flatsky(double theta, int ni, int limber)
   const int nisize = tomo.clustering_Nbin;
   const int ntheta = Ntable.N_thetaH;
   const int NSIZE = nisize;
-  const double lmin = limits.w_l_min;
-  const double lmax = limits.w_l_max;
-  const double lnlmax = log(lmax);
-  const double lnlmin = log(lmin);
+  const double l_min = limits.LMIN_hankel;
+  const double l_max = limits.LMAX_hankel;
+  const double lnlmax = log(l_max);
+  const double lnlmin = log(l_min);
   const double dlnl = (lnlmax - lnlmin)/((double) ntheta - 1.0);
   const double lnrc = 0.5*(lnlmax + lnlmin);
   const double nc = ntheta/2 + 1;
@@ -1834,7 +1834,7 @@ double w_gk_tomo_flatsky(double theta, int ni, int limber)
 
 // ---------------------------------------------------------------------------
 
-double w_ks_tomo_flatsky(double theta, int ni, int limber)
+double w_ks_tomo_flatsky(double theta, const int ni, const int limber)
 {
   static cosmopara C;
   static nuisancepara N;
@@ -1843,8 +1843,8 @@ double w_ks_tomo_flatsky(double theta, int ni, int limber)
   const int nisize = tomo.shear_Nbin;
   const int ntheta = Ntable.N_thetaH;
   const int NSIZE = nisize;
-  const double l_min = limits.w_l_min;
-  const double l_max = limits.w_l_max;
+  const double l_min = limits.LMIN_hankel;
+  const double l_max = limits.LMAX_hankel;
   const double lnlmax = log(l_max);
   const double lnlmin = log(l_min);
   const double dlnl = (lnlmax - lnlmin)/((double) ntheta - 1.0);
@@ -2014,13 +2014,13 @@ double w_ks_tomo_flatsky(double theta, int ni, int limber)
   return interpol(table[q], ntheta, lnthetamin, lnthetamax, dlntheta, lntheta, 1, 1);
 }
 
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 // Limber Approximation (Angular Power Spectrum)
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
 // SS ANGULAR CORRELATION FUNCTION - TATT
@@ -2148,7 +2148,8 @@ double int_for_C_ss_tomo_TATT_BB_limber(double a, void* params)
   return (ws_1 * ws_2 * tmp1) * chidchi.dchida / (fK * fK);
 }
 
-double C_ss_tomo_TATT_EE_limber_nointerp(double l, int ni, int nj, int init_static_vars_only)
+double C_ss_tomo_TATT_EE_limber_nointerp(const double l, const int ni, const int nj,
+  const int init_static_vars_only)
 {
   if (ni < -1 || ni > tomo.shear_Nbin - 1 || nj < -1 || nj > tomo.shear_Nbin - 1)
   {
@@ -2168,7 +2169,8 @@ double C_ss_tomo_TATT_EE_limber_nointerp(double l, int ni, int nj, int init_stat
       GSL_WORKSPACE_SIZE);
 }
 
-double C_ss_tomo_TATT_BB_limber_nointerp(double l, int ni, int nj, int init_static_vars_only)
+double C_ss_tomo_TATT_BB_limber_nointerp(const double l, const int ni, const int nj,
+  const int init_static_vars_only)
 {
   if (ni < -1 || ni > tomo.shear_Nbin - 1 || nj < -1 || nj > tomo.shear_Nbin - 1)
   {
@@ -2188,7 +2190,7 @@ double C_ss_tomo_TATT_BB_limber_nointerp(double l, int ni, int nj, int init_stat
       GSL_WORKSPACE_SIZE);
 }
 
-double C_ss_tomo_TATT_EE_limber(double l, int ni, int nj)
+double C_ss_tomo_TATT_EE_limber(const double l, const int ni, const int nj)
 {
   static cosmopara C;
   static nuisancepara N;
@@ -2199,7 +2201,7 @@ double C_ss_tomo_TATT_EE_limber(double l, int ni, int nj)
   const int NSIZE = tomo.shear_Npowerspectra;
   const int nell = Ntable.N_ell_TATT;
   const double lnlmin = log(fmax(limits.LMIN_tab, 1.0));
-  const double lnlmax = log(limits.w_l_max);
+  const double lnlmax = log(limits.LMAX);
   const double dlnl = (lnlmax - lnlmin) / ((double) nell - 1.0);
 
   if (table == 0)
@@ -2267,10 +2269,9 @@ double C_ss_tomo_TATT_EE_limber(double l, int ni, int nj)
     exit(1);
   }
   const double lnl = log(l);
-  if (lnl < lnlmin || lnl > lnlmax)
+  if (lnl < lnlmin)
   {
-    log_fatal("l = %e outside look-up table range [%e,%e]", l, exp(lnlmin), exp(lnlmax));
-    exit(1);
+    log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int ntomo = N_shear(ni, nj);
   if(!(ntomo>0))
@@ -2288,17 +2289,17 @@ double C_ss_tomo_TATT_EE_limber(double l, int ni, int nj)
     double f1;
     if (osc[q] == 0)
     {
-      f1 = sig[q] * exp(interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 0., 0.));
+      f1 = sig[q] * exp(interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 1, 1));
     }
     else
     {
-      f1 = interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 0., 0.);
+      f1 = interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 1, 1);
     }
     return isnan(f1) ? 0.0 : f1;
   }
 }
 
-double C_ss_tomo_TATT_BB_limber(double l, int ni, int nj)
+double C_ss_tomo_TATT_BB_limber(const double l, const int ni, const int nj)
 {
   static cosmopara C;
   static nuisancepara N;
@@ -2309,7 +2310,7 @@ double C_ss_tomo_TATT_BB_limber(double l, int ni, int nj)
   const int nell = Ntable.N_ell_TATT;
   const int NSIZE = tomo.shear_Npowerspectra;
   const double lnlmin = log(fmax(limits.LMIN_tab, 1.0));
-  const double lnlmax = log(limits.w_l_max);
+  const double lnlmax = log(limits.LMAX);
   const double dlnl = (lnlmax - lnlmin) / ((double) nell - 1.0);
 
   if (table == 0)
@@ -2378,10 +2379,9 @@ double C_ss_tomo_TATT_BB_limber(double l, int ni, int nj)
     exit(1);
   }
   const double lnl = log(l);
-  if (lnl < lnlmin || lnl > lnlmax)
+  if (lnl < lnlmin)
   {
-    log_fatal("l = %e outside look-up table range [%e,%e]", l, exp(lnlmin), exp(lnlmax));
-    exit(1);
+    log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int ntomo = N_shear(ni, nj);
   if(!(ntomo>0))
@@ -2399,11 +2399,11 @@ double C_ss_tomo_TATT_BB_limber(double l, int ni, int nj)
     double f1;
     if (osc[q] == 0)
     {
-      f1 = sig[q] * exp(interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 0, 0));
+      f1 = sig[q] * exp(interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 1, 1));
     }
     else
     {
-      f1 = interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 0, 0);
+      f1 = interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 1, 1);
     }
     return isnan(f1) ? 0.0 : f1;
   }
@@ -2483,8 +2483,8 @@ double int_for_C_ss_tomo_limber(double a, void* params)
   return res*PK*(chidchi.dchida/(fK*fK))*ell_prefactor/ell4;
 }
 
-double C_ss_tomo_limber_nointerp(double l, int ni, int nj, int use_linear_ps, 
-int init_static_vars_only)
+double C_ss_tomo_limber_nointerp(const double l, const int ni, const int nj,
+  const int use_linear_ps, const int init_static_vars_only)
 {
   if (ni < 0 || ni > tomo.shear_Nbin - 1 || nj < 0 || nj > tomo.shear_Nbin - 1)
   {
@@ -2504,7 +2504,7 @@ int init_static_vars_only)
       GSL_WORKSPACE_SIZE);
 }
 
-double C_ss_tomo_limber(double l, int ni, int nj)
+double C_ss_tomo_limber(const double l, const int ni, const int nj)
 {
   static cosmopara C;
   static nuisancepara N;
@@ -2513,7 +2513,7 @@ double C_ss_tomo_limber(double l, int ni, int nj)
   const int nell = Ntable.N_ell;
   const int NSIZE = tomo.shear_Npowerspectra;
   const double lnlmin = log(fmax(limits.LMIN_tab, 1.0));
-  const double lnlmax = log(limits.w_l_max);
+  const double lnlmax = log(limits.LMAX);
   const double dlnl = (lnlmax - lnlmin) / ((double) nell - 1.0);
 
   if (table == 0)
@@ -2553,10 +2553,9 @@ double C_ss_tomo_limber(double l, int ni, int nj)
     exit(1);
   }
   const double lnl = log(l);
-  if (lnl < lnlmin || lnl > lnlmax)
+  if (lnl < lnlmin)
   {
-    log_fatal("l = %e outside look-up table range [%e, %e]", l, exp(lnlmin), exp(lnlmax));
-    exit(1);
+    log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int ntomo = N_shear(ni, nj);
   if(!(ntomo>0))
@@ -2571,7 +2570,7 @@ double C_ss_tomo_limber(double l, int ni, int nj)
       log_fatal("internal logic error in selecting bin number");
       exit(1);
     } 
-    const double f1 = exp(interpol_fitslope(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 1.0));
+    const double f1 = exp(interpol_fitslope(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 1));
     return isnan(f1) ? 0.0 : f1;
   }
 }
@@ -2831,8 +2830,8 @@ double int_for_C_gs_tomo_limber_withb2(double a, void* params)
   return (linear_part + non_linear_part)*(chidchi.dchida/(fK*fK))*(ell_prefactor2/(ell*ell));
 }
 
-double C_gs_tomo_limber_nointerp(double l, int nl, int ns, int use_linear_ps, 
-int init_static_vars_only)
+double C_gs_tomo_limber_nointerp(const double l, int nl, int ns, const int use_linear_ps,
+const int init_static_vars_only)
 {
   if (nl < 0 || nl > tomo.clustering_Nbin - 1 || ns < 0 || ns > tomo.shear_Nbin - 1)
   {
@@ -2890,7 +2889,7 @@ int init_static_vars_only)
   return res;
 }
 
-double C_gs_tomo_limber(double l, int ni, int nj)
+double C_gs_tomo_limber(const double l, const int ni, const int nj)
 {
   static cosmopara C;
   static nuisancepara N;
@@ -2902,7 +2901,7 @@ double C_gs_tomo_limber(double l, int ni, int nj)
   const int NSIZE = tomo.ggl_Npowerspectra;
   const int nell = (like.IA == 5 || like.IA == 6) ? Ntable.N_ell_TATT :  Ntable.N_ell;
   const double lnlmin = log(fmax(limits.LMIN_tab, 1.0));
-  const double lnlmax = log(limits.w_l_max);
+  const double lnlmax = log(limits.LMAX);
   const double dlnl = (lnlmax - lnlmin) / ((double) nell - 1.0);
 
   if (table == 0) 
@@ -2973,7 +2972,8 @@ double C_gs_tomo_limber(double l, int ni, int nj)
           const int ZLNZ = ZL(k);
           const int ZSNZ = ZS(k);
           const double lnl = lnlmin + i*dlnl;
-          table[k][i] = log(C_gs_tomo_limber_nointerp(exp(lnl), ZLNZ, ZSNZ, use_linear_ps_limber, 0));
+          const double ll = exp(lnl);
+          table[k][i] = log(C_gs_tomo_limber_nointerp(ll, ZLNZ, ZSNZ, use_linear_ps_limber, 0));
         }
       }
     }
@@ -2987,15 +2987,14 @@ double C_gs_tomo_limber(double l, int ni, int nj)
     exit(1);
   } 
   const double lnl = log(l);
-  if (lnl < lnlmin || lnl > lnlmax)
+  if (lnl < lnlmin)
   {
-    log_fatal("l = %e outside look-up table range [%e,%e]", l, exp(lnlmin), exp(lnlmax));
-    exit(1);
+    log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int ntomo = N_ggl(ni, nj);
   if (!(ntomo>0))
   {
-    return 0,0;
+    return 0.0;
   }
   else
   {
@@ -3153,8 +3152,8 @@ double int_for_C_gg_tomo_limber_withb2(double a, void* params)
   return (linear_part + non_linear_part)*(chidchi.dchida/(fK*fK));
 }
 
-double C_gg_tomo_limber_nointerp(double l, int ni, int nj, int use_linear_ps,
-int init_static_vars_only)
+double C_gg_tomo_limber_nointerp(const double l, const int ni, const int nj, const int use_linear_ps,
+const int init_static_vars_only)
 {
   if (ni < 0 || ni > tomo.clustering_Nbin - 1 || nj < 0 || nj > tomo.clustering_Nbin - 1)
   {
@@ -3208,8 +3207,8 @@ int init_static_vars_only)
   return res;
 }
 
-double C_gg_tomo_limber(double l, int ni, int nj) // cross redshift bin not supported 
-{ 
+double C_gg_tomo_limber(const double l, const int ni, const int nj)
+{ // cross redshift bin not supported
   static cosmopara C;
   static nuisancepara N;
   static galpara G;
@@ -3217,7 +3216,7 @@ double C_gg_tomo_limber(double l, int ni, int nj) // cross redshift bin not supp
 
   const int nell = Ntable.N_ell;
   const double lnlmin = log(fmax(limits.LMIN_tab, 1.0));
-  const double lnlmax = log(limits.w_l_max);
+  const double lnlmax = log(limits.LMAX);
   const double dlnl = (lnlmax - lnlmin) / ((double) nell - 1.0);
   const int NSIZE = tomo.clustering_Nbin;
 
@@ -3265,10 +3264,9 @@ double C_gg_tomo_limber(double l, int ni, int nj) // cross redshift bin not supp
     exit(1);
   }
   const double lnl = log(l);
-  if (lnl < lnlmin || lnl > lnlmax)
+  if (lnl < lnlmin)
   {
-    log_fatal("l = %e outside look-up table range [%e,%e]", l, exp(lnlmin), exp(lnlmax));
-    exit(1);
+    log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int q = ni; // cross redshift bin not supported so not using N_CL(ni, nj) instead of ni
   if (q > NSIZE - 1)
@@ -3382,7 +3380,8 @@ double int_for_C_gk_limber_withb2(double a, void* params)
   return (linear_part + non_linear_part)*(chidchi.dchida/(fK*fK))*(ell_prefactor/(ell*ell));
 }
 
-double C_gk_tomo_limber_nointerp(double l, int ni, int use_linear_ps, int init_static_vars_only)
+double C_gk_tomo_limber_nointerp(const double l, const int ni, const int use_linear_ps,
+  const int init_static_vars_only)
 {
   if (ni < 0 || ni > tomo.clustering_Nbin - 1)
   {
@@ -3428,7 +3427,7 @@ double C_gk_tomo_limber_nointerp(double l, int ni, int use_linear_ps, int init_s
   }
 }
 
-double C_gk_tomo_limber(double l, int ni)
+double C_gk_tomo_limber(const double l, const int ni)
 {
   static cosmopara C;
   static nuisancepara N;
@@ -3438,7 +3437,7 @@ double C_gk_tomo_limber(double l, int ni)
   const int NSIZE = tomo.clustering_Nbin;
   const int nell = Ntable.N_ell;
   const double lnlmin = log(fmax(limits.LMIN_tab, 1.0));
-  const double lnlmax = log(limits.w_l_max);
+  const double lnlmax = log(limits.LMAX);
   const double dlnl = (lnlmax - lnlmin)/((double) nell - 1.0);
 
   if (table == 0)
@@ -3477,10 +3476,9 @@ double C_gk_tomo_limber(double l, int ni)
     exit(1);
   }
   const double lnl = log(l);
-  if (lnl < lnlmin || lnl > lnlmax)
+  if (lnl < lnlmin)
   {
-    log_fatal("l = %e outside look-up table range [%e, %e]", l, exp(lnlmin), exp(lnlmax));
-    exit(1);
+    log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int q =  ni; 
   if (q > NSIZE - 1)
@@ -3575,7 +3573,8 @@ double int_for_C_ks_limber(double a, void* params)
   return (res*PK*chidchi.dchida/(fK*fK))*ell_prefactor1*ell_prefactor2/ell4;
 }
 
-double C_ks_tomo_limber_nointerp(double l, int nj, int use_linear_ps, int init_static_vars_only)
+double C_ks_tomo_limber_nointerp(const double l, const int nj, const int use_linear_ps,
+  const int init_static_vars_only)
 {
   if (nj < -1 || nj > tomo.shear_Nbin - 1)
   {
@@ -3595,7 +3594,7 @@ double C_ks_tomo_limber_nointerp(double l, int nj, int use_linear_ps, int init_s
      GSL_WORKSPACE_SIZE);
 }
 
-double C_ks_tomo_limber(double l, int ni)
+double C_ks_tomo_limber(const double l, const int ni)
 {
   static cosmopara C;
   static nuisancepara N;
@@ -3606,7 +3605,7 @@ double C_ks_tomo_limber(double l, int ni)
   const int NSIZE = tomo.shear_Nbin;
   const int nell = Ntable.N_ell;
   const double lnlmin = log(fmax(limits.LMIN_tab, 1.0));
-  const double lnlmax = log(limits.w_l_max);
+  const double lnlmax = log(limits.LMAX);
   const double dlnl = (lnlmax - lnlmin)/((double) nell - 1.0);
 
   if (table == 0)
@@ -3669,10 +3668,9 @@ double C_ks_tomo_limber(double l, int ni)
     exit(1);
   }
   const double lnl = log(l);
-  if (lnl < lnlmin || lnl > lnlmax)
+  if (lnl < lnlmin)
   {
-    log_fatal("l = %e outside look-up table range [%e,%e]", l, exp(lnlmin), exp(lnlmax));
-    exit(1);
+    log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int q =  ni; 
   if (q > NSIZE - 1)
@@ -3722,24 +3720,25 @@ double int_for_C_kk_limber(double a, void* params)
   return WK*WK*PK*(chidchi.dchida/(fK*fK))*ell_prefactor*ell_prefactor/ell4;
 }
 
-double C_kk_limber_nointerp(double l, int use_linear_ps, int init_static_vars_only)
+double C_kk_limber_nointerp(const double l, const int use_linear_ps,
+  const int init_static_vars_only)
 {
   double ar[2] = {l, (double) use_linear_ps};
   const double amin = limits.a_min*(1. + 1.e-5);
-  const double amax = 1.0 - 1.e-5;
+  const double amax = 0.99999;
   return (init_static_vars_only == 1) ? int_for_C_kk_limber(amin, (void*) ar) :
     int_gsl_integrate_medium_precision(int_for_C_kk_limber, (void*) ar, amin, amax, 
       NULL, GSL_WORKSPACE_SIZE);
 }
 
-double C_kk_limber(double l)
+double C_kk_limber(const double l)
 {
   static cosmopara C;
   static double* table;
   
   const int nell = Ntable.N_ell;
   const double lnlmin = log(fmax(limits.LMIN_tab, 1.0));
-  const double lnlmax = log(limits.w_l_max);
+  const double lnlmax = log(limits.LMAX);
   const double dlnl = (lnlmax - lnlmin)/((double) nell - 1.0);
 
   if (table == 0)
@@ -3763,28 +3762,27 @@ double C_kk_limber(double l)
     update_cosmopara(&C);
   }
   const double lnl = log(l);
-  if (lnl < lnlmin || lnl > lnlmax)
+  if (lnl < lnlmin)
   {
-    log_fatal("l = %e outside look-up table range [%e,%e]", l, exp(lnlmin), exp(lnlmax));
-    exit(1);
+    log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
-  const double f1 = exp(interpol(table, nell, lnlmin, lnlmax, dlnl, lnl, 1., 1.));
+  const double f1 = exp(interpol(table, nell, lnlmin, lnlmax, dlnl, lnl, 1, 1));
   return isnan(f1) ? 0.0 : f1;
 }
 
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 // Non Limber (Angular Power Spectrum)
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 
 // --------------------------------------------------------------------------------------
 // Galaxy Clustering
 // --------------------------------------------------------------------------------------
 
-void f_chi_for_Psi_cl(double* chi, int Nchi, double* f_chi, int ni, double zmin, double zmax)
+void f_chi_for_Psi_cl(double* chi, int Nchi, double* f_chi, const int ni, double zmin, double zmax)
 { // Integrand for galaxy density
   if (ni < -1 || ni > tomo.clustering_Nbin - 1)
   {
@@ -3819,7 +3817,7 @@ void f_chi_for_Psi_cl(double* chi, int Nchi, double* f_chi, int ni, double zmin,
   }
 }
 
-void f_chi_for_Psi_cl_RSD(double* chi, int Nchi, double* f_chi, int ni, double zmin, double zmax)
+void f_chi_for_Psi_cl_RSD(double* chi, int Nchi, double* f_chi, const int ni, double zmin, double zmax)
 { // Integrand for galaxy density RSD
   if (ni < -1 || ni > tomo.clustering_Nbin - 1)
   {
@@ -3856,7 +3854,7 @@ void f_chi_for_Psi_cl_RSD(double* chi, int Nchi, double* f_chi, int ni, double z
   }
 }
 
-void f_chi_for_Psi_cl_Mag(double* chi, int Nchi, double* f_chi, int ni, double zmax)
+void f_chi_for_Psi_cl_Mag(double* chi, int Nchi, double* f_chi, const int ni, double zmax)
 { // Integrand for lensing magnification of galaxy density
   if (ni < -1 || ni > tomo.clustering_Nbin - 1)
   {
@@ -3893,7 +3891,7 @@ void f_chi_for_Psi_cl_Mag(double* chi, int Nchi, double* f_chi, int ni, double z
   }
 }
 
-void C_cl_tomo(int L, int ni, int nj, double* Cl, double dev, double tol) 
+void C_cl_tomo(int L, const int ni, const int nj, double* Cl, double dev, double tol)
 {
   if (ni < -1 || ni > tomo.clustering_Nbin - 1 || nj < -1 || nj > tomo.clustering_Nbin - 1)
   {
@@ -4031,8 +4029,13 @@ void C_cl_tomo(int L, int ni, int nj, double* Cl, double dev, double tol)
       cfftlog_ells(chi_ar, f2_chi_Mag, Nchi, &cfg_Mag, ell_ar, Nell_block, k2, Fk2_Mag);
     }
 
-    p_lin(k1[0][0]*real_coverH0, 1.0); // init static vars only
-    C_gg_tomo_limber_nointerp((double) ell_ar[0], ni, nj, 0, 1); // init static vars only
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      double init_static_vars_only = p_lin(k1[0][0]*real_coverH0, 1.0);
+      init_static_vars_only = C_gg_tomo_limber_nointerp((double) ell_ar[0], ni, nj, 0, 1);
+    }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for
     for (int i=0; i<Nell_block; i++)
     {
@@ -4059,7 +4062,7 @@ void C_cl_tomo(int L, int ni, int nj, double* Cl, double dev, double tol)
   }
   L++;
 
-  Cl[limits.LMAX_NOLIMBER+1] = C_gg_tomo_limber((double) limits.LMAX_NOLIMBER+1, ni, nj);
+  Cl[limits.LMAX_NOLIMBER] = C_gg_tomo_limber((double) limits.LMAX_NOLIMBER, ni, nj);
   #pragma omp parallel for
   for (int l=L; l<limits.LMAX_NOLIMBER; l++)
   {
@@ -4072,7 +4075,7 @@ void C_cl_tomo(int L, int ni, int nj, double* Cl, double dev, double tol)
 // Galaxy-Galaxylensing
 // --------------------------------------------------------------------------------------
 
-void f_chi_for_Psi_sh(double* chi, int Nchi, double* fchi, int nj, double zmax)
+void f_chi_for_Psi_sh(double* chi, int Nchi, double* fchi, const int nj, double zmax)
 {
   if (nj < -1 || nj > tomo.shear_Nbin - 1)
   {
@@ -4107,7 +4110,7 @@ void f_chi_for_Psi_sh(double* chi, int Nchi, double* fchi, int nj, double zmax)
   }
 }
 
-void f_chi_for_Psi_sh_IA(double* chi, int Nchi, double* fchi, int nj, double zmin, double zmax)
+void f_chi_for_Psi_sh_IA(double* chi, int Nchi, double* fchi, const int nj, double zmin, double zmax)
 { // TODO: ADD ALL IA POSSIBILITIES
   if (nj < -1 || nj > tomo.shear_Nbin - 1)
   {
@@ -4294,8 +4297,13 @@ void C_gl_tomo(int L, int nl, int ns, double* Cl, double dev, double tolerance)
     cfftlog_ells(chi_ar, f1_chi_Mag, Nchi, &cfg_Mag, ell_ar, Nell_block, k1, Fk1_Mag);
     cfftlog_ells(chi_ar, f2_chi, Nchi, &cfg_shear, ell_ar, Nell_block, k2, Fk2);
 
-    p_lin(k1[0][0]*real_coverH0, 1.0); // init static vars only
-    C_cg_tomo_limber_nointerp((double) ell_ar[0], nl, ni, nj, 0, 1); // init static vars only
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      double init_static_vars_only = p_lin(k1[0][0]*real_coverH0, 1.0);
+      init_static_vars_only = C_gs_tomo_limber_nointerp((double) ell_ar[0], nl, ns, 1, 1);
+    }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for
     for (int i=0; i<Nell_block; i++)
     {
@@ -4326,9 +4334,9 @@ void C_gl_tomo(int L, int nl, int ns, double* Cl, double dev, double tolerance)
   }
   L++;
 
-  Cl[L] = C_gs_tomo_limber((double) L, nl, ns);
+  Cl[limits.LMAX_NOLIMBER] = C_gs_tomo_limber((double) limits.LMAX_NOLIMBER, nl, ns);
   #pragma omp parallel for
-  for (int l=L+1; l<limits.LMAX_NOLIMBER+1; l++)
+  for (int l=L; l<limits.LMAX_NOLIMBER; l++)
   {
     Cl[l] = (l > limits.LMIN_tab) ? C_gs_tomo_limber((double) l, nl, ns) :
       C_gs_tomo_limber_nointerp((double) l, nl, nsq, use_linear_ps_limber, 0);

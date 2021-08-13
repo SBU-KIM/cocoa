@@ -53,7 +53,6 @@ redshiftpara redshift =
   .shear_zdistrpar_zmin = 0.0,
   .shear_zdistrpar_zmax = 0.0,
   .shear_histogram_zbins = 0,
-  
   .clustering_photoz = 0,
   .clustering_zdistrpar_zmin = 0.0,
   .clustering_zdistrpar_zmax = 0.0,
@@ -143,10 +142,13 @@ lim limits =
   .a_min = 1./(1.+10.),    // a_min (z=10, needed for CMB lensing)
   .k_min_cH0 = 2.e-2,      // k_min_cH0
   .k_max_cH0 = 3.e+6,      // k_max_cH0
-  .M_min = 1.e+6,          // M_min
-  .M_max = 1.e+17,         // M_max       
+  .M_min = 1.0e+6,         // M_min
+  .M_max = 1.0e+17,        // M_max
   .LMIN_tab = 20,          // LMIN_tab
   .LMAX_NOLIMBER = 250,    // LMAX_NOLIMBER
+  .LMAX = 100000,
+  .LMIN_hankel = 0.0001,
+  .LMAX_hankel = 5.0e6,
   .cluster_util_log_M_min = 12.0,
   .cluster_util_log_M_max = 15.9,
   .binned_P_lambda_obs_given_M_zmin_table = 0.20,
@@ -159,8 +161,6 @@ lim limits =
   .halo_exclusion_k_max_hankel = 1.0E8,
   .halo_exclusion_R_min = 0.0,
   .halo_exclusion_R_max = 15.0/2997, 
-  .w_l_min = 0.0001,
-  .w_l_max = 5.0e6
 };
 
 Ntab Ntable = 
@@ -175,7 +175,7 @@ Ntab Ntable =
   .N_DS = 1000,                       // N_DS
   .N_ell_TATT = 200,                  // N_ell_TATT (modified by COCOA from 60)
   .NL_Nell_block = 10,                // Cosmo2D - NL = NonLimber (NL_Nell_block)
-  .NL_Nchi - 500,                     // Cosmo2D - NL = NonLimber (NL_Nchi)
+  .NL_Nchi = 500,                     // Cosmo2D - NL = NonLimber (NL_Nchi)
   .N_a_halo_exclusion = 100,          // N_a for binned_p_cc_incl_halo_exclusion (cluster_util.c)
   .N_k_halo_exclusion = 100,          // N_k for binned_p_cc_incl_halo_exclusion (cluster_util.c)
   .N_k_hankel_halo_exclusion = 3192,  // N for 3D Hankel Transform (pk_to_xi and xi_to_pk) 
@@ -211,7 +211,7 @@ TinkerEmuParam tinkerEmuParam =
 
 void reset_like_struct()
 {
-  like.IA = 0.;
+  like.IA = 0;
   like.bias = 0;
   like.Ncl = 0;
   like.Ntheta = 0;
