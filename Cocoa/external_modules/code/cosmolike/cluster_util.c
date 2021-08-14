@@ -23,6 +23,7 @@
 #include "radial_weights.h"
 #include "redshift_spline.h"
 #include "structs.h"
+#include "tinker_emulatorlator.h"
 
 #include "log.c/src/log.h"
 
@@ -954,7 +955,7 @@ double dndlnM_times_binned_P_lambda_obs_given_M(double lnM, void* params)
   }
   else if (Cluster.hmf_model == 1)
   {
-    mfunc = tinker_emu_massfunc_tab(M, a);
+    mfunc = tinker_emulator_massfunc(M, a);
   }
   else
   {
@@ -1001,7 +1002,7 @@ double B1_x_BSF(const double M, const double a)
   } 
   else if (Cluster.bias_model == 1) 
   {
-    B1 = tinker_emu_B1_tab(M, a);
+    B1 = tinker_emulator_B1(M, a);
   }
   else 
   {
@@ -1020,7 +1021,7 @@ double B2_x_BSF(const double M, const double a)
   } 
   else if (Cluster.bias_model == 1) 
   {
-    B1 = tinker_emu_B1_tab(M, a);
+    B1 = tinker_emulator_B1(M, a);
   }
   else 
   {
@@ -1039,7 +1040,7 @@ double B1M1_x_BS(const double M, const double a)
   } 
   else if (Cluster.bias_model == 1) 
   {
-    B1M1 = tinker_emu_B1_tab(M, a) - 1;
+    B1M1 = tinker_emulator_B1(M, a) - 1;
   }
   else 
   {
