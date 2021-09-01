@@ -23,7 +23,7 @@
 #include "radial_weights.h"
 #include "redshift_spline.h"
 #include "structs.h"
-#include "tinker_emulatorlator.h"
+#include "tinker_emulator.h"
 
 #include "log.c/src/log.h"
 
