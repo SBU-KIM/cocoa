@@ -104,14 +104,17 @@ double sigma2(const double M)
   } 
   if (recompute_cosmo3D(C)) 
   {
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
     {
-      double ar[1] {radius(exp(lnmmin))};
-      int_for_sigma2(min, (void*) ar); // init
+      double ar[1] = {radius(exp(lnmmin))};
+      double init_static_vars_only = int_for_sigma2(min, (void*) ar); // init
     }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for
     for (int i=0; i<Ntable.N_S2; i++) 
     {
-      double ar[1] {radius(exp(lnmmin + i*dm))};
+      double ar[1] = {radius(exp(lnmmin + i*dm))};
       table_S2[i] = log(int_gsl_integrate_medium_precision(int_for_sigma2, (void*) ar, min, max, 
         NULL, GSL_WORKSPACE_SIZE));
     }
@@ -119,6 +122,14 @@ double sigma2(const double M)
   }
   return exp(interpol(table_S2, Ntable.N_S2, lnmmin, lnmmax, dm, lnM, 1.0, 1.0));
 }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// \nu
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 
 double nu(const double M, const double a) 
 {
@@ -244,8 +255,7 @@ double B1_nu(const double n, const double a)
          B * pow(n, b) + C * pow(n, c);
 }
 
-// normalization for redshift evolution of mass function (Eq. (8) in
-// Tinker et al. 2010), enforcing mass to be unbiased on average
+// norm for redshift evolution of < function (Eq.8 in Tinker 2010) + enforcing <M> to be unbiased
 double int_for_mass_norm(double n, void *params) 
 { // inner integral
   double* ar = (double*) params;
@@ -258,33 +268,37 @@ double mass_norm(const double a)
   static cosmopara C;
   static double* table;
   
+  const int na = Ntable.N_a;
   const double amin = limits.a_min;
-  const double amax = 1.;
-  const double da = (amax - amin) / (Ntable.N_a - 1.);
+  const double amax = 0.999;
+  const double da = (amax - amin) / ((double) na - 1.0);
   
   const double min = 0.0;
   const double max = 10.0;
 
   if (table == 0) 
   {
-    table = (double*) malloc(sizeof(double)*Ntable.N_a);
+    table = (double*) malloc(sizeof(double)*na);
   }
   if (recompute_cosmo3D(C)) 
   {
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
     {
       double ar[1] = {amin}; 
-      int_for_mass_norm(min, (void*) ar); // init
+      double init_static_vars_only = int_for_mass_norm(min, (void*) ar); // init
     }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for
-    for (int i=0; i<Ntable.N_a; i++) 
+    for (int i=0; i<na; i++)
     {
       double ar[1] = {amin + i*da};      
-      table[i] = int_gsl_integrate_medium_precision(int_for_mass_norm, (void*) ar, min, 
-        max, NULL, GSL_WORKSPACE_SIZE);
+      table[i] = int_gsl_integrate_medium_precision(int_for_mass_norm, (void*) ar, min, max, NULL,
+        GSL_WORKSPACE_SIZE);
     }
     update_cosmopara(&C);
   }
-  return interpol(table, Ntable.N_a, amin, amax, da, fmin(a, amax-da), 1.0, 1.0);
+  return interpol(table, na, amin, amax, da, fmin(a, amax-da), 1.0, 1.0);
 }
 
 double int_for_bias_norm(double n, void* params) 
@@ -301,22 +315,25 @@ double bias_norm(const double a)
 
   const int na = Ntable.N_a;
   const double amin = limits.a_min; 
-  const double amax = 1.;
-  const double da = (amax - amin) / (na - 1.);
+  const double amax = 0.999;
+  const double da = (amax - amin) / ((double) na - 1.0);
 
   if (table == 0) 
   {
-    table = (double*) malloc(sizeof(double)*Ntable.N_a);
+    table = (double*) malloc(sizeof(double)*na);
   }
   if (recompute_cosmo3D(C)) 
-  { 
+  {
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
     {
       double ar[1] = {amin}; 
-      int_for_bias_norm(limits.M_min, (void*) ar); // init 
-      nu(limits.M_min, amin); // init
+      double init_static_vars_only = int_for_bias_norm(limits.M_min, (void*) ar); // init
+      init_static_vars_only = nu(limits.M_min, amin); // init
     }
+    #pragma GCC diagnostic pop
     #pragma omp parallel for
-    for (int i=0; i<na-1; i++) 
+    for (int i=0; i<na; i++)
     {
       double ar[1] = {amin + i*da};      
       table[i] = int_gsl_integrate_medium_precision(int_for_bias_norm, (void*) ar, 
@@ -422,7 +439,7 @@ double int_for_I02(double logm, void* params)
   const double k1 = ar[1];
   const double k2 = ar[2];
   const double m = exp(logm);
-  const double c = conc_noiterp(m, a);
+  const double c = conc(m, a);
   const double u = u_nfw_c(c, k1, m, a)*u_nfw_c(c, k2, m, a);
   const double tmp = m/(cosmology.rho_crit * cosmology.Omega_m);
   return massfunc(m, a) * m * tmp * tmp * u;
@@ -430,7 +447,7 @@ double int_for_I02(double logm, void* params)
 
 double I02_noiterp(const double k1, const double k2, const double a) 
 {
-  double ar[2] = {a, k1, k2};
+  double ar[3] = {a, k1, k2};
   return int_gsl_integrate_medium_precision(int_for_I02, (void*) ar, log(limits.M_min),
     log(limits.M_max), NULL, GSL_WORKSPACE_SIZE);
 }
@@ -458,12 +475,15 @@ double I11(const double k, const double a)
   static cosmopara C;
   static double** table_I1 = 0;
 
+  const int na = Ntable.N_a;
   const double amin = limits.a_min;
-  const double amax = 1.0;
-  const double da = (amax - amin) / (Ntable.N_a);
+  const double amax = 0.999;
+  const double da = (amax - amin) / ((double) na - 1.0);
+
+  const int nk = Ntable.N_k_nlin;
   const double logkmin = log(limits.k_min_cH0);
   const double logkmax = log(limits.k_max_cH0);
-  const double dk = (logkmax - logkmin) / (Ntable.N_k_nlin);
+  const double dlogk = (logkmax - logkmin) / ((double) nk - 1.0);
 
   if (table_I1 == 0)
   {
@@ -479,27 +499,27 @@ double I11(const double k, const double a)
       const int i = 0;
       {
         const int j = 0;
-        table_I1[i][j] = I_11_noiterp(exp(logkmin + j*dk), fmin(amin + i*da, 0.999));
+        table_I1[i][j] = I11_noiterp(exp(logkmin + j*dlogk), amin + i*da);
       }
       #pragma omp parallel for
-      for (int j=1; j<Ntable.N_k_nlin; j++) 
+      for (int j=1; j<nk; j++)
       {
-        table_I1[i][j] = I_11_noiterp(exp(logkmin + j*dk), fmin(amin + i*da, 0.999));
+        table_I1[i][j] = I11_noiterp(exp(logkmin + j*dlogk), amin + i*da);
       }
     }
     #pragma omp parallel for collapse(2)
-    for (int i=1; i<Ntable.N_a; i++) 
+    for (int i=1; i<na; i++)
     {
-      for (int j=0; j<Ntable.N_k_nlin; j++) 
+      for (int j=0; j<nk; j++)
       {
-        table_I1[i][j] = I_11_noiterp(exp(logkmin + j*dk), fmin(amin + i*da, 0.999));
+        table_I1[i][j] = I11_noiterp(exp(logkmin + j*dlogk), amin + i*da);
       }
     }
     update_cosmopara(&C);
   }
-  const double tmp = fmin(a, amax - 1.1 * da); // to avoid interpolation errors near z = 0
-  return exp(interpol2d(table_I1, Ntable.N_a, amin, amax, da, tmp, Ntable.N_k_nlin, 
-    logkmin, logkmax, dk, log(k), 1.0, 1.0));
+  // const double tmp = fmin(a, amax - 1.1 * da); // to avoid interpolation errors near z = 0
+  return exp(interpol2d(table_I1, na, amin, amax, da, a, nk, logkmin, logkmax, dlogk, log(k),
+    1.0, 1.0));
 }
 
 double p_mm_1h_noiterp(const double k, const double a) 
@@ -518,10 +538,12 @@ double p_mm_halomodel(const double k, const double a)
   static cosmopara C;
   static double** table_P_NL = 0;
 
-  const double da = (1.0 - limits.a_min) / ((double) Ntable.N_a);
+  const double amin = limits.a_min;
+  const double amax = 0.999;
+  const double da = (amax - amin) / ((double) Ntable.N_a - 1.0);
   const double logkmin = log(limits.k_min_cH0);
   const double logkmax = log(limits.k_max_cH0);
-  const double dk = (logkmax - logkmin) / ((double) Ntable.N_k_nlin);
+  const double dk = (logkmax - logkmin) / ((double) Ntable.N_k_nlin - 1.0);
 
   if (table_P_NL == 0)
   {
@@ -535,7 +557,7 @@ double p_mm_halomodel(const double k, const double a)
   { // extend this by halo model parameters if these become part of the model
     {
       const int i = 0;
-      const double aa = limits.a_min + i*da > 0.999 ? .999 : limits.a_min + i*da;
+      const double aa = amin + i*da > 0.999 ? 0.999 : amin + i*da;
       {
         const int j = 0;
         const double kk = exp(logkmin + j*dk);
@@ -553,15 +575,15 @@ double p_mm_halomodel(const double k, const double a)
     { 
       for (int j=0; j<Ntable.N_k_nlin; j++) 
       {
-        const double aa = limits.a_min + i*da > 0.999 ? .999 : limits.a_min + i*da;
+        const double aa = amin + i*da > amax ? amax : amin + i*da;
         const double kk = exp(logkmin + j*dk);
         table_P_NL[i][j] = log(p_mm_1h_noiterp(kk, aa) + p_mm_2h_noiterp(kk, aa));
       }
     }
     update_cosmopara(&C);
   }
-  return exp(interpol2d(table_P_NL, Ntable.N_a, limits.a_min, 1.0, da, a, Ntable.N_k_nlin, logkmin, 
-    logkmax, dk, log(k), 0.0, 0.0));
+  return exp(interpol2d(table_P_NL, Ntable.N_a, amin, amax, da, a, Ntable.N_k_nlin, logkmin,
+    logkmax, dk, log(k), 1.0, 1.0));
 }
 
 // ---------------------------------------------------------------------------
@@ -591,6 +613,7 @@ double int_for_b_ngmatched(double logm, void* params)
 {
   double* ar = (double*) params;
   const double a = ar[0];
+  const double m = exp(logm);
   return massfunc(m, a) * m * B1(exp(logm), a);
 }
 
@@ -620,8 +643,8 @@ double b_source(double a) // lookup table for b1 of source galaxies
   static double* table_b;
   
   const double amin = limits.a_min;
-  const double amax = 1. / (1. + redshift.shear_zdistrpar_zmin);
-  const double da = (amax - amin) / (1. * Ntable.N_a);
+  const double amax = 1.0 / (1.0 + redshift.shear_zdistrpar_zmin);
+  const double da = (amax - amin) / ((double) Ntable.N_a - 1.0);
   const double ngal = survey.n_gal;
   const double mag_lim = survey.m_lim;
   

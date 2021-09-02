@@ -39,9 +39,6 @@ double SDSS_P_true_lambda_given_mass(const double true_lambda, const double mass
 double SDSS_P_lambda_obs_given_true_lambda(const double observed_lambda, const double true_lambda, 
   const double z);
 
-double SDSS_P_lambda_obs_lambda_true_given_M(double true_lambda, const double observed_lambda, 
-  const double M, const double z);
-
 double SDSS_P_lambda_obs_given_M(const double observed_lambda, const double M, const double z, 
   const int init_static_vars_only);
 
@@ -81,7 +78,7 @@ double B1_x_BSF(const double M, const double a);
 
 double B2_x_BSF(const double M, const double a);
 
-double B1M1_x_BS(const double M, const double a); // (B1 - 1) x Selection Bias
+double B1M1_x_BSF(const double M, const double a); // (B1 - 1) x Selection Bias
 
 double weighted_B1_nointerp(const int nl, const double z, const int init_static_vars_only);
 double weighted_B1(const int nl, const double z);
@@ -139,6 +136,17 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
 double binned_p_cg(const double k, const double a, const int nl, const int nj, 
   const int use_linear_ps);
 
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// cluster number counts
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
+double binned_Ndensity_nointerp(const int nl, const double z, const int init_static_vars_only);
+
+double binned_Ndensity(const int nl, const double z);
+
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
@@ -153,6 +161,7 @@ double binned_p_cm_nointerp(const double k, const double a, const int nl,
 // nl = lambda_obs bin, ni = cluster redshift bin
 double binned_p_cm(const double k, const double a, const int nl, const int ni, 
 const int include_1h_term, const int use_linear_ps);
+
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------

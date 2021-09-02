@@ -56,14 +56,13 @@ typedef struct
   int N_ell_TATT;                  // Cosmo2D
   int NL_Nell_block;               // Cosmo2D - NL = NonLimber
   int NL_Nchi;                     // Cosmo2D - NL = NonLimber
-  int N_a_halo_exclusion,          // N_a for binned_p_cc_incl_halo_exclusion (cluster_util.c)
-  int N_k_halo_exclusion,          // N_k for binned_p_cc_incl_halo_exclusion (cluster_util.c)
-  int N_k_hankel_halo_exclusion,   // N for 3D Hankel Transform (pk_to_xi and xi_to_pk) 
-  int N_R_halo_exclusion,
-  int binned_P_lambda_obs_given_M_size_z_table,
-  int binned_P_lambda_obs_given_M_size_M_table,
-  int binned_p_cm_size_a_table
-  int 
+  int N_a_halo_exclusion;          // N_a for binned_p_cc_incl_halo_exclusion (cluster_util.c)
+  int N_k_halo_exclusion;          // N_k for binned_p_cc_incl_halo_exclusion (cluster_util.c)
+  int N_k_hankel_halo_exclusion;   // N for 3D Hankel Transform (pk_to_xi and xi_to_pk)
+  int N_R_halo_exclusion;
+  int binned_P_lambda_obs_given_M_size_z_table;
+  int binned_P_lambda_obs_given_M_size_M_table;
+  int binned_p_cm_size_a_table;
 } Ntab;
 
 typedef struct 
@@ -159,8 +158,9 @@ typedef struct
   int N_MOR;                      // Mass observable relation (number of nuisance params)
   int N_SF;                       // selection function (number of nuisance params)
 
-  int halo_exclusion_model,
-  double delta_exclusion,  // delta for exclusion radius (halo_exclusion) according to Baldauf 2013
+
+  int halo_exclusion_model;
+  double delta_exclusion;  // delta for exclusion radius (halo_exclusion) according to Baldauf 2013
 
   int N200_Nbin;                  // number of cluster bins in lambda_obs (observed richness)
   double N200_min;                // global lambda_obs_min (observed richness)
@@ -169,7 +169,7 @@ typedef struct
   double N_max[MAX_SIZE_ARRAYS];  // lambda_obs_max in each bin in lambda_obs (observed richness)
   
   char model[CHAR_MAX_SIZE];
-} clusterpara;
+} clusterparams;
 
 typedef struct
 {
@@ -255,7 +255,7 @@ typedef struct
   int clusterCC;
 } likepara;
 
-
+typedef double (*B1_model)(double z, int nz);
 
 typedef struct
 {
@@ -266,13 +266,11 @@ typedef struct
   B1_model b1_function;
 } galpara;
 
-typedef double (*B1_model)(double z, int nz);
 
 typedef struct
 {
   char runmode[CHAR_MAX_SIZE];
 } pdeltapara;
-
 
 
 typedef struct
@@ -309,7 +307,7 @@ typedef struct
   int tinker_hmf_nparam_redshift;
   int tinker_hmf_extrapolation_cut_in;
   int tinker_hmf_extrapolation_cut_out;
-} TinkerEmuParam;
+} TinkerEmuParameters;
 
 double bgal_z(double z, int nz);
 
@@ -335,7 +333,7 @@ extern sur survey;
 
 extern galpara gbias;
 
-extern clusterpara;
+extern clusterparams Cluster;
 
 extern pdeltapara pdeltaparams;
 
@@ -351,7 +349,7 @@ extern lim limits;
 
 extern Ntab Ntable;
 
-export TinkerEmuParam tinkerEmuParam;
+extern TinkerEmuParameters tinkerEmuParam;
 
 
 //  ----------------------------------------------------------------------------------

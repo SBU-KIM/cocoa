@@ -1,3 +1,23 @@
+#include <assert.h>
+#include <gsl/gsl_interp2d.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdlib.h>
+
+#include <gsl/gsl_math.h>
+#include <gsl/gsl_sf_gamma.h>
+#include <gsl/gsl_linalg.h>
+
+#include "basics.h"
+#include "halo.h"
+#include "recompute.h"
+#include "structs.h"
+#include "tinker_emulator.h"
+
+#include "log.c/src/log.h"
+
 static double emu_tinker_bias_y[40][4] = {
     {0.22772415000000001,-0.37692982250000007,-0.0402944999999999,0.04022747500000001},
     {-0.28278585,0.19515017749999994,0.04740549999999999,-0.06182552499999994},
@@ -373,7 +393,8 @@ const int type)
       gsl_matrix_set(cov, i, j,result);
     } 
   }
-  invert_matrix_colesky(cov);
+  gsl_linalg_cholesky_decomp (cov);
+  gsl_linalg_cholesky_invert(cov);
   for (int i=0; i<nsamp; ++i)
   {
     for (int j=0; j<nsamp; ++j)
@@ -535,7 +556,7 @@ void emulate_all(const double *const cos, double *const ystar, const int type)
   }
     
   double* yin = (double*) malloc(sizeof(double)*nparam);
-  for (i=0; i<nparam; ++i)
+  for (int i=0; i<nparam; ++i)
   {
     if (type == 0) 
     {

@@ -105,7 +105,7 @@ const int nj);
 
 // nl = lambda_obs bin, ni = cluster redshift bin, nj = galaxy redshift bin
 double C_cg_tomo_limber_nointerp(const double l, const int nl, const int ni, const int nj, 
-const int use_linear_ps);
+const int use_linear_ps, const int init_static_vars_only);
 
 double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj);
 
@@ -118,9 +118,6 @@ double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj
 // ----------------------------------------------------------------------------
 
 // nl = lambda_obs bin
-double binned_Ndensity_nointerp(const int nl, const double z, const int init_static_vars_only);
-
-double binned_Ndensity(const int nl, const double z);
 
 double binned_N_nointerp(const int nl, const int nz, const int interpolate_survey_area, 
 const int init_static_vars_only);

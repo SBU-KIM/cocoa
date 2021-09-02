@@ -44,7 +44,7 @@ tomopara tomo =
 {
   .n_source = {0},
   .n_lens = {0},
-  .external_selection_cg_clustering = NULL
+  .external_selection_cg_clustering = {0}
 };
 
 redshiftpara redshift =
@@ -57,17 +57,17 @@ redshiftpara redshift =
   .clustering_zdistrpar_zmin = 0.0,
   .clustering_zdistrpar_zmax = 0.0,
   .clustering_histogram_zbins = 0
-}
+};
 
 galpara gbias =
 {
   .b2 = {0},
   .bs2 = {0},
   .b1_function = &b1_per_bin,
-  .b_mag = {0},
+  .b_mag = {0}
 }; // default: point to old bgal_z routin
 
-clusterpara Cluster =
+clusterparams Cluster =
 {
   .interpolate_survey_area = 1,
   .bias_model = 0,
@@ -78,11 +78,7 @@ clusterpara Cluster =
   .N200_Nbin = 0,
   .N_min = {0},
   .N_max = {0},
-  .lbin = 0,
-  .l_min = 0.0,
-  .l_max = 0.0,
-  .model = "default",
-  .external_selection_cg_clustering = {0}
+  .model = "default"
 };
 
 pdeltapara pdeltaparams =
@@ -100,7 +96,7 @@ nuisancepara nuisance =
   .sigma_zphot_shear = {0},
   .bias_zphot_shear = {0},
   .sigma_zphot_clustering = {0},
-  .bias_zphot_clustering = {0},
+  .bias_zphot_clustering = {0}
 };
 
 barypara bary =
@@ -111,7 +107,7 @@ barypara bary =
   .a_bins = NULL,
   .logk_bins = NULL,
   .log_PkR = NULL,
-  .interp2d = NULL,
+  .interp2d = NULL
 };
 
 Cmb cmb =
@@ -282,6 +278,8 @@ void reset_tomo_struct()
 
     tomo.cluster_zmax[i] = 0.0;
     tomo.cluster_zmin[i] = 0.0;
+
+    tomo.external_selection_cg_clustering[i] = 0;
   }
 
   tomo.shear_Nbin = 0;
@@ -294,8 +292,6 @@ void reset_tomo_struct()
   tomo.cg_clustering_Npowerspectra = 0;
   tomo.cc_clustering_Npowerspectra = 0;
   tomo.cgl_Npowerspectra = 0;
-
-  tomo.external_selection_cg_clustering = NULL;
 }
 
 void reset_gbias_struct()
@@ -339,9 +335,6 @@ void reset_nuisance_struct()
   nuisance.eta_ia_highz = 0.0;
   nuisance.oneplusz0_ia = 0.0;
   nuisance.c1rhocrit_ia = 0.01389;
-
-  nuisance.N_cluster_MOR = 0;
-  nuisance.N_cluster_selection = 0;
 }
 
 void reset_survey_struct()
@@ -494,11 +487,11 @@ void update_nuisance(nuisancepara *N)
     N->b_ta_z[i] = nuisance.b_ta_z[i];
   }
   
-  for (int i=0; i<nuisance.N_cluster_MOR; ++i) 
+  for (int i=0; i<Cluster.N_MOR; ++i)
   {
     N->cluster_MOR[i] = nuisance.cluster_MOR[i];
   }
-  for (int i=0; i<nuisance.N_cluster_selection; ++i) 
+  for (int i=0; i<Cluster.N_SF; ++i)
   {
     N->cluster_selection[i] = nuisance.cluster_selection[i];
   }

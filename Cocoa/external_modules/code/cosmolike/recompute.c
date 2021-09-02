@@ -128,14 +128,14 @@ int recompute_clusters(cosmopara C, nuisancepara N)
   {
     return 1;
   }
-  for (int i=0; i<nuisance.N_cluster_MOR; ++i)
+  for (int i=0; i<Cluster.N_MOR; i++)
   {
     if (N.cluster_MOR[i] != nuisance.cluster_MOR[i]) 
     {
       return 1;
     }
   }
-  for (int i=0; i<nuisance.N_cluster_selection; ++i)
+  for (int i=0; i<Cluster.N_SF; i++)
   {
     if (N.cluster_selection[i] != nuisance.cluster_selection[i]) 
     {

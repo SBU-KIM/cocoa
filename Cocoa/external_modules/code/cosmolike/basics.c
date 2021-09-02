@@ -63,10 +63,10 @@ bin_avg set_bin_average(int i_theta, int j_L)
     dPmax = (double**) malloc(like.Ntheta*sizeof(double*));
     for(int i=0; i<like.Ntheta ; i++)
     {
-      Pmin[i] = (double*) calloc(limits.w_l_max, sizeof(double));
-      Pmax[i] = (double*) calloc(limits.w_l_max, sizeof(double));
-      dPmin[i] = (double*) calloc(limits.w_l_max, sizeof(double));
-      dPmax[i] = (double*) calloc(limits.w_l_max, sizeof(double));
+      Pmin[i] = (double*) calloc(limits.LMAX, sizeof(double));
+      Pmax[i] = (double*) calloc(limits.LMAX, sizeof(double));
+      dPmin[i] = (double*) calloc(limits.LMAX, sizeof(double));
+      dPmax[i] = (double*) calloc(limits.LMAX, sizeof(double));
     }
     xmin = (double*) calloc(like.Ntheta, sizeof(double));
     xmax = (double*) calloc(like.Ntheta, sizeof(double));
@@ -79,13 +79,13 @@ bin_avg set_bin_average(int i_theta, int j_L)
     #pragma omp parallel for
     for (int i=0; i<like.Ntheta; i++)
     {
-      int status = gsl_sf_legendre_Pl_deriv_array(limits.w_l_max, xmin[i], Pmin[i], dPmin[i]);
+      int status = gsl_sf_legendre_Pl_deriv_array(limits.LMAX, xmin[i], Pmin[i], dPmin[i]);
       if (status) 
       {
         log_fatal(gsl_strerror(status));
         exit(1);
       }
-      status = gsl_sf_legendre_Pl_deriv_array(limits.w_l_max, xmax[i], Pmax[i], dPmax[i]);
+      status = gsl_sf_legendre_Pl_deriv_array(limits.LMAX, xmax[i], Pmax[i], dPmax[i]);
       if (status) 
       {
         log_fatal(gsl_strerror(status));
@@ -466,13 +466,13 @@ void hankel_kernel_FT_3D(double x, fftw_complex *res, double *arg, int argc)
       a1[1] = 0.5*x; a2[1]=-a1[1];
       cdgamma(a1,&g1);
       cdgamma(a2,&g2);
-      xln2 = x*constants.ln2;
+      xln2 = x*M_LN2;
       si   = sin(xln2);
       co   = cos(xln2);
       d1   = g1[0]*g2[0]+g1[1]*g2[1]; /* Re */
       d2   = g1[1]*g2[0]-g1[0]*g2[1]; /* Im */
       mod  = g2[0]*g2[0]+g2[1]*g2[1];
-      pref = exp(constants.ln2*q)/mod;
+      pref = exp(M_LN2*q)/mod;
 
       (*res)[0] = pref*(co*d1-si*d2);
       (*res)[1] = pref*(si*d1+co*d2);

@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_sf.h>
+#include <gsl/gsl_spline.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,8 +23,8 @@
 
 static int GSL_WORKSPACE_SIZE = 250;
 static int use_linear_ps_limber = 0; /* 0 or 1 */
-static INCLUDE_MAG_IN_C_CC_NONLIMBER = 0; /* 0 or 1 */
-static INCLUDE_MAG_IN_C_CG_NONLIMBER = 0; /* 0 or 1 */
+static int INCLUDE_MAG_IN_C_CC_NONLIMBER = 0; /* 0 or 1 */
+static int INCLUDE_MAG_IN_C_CG_NONLIMBER = 0; /* 0 or 1 */
 
 // --------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------
@@ -47,8 +48,9 @@ const int limber)
   static double** Pl = 0;
   static double* w_vec = 0;
 
-  const int nell = Ntable.N_ell;
+  const int nell = limits.LMAX;
   const int ntheta = like.Ntheta;
+  const int nlsize = Cluster.N200_Nbin;
   const int ngammat_size = tomo.cgl_Npowerspectra;
   const int NSIZE = nlsize*ngammat_size;
 
@@ -103,7 +105,7 @@ const int limber)
     {
       const int ZC = ZCL(0);
       const int ZSC = ZCS(0);
-      double init_static_vars_only = C_cs_tomo_limber(limits.LMIN_tab + 1, i, ZC, ZSC);
+      double init_static_vars_only = C_cs_tomo_limber(limits.LMIN_tab + 1, 0, ZC, ZSC);
     }
     #pragma GCC diagnostic pop
     if (limber == 1)
@@ -209,9 +211,10 @@ const int limber)
   const int nlsize = Cluster.N200_Nbin;
   const int nccl_size = tomo.cluster_Nbin; // cross redshift bin not supported so not using
                                            // tomo.cc_clustering_Npowerspectra
-  const int NSIZE = nlsize*nlsize*nccl_size;
-  const int nell = Ntable.N_ell;
+
+  const int nell = limits.LMAX;
   const int ntheta = like.Ntheta;
+  const int NSIZE = nlsize*nlsize*nccl_size;
 
   if (Pl == 0)
   {
@@ -271,6 +274,8 @@ const int limber)
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
     {
+      const int i = 0;
+      const int j = 0;
       const int ZCCL1 = 0;
       const int ZCCL2 = 0;
       double init_static_vars_only = C_cc_tomo_limber(limits.LMIN_tab + 1, i, j, ZCCL1, ZCCL2);
@@ -330,7 +335,7 @@ const int limber)
               const int q = i*nlsize*nccl_size + j*nccl_size + k;
               const int ZCCL1 = k; // cross redshift bin not supported so not using ZCCL1(k)
               const int ZCCL2 = k; // cross redshift bin not supported so not using ZCCL2(k)
-              Cl[q][l] = C_cc_tomo_limber(l, i, j, ZCCL1, ZCCL2)
+              Cl[q][l] = C_cc_tomo_limber(l, i, j, ZCCL1, ZCCL2);
             }
           }
         }
@@ -437,8 +442,8 @@ double w_cg_tomo(const int nt, const int nl, const int ni, const int nj, const i
   const int ntheta = like.Ntheta;
   const int nlsize = Cluster.N200_Nbin;
   const int ncg_size = tomo.cg_clustering_Npowerspectra;
+  const int nell = limits.LMAX;
   const int NSIZE = nlsize*ncg_size;
-  const int nell = Ntable.N_ell;
 
   if (Pl == 0)
   {
@@ -490,6 +495,11 @@ double w_cg_tomo(const int nt, const int nl, const int ni, const int nj, const i
   }
   if (recompute_cg(C, G, N))
   {
+    double** Cl = malloc(NSIZE*sizeof(double*));
+    for (int i=0; i<NSIZE; i++)
+    {
+      Cl[i] = calloc(nell, sizeof(double));
+    }
     if (limber == 1)
     {
       #pragma GCC diagnostic push
@@ -524,7 +534,7 @@ double w_cg_tomo(const int nt, const int nl, const int ni, const int nj, const i
     #pragma omp parallel for collapse(3)
     for (int i=0; i<nlsize; i++)
     {
-      for (int j=0; j<ntomo; j++)
+      for (int j=0; j<ncg_size; j++)
       {
         for (int p=0; p<ntheta; p++)
         {
@@ -592,8 +602,8 @@ double w_cg_tomo(const int nt, const int nl, const int ni, const int nj, const i
 // --------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------
 
-double w_gammat_cluster_tomo_flatsky(const double theta, const int nl, const int ni, 
-const int nj, const int limber) 
+double w_gammat_cluster_tomo_flatsky(const double theta, const int nl, const int ni, const int nj,
+const int limber)
 { // nl = lambda_obs bin, ni = cluster redshift bin, nj = source redshift bin
   static cosmopara C;
   static nuisancepara N;
@@ -647,14 +657,16 @@ const int nj, const int limber)
       #pragma GCC diagnostic push
       #pragma GCC diagnostic ignored "-Wunused-variable"
       {
-        const int ZC = ZCL(0);
-        const int ZSC = ZCS(0);
+        const int i = 0;
+        const int j = 0;
+        const int ZC = ZCL(j);
+        const int ZSC = ZCS(j);
         double init_static_vars_only = C_cs_tomo_limber(limits.LMIN_tab + 1, i, ZC, ZSC);
       }
       #pragma GCC diagnostic pop
       if (limber == 1)
       { 
-        #pragma omp parallel for collapse (3);
+        #pragma omp parallel for collapse (3)
         for (int i=0; i<nlsize; i++)
         {
           for (int j=0; j<ngammat_size; j++)
@@ -761,7 +773,7 @@ const int nj, const int limber)
     update_cosmopara(&C);
     update_nuisance(&N);
   } 
-  if (nt < 0 || nl > nlsize - 1)
+  if (nl < 0 || nl > nlsize - 1)
   {
     log_fatal("error in selecting bin number nl = %d (max %d)", nl, nlsize);
     exit(1); 
@@ -866,6 +878,8 @@ const int nj, const int limber)
       #pragma GCC diagnostic push
       #pragma GCC diagnostic ignored "-Wunused-variable"
       {
+        const int i = 0;
+        const int j = 0;
         double init_static_vars_only = C_cc_tomo_limber(limits.LMIN_tab + 1, i, j, 0, 0);
       }
       #pragma GCC diagnostic pop
@@ -892,7 +906,7 @@ const int nj, const int limber)
             {
               const int ZCCL1 = k; // cross redshift bin not supported so not using ZCCL1(k)
               const int ZCCL2 = k; // cross redshift bin not supported so not using ZCCL1(k)
-              C_cc_tomo(L, i, j, ZCCL1, ZCCL2, Cl[j][k], dev, tol);
+              C_cc_tomo(L, i, j, ZCCL1, ZCCL2, Cl_NL[j][k], dev, tol);
               
               const gsl_interp_type* T = gsl_interp_linear;
               fCL_NL[j][k] = gsl_spline_alloc(T, limits.LMAX_NOLIMBER);
@@ -951,12 +965,15 @@ const int nj, const int limber)
         }
         if (limber != 1)
         {
-          for (int k=0; k<nccl_size; k++)
-          {
-            free(Cl_NL[j][k]);
-            gsl_spline_free(fCL_NL[j][k]);
-          }
           for (int j=i; j<nlsize; j++) 
+          {
+            for (int k=0; k<nccl_size; k++)
+            {
+              free(Cl_NL[j][k]);
+              gsl_spline_free(fCL_NL[j][k]);
+            }
+          }
+          for (int j=i; j<nlsize; j++)
           {
             free(Cl_NL[j]);
             free(fCL_NL[j]);
@@ -1330,12 +1347,14 @@ double int_for_C_cs_tomo_limber(double a, void* params)
   const int nj = (int) ar[2];
   const double ell = ar[3] + 0.5;
   const int use_linear_ps = (int) ar[4];
+  const int include_1h_term = 1;
 
   struct chis chidchi = chi_all(a);
   const double hoverh0 = hoverh0v2(a, chidchi.dchida);
   const double fK = f_K(chidchi.chi);
   const double k = ell/fK;  
-  const double PCM = binned_p_cm(k, a, nl, use_linear_ps);
+  const double PCM = binned_p_cm(k, a, nl, ni, include_1h_term, use_linear_ps);
+
   const double WCL = W_cluster(ni, a, chidchi.chi, hoverh0);
   const double WK = W_kappa(a, fK, nj);
   
@@ -1345,9 +1364,9 @@ double int_for_C_cs_tomo_limber(double a, void* params)
 double C_cs_tomo_limber_nointerp(const double l, const int nl, const int ni, const int nj, 
 const int use_linear_ps, const int init_static_vars_only)
 {
-  if (nl < 0 || nl > nlsize - 1)
+  if (nl < 0 || nl > Cluster.N200_Nbin - 1)
   {
-    log_fatal("error in selecting bin number nl = %d (max %d)", nl, nlsize);
+    log_fatal("error in selecting bin number nl = %d (max %d)", nl, Cluster.N200_Nbin);
     exit(1); 
   } 
   if (ni < 0 || ni > tomo.cluster_Nbin - 1)
@@ -1463,8 +1482,8 @@ double C_cs_tomo_limber(const double l, const int nl, const int ni, const int nj
       exit(1);
     }
     const double f1 = exp(interpol(table[q], nell, lnlmin, lnlmax, dlnl, lnl, 1, 1));
+    return isnan(f1) ? 0.0 : f1;
   }
-  return isnan(f1) ? 0.0 : f1;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1500,14 +1519,14 @@ double int_for_C_cc_tomo_limber(double a, void* params)
 double C_cc_tomo_limber_nointerp(const double l, const int nl1, const int nl2, const int ni, 
 const int nj, const int use_linear_ps, const int init_static_vars_only)
 { // nl{1,2} = lambda_obs bins, n{i,j} = cluster redshift bins
-  if (nl1 < 0 || nl1 > nlsize - 1)
+  if (nl1 < 0 || nl1 > Cluster.N200_Nbin - 1)
   {
-    log_fatal("error in selecting bin number nl1 = %d (max %d)", nl1, nlsize);
+    log_fatal("error in selecting bin number nl1 = %d (max %d)", nl1, Cluster.N200_Nbin);
     exit(1); 
   } 
-  if (nl2 < 0 || nl2 > nlsize - 1)
+  if (nl2 < 0 || nl2 > Cluster.N200_Nbin - 1)
   {
-    log_fatal("error in selecting bin number nl2 = %d (max %d)", nl2, nlsize);
+    log_fatal("error in selecting bin number nl2 = %d (max %d)", nl2, Cluster.N200_Nbin);
     exit(1); 
   } 
   if (ni < 0 || ni > tomo.cluster_Nbin - 1)
@@ -1662,11 +1681,11 @@ double int_for_C_cg_tomo_limber(double a, void* params)
 }
 
 double C_cg_tomo_limber_nointerp(const double l, const int nl, const int ni, const int nj, 
-const int use_linear_ps) 
+const int use_linear_ps, const int init_static_vars_only)
 { // nl = lambda_obs bin, ni = cluster redshift bin, nj = galaxy redshift bin
-  if (nl > nlsize - 1)
+  if (nl > Cluster.N200_Nbin - 1)
   {
-    log_fatal("error in selecting bin number nl = %d (max %d)", nl, nlsize);
+    log_fatal("error in selecting bin number nl = %d (max %d)", nl, Cluster.N200_Nbin);
     exit(1); 
   } 
   if (ni < 0 || ni > tomo.cluster_Nbin - 1)
@@ -1689,8 +1708,15 @@ const int use_linear_ps)
   } 
   const double amin = 1.0/(1.0 + zmax);
   const double amax = 1.0/(1.0 + zmin);
-  return int_gsl_integrate_low_precision(int_for_C_cg_tomo_limber, (void*) ar, amin, amax, 
-    NULL, GSL_WORKSPACE_SIZE);
+  if (init_static_vars_only == 1)
+  {
+    return int_for_C_cg_tomo_limber(amin, (void*) ar);
+  }
+  else
+  {
+    return int_gsl_integrate_low_precision(int_for_C_cg_tomo_limber, (void*) ar, amin, amax,
+      NULL, GSL_WORKSPACE_SIZE);
+  }
 }
 
 double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj)
@@ -1725,7 +1751,7 @@ double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj
       const double Z2 = ZCGCL2(0);
       const double ll = exp(lnlmin);
       double init_static_vars_only = 
-        C_cg_tomo_limber_nointerp(ll, 0, Z1, Z2, use_linear_ps_limber, 1)
+        C_cg_tomo_limber_nointerp(ll, 0, Z1, Z2, use_linear_ps_limber, 1);
     }
     #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(3)

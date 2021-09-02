@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_sf.h>
+#include <gsl/gsl_spline.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,7 +67,7 @@ static int has_b2_galaxies()
       res = 1;
     }
   }
-  return res 
+  return res;
 }
 
 // --------------------------------------------------------------------------------------
@@ -92,9 +93,9 @@ double xi_pm_tomo(const int pm, const int nt, const int ni, const int nj, const 
   static cosmopara C;
   static nuisancepara N;
   
-  const int NSIZE = tomo.shear_Npowerspectra;
-  const int nell = Ntable.N_ell;
+  const int nell = limits.LMAX;
   const int ntheta = like.Ntheta;
+  const int NSIZE = tomo.shear_Npowerspectra;
 
   if (Glplus == 0)
   {
@@ -190,15 +191,19 @@ double xi_pm_tomo(const int pm, const int nt, const int ni, const int nj, const 
       { // NEW TATT MODELING
         double** Cl_EE = (double**) malloc(NSIZE*sizeof(double*));
         double** Cl_BB = (double**) malloc(NSIZE*sizeof(double*));
-        for (int nz = 0; nz<NSIZE; nz++)
+        for (int i = 0; i<NSIZE; i++)
         {
-          Cl_EE[nz] = calloc(nell, sizeof(double));
-          Cl_BB[nz] = calloc(nell, sizeof(double));
+          Cl_EE[i] = calloc(nell, sizeof(double));
+          Cl_BB[i] = calloc(nell, sizeof(double));
         }
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wunused-variable"     
         { // init the functions C_ss_tomo_TATT_EE/BB_limber
           // only compute BB if the TATT parameters allow for B-mode terms
+          const int nz = 0;
+          const int Z1NZ = Z1(nz);
+          const int Z2NZ = Z2(nz);
+
           const int BM = (nuisance.b_ta_z[0] || nuisance.b_ta_z[Z1NZ] ||
                           nuisance.b_ta_z[Z2NZ] || nuisance.A2_ia ||
                           nuisance.A2_z[Z1NZ] || nuisance.A2_z[Z2NZ]) ? 1 : 0;
@@ -253,9 +258,9 @@ double xi_pm_tomo(const int pm, const int nt, const int ni, const int nj, const 
       else
       {
         double** Cl = malloc(NSIZE*sizeof(double*));
-        for (int nz=0; nz<NSIZE; nz++)
+        for (int i=0; i<NSIZE; i++)
         {
-          Cl[nz] = calloc(nell, sizeof(double));
+          Cl[i] = calloc(nell, sizeof(double));
         }
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wunused-variable"
@@ -354,7 +359,7 @@ double w_gammat_tomo(const int nt, const int ni, const int nj, const int limber)
   static nuisancepara N;
   static galpara G;
     
-  const int nell = Ntable.N_ell;
+  const int nell = limits.LMAX;
   const int ntheta = like.Ntheta;
   const int NSIZE = tomo.ggl_Npowerspectra;
 
@@ -432,18 +437,18 @@ double w_gammat_tomo(const int nt, const int ni, const int nj, const int limber)
         const double tolerance = 0.0075;    // required fractional accuracy in C(l)
         const double dev = 10. * tolerance; // will be diff exact vs Limber init to large
                                             // value in order to start while loop
-        const int Z1 = ZL(nz);
-        const int Z2 = ZS(nz);
-        C_gl_tomo(L, Z1, Z2, Cl[nz], dev, tolerance);
+        const int ZLNZ = ZL(nz);
+        const int ZSNZ = ZS(nz);
+        C_gl_tomo(L, ZLNZ, ZSNZ, Cl[nz], dev, tolerance);
       }
       #pragma omp parallel for collapse(2)
       for (int nz=0; nz<NSIZE; nz++) // LIMBER PART
       {
         for (int l=limits.LMAX_NOLIMBER+1; l<nell; l++)
         {
-          const int Z1 = ZL(nz);
-          const int Z2 = ZS(nz);
-          Cl[nz][l] = C_gg_tomo_limber((double) l, Z1, Z2);
+          const int ZLNZ = ZL(nz);
+          const int ZSNZ = ZS(nz);
+          Cl[nz][l] = C_gs_tomo_limber((double) l, ZLNZ, ZSNZ);
         }
       }
     }
@@ -482,7 +487,7 @@ double w_gammat_tomo(const int nt, const int ni, const int nj, const int limber)
   const int ntomo = N_ggl(ni, nj);
   if (!(ntomo>0))
   {
-    return 0.0
+    return 0.0;
   }
   else
   {
@@ -492,8 +497,8 @@ double w_gammat_tomo(const int nt, const int ni, const int nj, const int limber)
       log_fatal("internal logic error in selecting bin number");
       exit(1);
     }
+    return w_vec[q];
   }
-  return w_vec[q];
 }
 
 // ---------------------------------------------------------------------------
@@ -512,7 +517,7 @@ double w_gg_tomo(const int nt, const int ni, const int nj, const int limber)
   static nuisancepara N;
   static galpara G;
 
-  const int nell = Ntable.N_ell;
+  const int nell = limits.LMAX;
   const int ntheta = like.Ntheta;
   const int NSIZE = tomo.clustering_Npowerspectra;
 
@@ -679,7 +684,7 @@ double w_gk_tomo(const int nt, const int ni, const int limber)
   static nuisancepara N;
   static galpara G;
   
-  const int nell = Ntable.N_ell;
+  const int nell = limits.LMAX;
   const int ntheta = like.Ntheta;
   const int NSIZE = tomo.clustering_Nbin;
   
@@ -806,7 +811,7 @@ double w_ks_tomo(const int nt, const int ni, const int limber)
   static nuisancepara N;
   static galpara G;
   
-  const int nell = Ntable.N_ell;
+  const int nell = limits.LMAX;
   const int ntheta = like.Ntheta;
   const int NSIZE = tomo.shear_Nbin;
 
@@ -1187,9 +1192,9 @@ double w_gammat_tomo_flatsky(double theta, const int ni, const int nj, const int
       { 
         fCL_NL = (gsl_spline**) malloc(sizeof(gsl_spline*)*NSIZE);
         double** Cl_NL = (double**) malloc(sizeof(double*)*NSIZE);
-        for (int i=0; j<NSIZE; j++)
+        for (int i=0; i<NSIZE; i++)
         {
-          Cl_NL[j] = calloc(limits.LMAX_NOLIMBER, sizeof(double));
+          Cl_NL[i] = calloc(limits.LMAX_NOLIMBER, sizeof(double));
         }
         double* ll = calloc(limits.LMAX_NOLIMBER, sizeof(double));
         for (int i=0; i<limits.LMAX_NOLIMBER; i++)
@@ -1225,9 +1230,9 @@ double w_gammat_tomo_flatsky(double theta, const int ni, const int nj, const int
             exit(1);
           }
         }
-        for (int i=0; j<NSIZE; j++)
+        for (int i=0; i<NSIZE; i++)
         {
-          free(Cl_NL[j]);
+          free(Cl_NL[i]);
         }
         free(Cl_NL);
         free(ll);
@@ -1248,7 +1253,7 @@ double w_gammat_tomo_flatsky(double theta, const int ni, const int nj, const int
           const double l = exp(lnrc + (p - nc)*dlnl);
           if (limber == 1 || (limber != 1 && l > limits.LMAX_NOLIMBER - 1))
           {
-            lP[q][p] = (l > limits.LMIN_tab) ? l*C_gs_tomo_limber(l, ZLNZ, ZSNZ) :
+            lP[k][p] = (l > limits.LMIN_tab) ? l*C_gs_tomo_limber(l, ZLNZ, ZSNZ) :
               l*C_gs_tomo_limber_nointerp(l, ZLNZ, ZSNZ, use_linear_ps_limber, 0);
           }
           else
@@ -1378,7 +1383,7 @@ double w_gammat_tomo_flatsky(double theta, const int ni, const int nj, const int
   {
     return 0.0;
   }
-  else(test_zoverlap(ni, nj))
+  else if (test_zoverlap(ni, nj))
   {
     const int q = ntomo;
     if (q > NSIZE - 1)
@@ -1388,6 +1393,10 @@ double w_gammat_tomo_flatsky(double theta, const int ni, const int nj, const int
     }
     return interpol(table[q], ntheta, lnthetamin, lnthetamax, dlntheta, lntheta, 1, 1);
   } 
+  else
+  {
+    return 0.0;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1447,9 +1456,9 @@ double w_gg_tomo_flatsky(double theta, const int ni, const int nj, const int lim
         { 
           fCL_NL = (gsl_spline**) malloc(sizeof(gsl_spline*)*NSIZE);
           double** Cl_NL = (double**) malloc(sizeof(double*)*NSIZE);
-          for (int i=0; j<NSIZE; j++)
+          for (int i=0; i<NSIZE; i++)
           {
-            Cl_NL[j] = calloc(limits.LMAX_NOLIMBER, sizeof(double));
+            Cl_NL[i] = calloc(limits.LMAX_NOLIMBER, sizeof(double));
           }
           double* ll = calloc(limits.LMAX_NOLIMBER, sizeof(double));
           for (int i=0; i<limits.LMAX_NOLIMBER; i++)
@@ -1465,7 +1474,7 @@ double w_gg_tomo_flatsky(double theta, const int ni, const int nj, const int lim
           { // Cocoa: no threading allowed here - (fftw allocation @C_gl_tomo)
             const int ZCL1 = k; // cross redshift bin not supported so not using ZCL1(k)
             const int ZCL2 = k; // cross redshift bin not supported so not using ZCL2(k) 
-            C_cc_tomo(L, ZCL1, ZCL1, Cl_NL[k], dev, tolerance);
+            C_cl_tomo(L, ZCL1, ZCL1, Cl_NL[k], dev, tolerance);
 
             const gsl_interp_type* T = gsl_interp_linear;
             fCL_NL[k] = gsl_spline_alloc(T, limits.LMAX_NOLIMBER);
@@ -1485,9 +1494,9 @@ double w_gg_tomo_flatsky(double theta, const int ni, const int nj, const int lim
               exit(1);
             }
           } 
-          for (int i=0; j<NSIZE; j++)
+          for (int i=0; i<NSIZE; i++)
           {
-            free(Cl_NL[j]);
+            free(Cl_NL[i]);
           }
           free(Cl_NL);
           free(ll);
@@ -1514,7 +1523,7 @@ double w_gg_tomo_flatsky(double theta, const int ni, const int nj, const int lim
             else
             {
               double CLNL;
-              int status = gsl_spline_eval_e(fCL_NL[k], l, NULL, NULL, &CLNL);
+              int status = gsl_spline_eval_e(fCL_NL[k], l, NULL, &CLNL);
               if (status) 
               {
                 log_fatal(gsl_strerror(status));
@@ -1714,7 +1723,7 @@ double w_gk_tomo_flatsky(double theta, const int ni, const int limber)
           for (int p=0; p<ntheta; p++)
           {
             const double l = exp(lnrc + (p - nc)*dlnl);
-            P[i][p] = (l > limits.LMIN_tab) ? l*C_gk_tomo_limber_wrapper(l, i) :
+            lP[i][p] = (l > limits.LMIN_tab) ? l*C_gk_tomo_limber_wrapper(l, i) :
               l*C_gk_tomo_limber_nointerp_wrapper(l, i, use_linear_ps_limber, 0);
           }
         }
@@ -2077,7 +2086,7 @@ double int_for_C_ss_tomo_TATT_EE_limber(double a, void* params)
   const int n2 = (int) ar[1]; // second source bin
   if (n1 < 0 || n1 > tomo.shear_Nbin - 1 || n2 < 0 || n2 > tomo.shear_Nbin - 1)
   {
-    log_fatal("error in selecting bin number (ni, nj) = [%d,%d]", ni, nj);
+    log_fatal("error in selecting bin number (ni, nj) = [%d,%d]", n1, n2);
     exit(1);
   }
   const double ell = ar[2] + 0.5;
@@ -2085,10 +2094,9 @@ double int_for_C_ss_tomo_TATT_EE_limber(double a, void* params)
   const double growfac_a = growfac(a);
   struct chis chidchi = chi_all(a);
   double hoverh0 = hoverh0v2(a, chidchi.dchida);
-  const double PK = Pdelta(k, a);
-
   const double fK = f_K(chidchi.chi);
   const double k = ell / fK;
+  const double PK = Pdelta(k, a);
 
   const double ws1 = W_source(a, n1, hoverh0); // radial n_z weight for first source bin
   const double ws2 = W_source(a, n2, hoverh0); // radial n_z weight for second source bin
@@ -2123,7 +2131,7 @@ double int_for_C_ss_tomo_TATT_BB_limber(double a, void* params)
   const int n2 = (int) ar[1]; // second source bin
   if (n1 < 0 || n1 > tomo.shear_Nbin - 1 || n2 < 0 || n2 > tomo.shear_Nbin - 1)
   {
-    log_fatal("error in selecting bin number (ni, nj) = [%d,%d]", ni, nj);
+    log_fatal("error in selecting bin number (ni, nj) = [%d,%d]", n1, n2);
     exit(1);
   }
   const double ell = ar[2] + 0.5;
@@ -2604,11 +2612,10 @@ double int_for_C_gs_tomo_limber_TATT(double a, void* params)
   struct chis chidchi = chi_all(a);
   const double hoverh0 = hoverh0v2(a, chidchi.dchida);
   const double g4 = growfac_a*growfac_a*growfac_a*growfac_a;
-  const double PK = Pdelta(k, a);
-
   const double ell = l + 0.5;
   const double fK = f_K(chidchi.chi);
   const double k = ell / fK;
+  const double PK = Pdelta(k, a);
 
   const double ws = W_source(a, nj, hoverh0);
   const double wk = W_kappa(a, fK, nj);
@@ -2647,7 +2654,7 @@ double int_for_C_gs_tomo_limber(double a, void* params)
   const int ns = (int) ar[1];
   if (nl < 0 || nl > tomo.clustering_Nbin - 1 || ns < 0 || ns > tomo.shear_Nbin - 1)
   {
-    log_fatal("error in selecting bin number (ni, nj) = [%d,%d]", ni, nj);
+    log_fatal("error in selecting bin number (nl, ns) = [%d,%d]", nl, ns);
     exit(1);
   }
   const double l = ar[2];

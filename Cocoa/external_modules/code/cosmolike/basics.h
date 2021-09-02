@@ -1,5 +1,6 @@
 #include <fftw3.h>
 #include <gsl/gsl_matrix.h>
+#include "structs.h"
 
 #ifndef __COSMOLIKE_BASICS_H
 #define __COSMOLIKE_BASICS_H
