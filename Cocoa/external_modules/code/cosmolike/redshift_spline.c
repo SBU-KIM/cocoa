@@ -1907,7 +1907,7 @@ double pf_cluster_histo_n(double z,  void* params)
   return res;
 }
 
-double pz_cluster(double zz, int nz)
+double pz_cluster(const double zz, const int nz)
 {
   static double** table = 0;
   static double* z_v = 0;
@@ -1989,9 +1989,8 @@ double pz_cluster(double zz, int nz)
     #pragma omp parallel for
     for (int i=0; i<tomo.cluster_Nbin; i++)
     {
-      double ar[0]
-      ar[0] = (double) i;
-      
+      double ar[1] = {(double) i};
+
       const double norm = int_gsl_integrate_medium_precision(pf_cluster_histo_n, (void*) ar, 1E-5, 
         tomo.cluster_zmax[i] + 1.0, NULL, GSL_WORKSPACE_SIZE) / 
         (tomo.cluster_zmax[i] - tomo.cluster_zmin[i]);
@@ -2015,7 +2014,7 @@ double pz_cluster(double zz, int nz)
       norm += NORM[i];
     }
 
-    for (int k=0, k<zbins; k++)
+    for (int k=0; k<zbins; k++)
     {
       table[0][k] = 0; 
       for (int i=0; i<tomo.cluster_Nbin; i++)
@@ -2036,7 +2035,7 @@ double pz_cluster(double zz, int nz)
     }
   }
 
-  if (nz > tomo.cluster_Nbin - 1 || nj < -1)  
+  if (nz > tomo.cluster_Nbin - 1 || nz < -1)
   {
     log_fatal("pz_cluster(z, %d) outside tomo.cluster_Nbin range", nz);
     exit(1);
@@ -2050,7 +2049,7 @@ double pz_cluster(double zz, int nz)
   else
   {
     double result = 0.0;
-    int status = gsl_spline_eval_e(photoz_splines[nj + 1], zz, NULL, &result);
+    int status = gsl_spline_eval_e(photoz_splines[nz + 1], zz, NULL, &result);
     if (status) 
     {
       log_fatal(gsl_strerror(status));
@@ -2063,12 +2062,12 @@ double pz_cluster(double zz, int nz)
 
 double dV_cluster(double z, void* params)
 {
-  double* ar = (double*) params
+  double* ar = (double*) params;
   const int nz = ar[0];
   const double a = 1.0/(1.0 + z);
   struct chis chidchi = chi_all(a);
   const double hoverh0 = hoverh0v2(a, chidchi.dchida);
-  const double fK = f_K(chi);
+  const double fK = f_K(chidchi.chi);
   return (fK*fK/hoverh0)*pz_cluster(z, nz);
 }
 
@@ -2078,8 +2077,8 @@ double norm_z_cluster(const int nz)
   static double* table;
 
   const int N_z = tomo.clustering_Nbin;
-  const double zmin = tomo.cluster_zmin[i];
-  const double zmax = tomo.cluster_zmax[i];
+  const double zmin = tomo.cluster_zmin[nz];
+  const double zmax = tomo.cluster_zmax[nz];
   
   if (table == 0) 
   {
@@ -2088,6 +2087,7 @@ double norm_z_cluster(const int nz)
   if (recompute_cosmo3D(C))
   {
     { // init static vars only 
+      const int i = 0;
       double params[1] = {0.0};
       dV_cluster(tomo.cluster_zmin[i], (void*) params);
     }
@@ -2103,13 +2103,8 @@ double norm_z_cluster(const int nz)
   return table[nz];
 }
 
-double zdistr_cluster(int nz, double z, double chi, double hoverh0) 
+double zdistr_cluster(const int nz, const double z)
 { //simplfied selection function, disregards evolution of N-M relation+mass function within z bin
-  if (z < zmin || z > zmax)
-  {
-    log_fatal("z = %e outside look-up table range [%e,%e]", z, zmin, zmax);
-    exit(1);
-  }
   double params[1] = {nz};
   return dV_cluster(z, (void*) params)/norm_z_cluster(nz);
 }
@@ -2127,7 +2122,7 @@ double int_nsource(double z, void* param __attribute__((unused)))
   return zdistr_photoz(z, -1);
 }
 
-double nsource(int ni) // ni =-1 -> no tomography; ni>= 0 -> tomography bin ni
+double nsource(const int ni) // ni =-1 -> no tomography; ni>= 0 -> tomography bin ni
 { // returns n_gal for shear tomography bin j, works only with binned
   static double* table = 0;
   if (table == 0) 
@@ -2189,7 +2184,7 @@ double int_nlens(double z, void *param __attribute__((unused)))
 }
 
 // returns n_gal for clustering tomography bin ni, works only with binned distributions
-double nlens(int ni) // ni =-1 -> no tomography; ni>= 0 -> tomography bin ni
+double nlens(const int ni) // ni =-1 -> no tomography; ni>= 0 -> tomography bin ni
 {
   static double* table = 0;
   if (table == 0) 
@@ -2264,7 +2259,7 @@ double norm_for_zmean(double z, void* params)
   return pf_photoz(z, ni);
 }
 
-double zmean(int ni) 
+double zmean(const int ni)
 { // mean true redshift of galaxies in tomography bin j
   static double* table = 0;
   
@@ -2307,7 +2302,7 @@ double int_for_zmean_source(double z, void* params)
   return z * zdistr_photoz(z, ni);
 }
 
-double zmean_source(int ni) 
+double zmean_source(const int ni)
 { // mean true redshift of source galaxies in tomography bin j
   static double* table = 0;
   
@@ -2401,7 +2396,7 @@ double g_tomo(const double a, const int ni) // for tomography bin ni
   const int N_z = tomo.shear_Nbin;
   const int N_a = Ntable.N_a; 
   const double amin = 1.0/(redshift.shear_zdistrpar_zmax + 1.0);
-  const double amax = 0.999999
+  const double amax = 0.999999;
   const double da = (amax - amin)/((double) N_a - 1.0);
 
   if (table == 0) 
@@ -2418,11 +2413,11 @@ double g_tomo(const double a, const int ni) // for tomography bin ni
       double ar[2];
       ar[0] = (double) -1; 
       ar[1] = chi(amin);
-      int_for_g_tomo(amin, (void*) ar)
+      int_for_g_tomo(amin, (void*) ar);
       if (N_z > 0) 
       {
         ar[0] = (double) 0;
-        int_for_g_tomo(amin, (void*) ar) 
+        int_for_g_tomo(amin, (void*) ar);
       }
     } 
     #pragma omp parallel for collapse(2)
@@ -2500,11 +2495,11 @@ double g2_tomo(const double a, const int ni)
       double ar[2];
       ar[0] = (double) -1; 
       ar[1] = chi(amin);
-      int_for_g2_tomo(amin, (void*) ar)
+      int_for_g2_tomo(amin, (void*) ar);
       if (N_z > 0) 
       {
         ar[0] = (double) 0;
-        int_for_g2_tomo(amin, (void*) ar) 
+        int_for_g2_tomo(amin, (void*) ar);
       }
     } 
     #pragma omp parallel for collapse(2)
@@ -2646,7 +2641,7 @@ double int_for_g_lens_cl(double aprime, void* params)
   const double zprime = 1.0/aprime - 1.0;
   const double chi1 = chi(a);
   const double chiprime = chi(aprime);
-  return zdistr_cluster(zprime, ni, nl)*f_K(chiprime - chi1)/f_K(chiprime)/(aprime*aprime);
+  return zdistr_cluster(zprime, ni)*f_K(chiprime - chi1)/f_K(chiprime)/(aprime*aprime);
 }
 
 double g_lens_cluster(const double a, const int nz, const int nl)
@@ -2746,7 +2741,7 @@ double int_for_ggl_efficiency(double z, void* params)
   return pf_photoz(z, ni)*g_tomo(a, nj) * (1.0 + z)*f_K(chi(a));
 }
 
-double ggl_efficiency(int ni, int nj) 
+double ggl_efficiency(const int ni, const int nj)
 {
   static double** table = 0;
   

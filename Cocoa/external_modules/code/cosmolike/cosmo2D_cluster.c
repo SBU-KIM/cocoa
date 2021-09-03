@@ -13,6 +13,7 @@
 #include "basics.h"
 #include "cosmo3D.h"
 #include "cluster_util.h"
+#include "cosmo2D.h"
 #include "cosmo2D_cluster.h"
 #include "radial_weights.h"
 #include "recompute.h"
@@ -1355,7 +1356,7 @@ double int_for_C_cs_tomo_limber(double a, void* params)
   const double k = ell/fK;  
   const double PCM = binned_p_cm(k, a, nl, ni, include_1h_term, use_linear_ps);
 
-  const double WCL = W_cluster(ni, a, chidchi.chi, hoverh0);
+  const double WCL = W_cluster(ni, a, hoverh0);
   const double WK = W_kappa(a, fK, nj);
   
   return WCL*WK*PCM*chidchi.dchida/(fK*fK);
@@ -1511,7 +1512,7 @@ double int_for_C_cc_tomo_limber(double a, void* params)
   const double fK = f_K(chidchi.chi);
   const double k  = ell/fK;
 
-  const double res = W_cluster(ni, a, chidchi.chi, hoverh0)*W_cluster(nj, a, chidchi.chi, hoverh0);
+  const double res = W_cluster(ni, a, hoverh0)*W_cluster(nj, a, hoverh0);
   const double PCC = binned_p_cc(k, a, nl1, nl2, use_linear_ps);
   return (res == 0.0) ? 0.0 : res*PCC*chidchi.dchida/(fK*fK);
 }
@@ -1676,7 +1677,7 @@ double int_for_C_cg_tomo_limber(double a, void* params)
   const  double fK  = f_K(chidchi.chi);
   const double k = ell/fK;
   const double PCG = binned_p_cg(k, a, nl, nj, use_linear_ps);
-  const double tmp = W_cluster(ni, a, chidchi.chi, hoverh0)*W_HOD(a, nj, hoverh0);
+  const double tmp = W_cluster(ni, a, hoverh0)*W_HOD(a, nj, hoverh0);
   return tmp*PCG*chidchi.dchida/(fK*fK);
 }
 
@@ -1820,17 +1821,18 @@ double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj
 // ------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------
 
-void f_chi_for_Psi_cluster_cl(double* chi, const int Nchi, double* fchi, const int ni, 
-const int nl, const double zmax)
+void f_chi_for_Psi_cluster_cl(double *const chi, const int Nchi, double *const fchi, const int ni,
+const int nl, const double zmin, const double zmax)
 {
   const double real_coverH0 = cosmology.coverH0 / cosmology.h0; // unit Mpc
   {
     const int i = 0;
     const double a = a_chi(chi[i]/real_coverH0 /* convert unit to c/H0 */);
     const double z = 1./a - 1.;
-    const double tmp1 = zdistr_cluster(z, ni, nl);
+    const double hoh0 = hoverh0(a);
+    const double tmp1 = zdistr_cluster(z, ni);
     const double pf = (tmp1 < 0.) ? 0 : tmp1; ; // get rid of unphysical negatives
-    fchi[i] = chi[i]*pf*growfac(a)*weighted_bias(nl, z)*hoverh0(a)/real_coverH0;
+    fchi[i] = chi[i]*pf*growfac(a)*weighted_B1(nl, z)*hoh0/real_coverH0;
     if ((z < zmin) || (z > zmax))
     {
       fchi[i] = 0.0;
@@ -1841,9 +1843,10 @@ const int nl, const double zmax)
   {
     const double a = a_chi(chi[i]/real_coverH0 /* convert unit to c/H0 */);
     const double z = 1./a - 1.;
-    const double tmp1 = zdistr_cluster(z, ni, nl);
+    const double hoh0 = hoverh0(a);
+    const double tmp1 = zdistr_cluster(z, ni);
     const double pf = (tmp1 < 0.) ? 0 : tmp1; // get rid of unphysical negatives
-    fchi[i] = chi[i]*pf*growfac(a)*weighted_bias(nl, z)*hoverh0(a)/real_coverH0;
+    fchi[i] = chi[i]*pf*growfac(a)*weighted_B1(nl, z)*hoh0/real_coverH0;
     if ((z < zmin) || (z > zmax))
     {
       fchi[i] = 0.0;
@@ -1851,18 +1854,19 @@ const int nl, const double zmax)
   }
 }
 
-void f_chi_for_Psi_cluster_cl_RSD(double* chi, const int Nchi, double* fchi, const int ni, 
-const int nl, const double zmax)
+void f_chi_for_Psi_cluster_cl_RSD(double *const chi, const int Nchi, double *const fchi,
+const int ni, const int nl, const double zmin, const double zmax)
 {
   const double real_coverH0 = cosmology.coverH0 / cosmology.h0;
   {
     const int i = 0;
     const double a = a_chi(chi[i]/real_coverH0 /* convert unit to c/H0 */);
     const double z = 1./a - 1.;
-    const double tmp1 = zdistr_cluster(z,ni, nlambda);
+    const double hoh0 = hoverh0(a);
+    const double tmp1 = zdistr_cluster(z, ni);
     const double pf = (tmp1 < 0.) ? 0 : tmp1; // get rid of unphysical negatives
     struct growths tmp2 = growfac_all(a);
-    fchi[i] = -chi[i]*pf*tmp2.D*tmp2.f*hoverh0(a)/real_coverH0;
+    fchi[i] = -chi[i]*pf*tmp2.D*tmp2.f*hoh0/real_coverH0;
     if ((z < zmin) || (z > zmax))
     {
       fchi[i] = 0.;
@@ -1873,10 +1877,11 @@ const int nl, const double zmax)
   {
     const double a = a_chi(chi[i]/real_coverH0 /* convert unit to c/H0 */);
     const double z = 1./a - 1.;
-    const double tmp1 = zdistr_cluster(z,ni, nlambda);
+    const double hoh0 = hoverh0(a);
+    const double tmp1 = zdistr_cluster(z, ni);
     const double pf = (tmp1 < 0.) ? 0 : tmp1; // get rid of unphysical negatives
     struct growths tmp2 = growfac_all(a);
-    fchi[i] = -chi[i]*pf*tmp2.D*tmp2.f*hoverh0(a)/real_coverH0;
+    fchi[i] = -chi[i]*pf*tmp2.D*tmp2.f*hoh0/real_coverH0;
     if ((z < zmin) || (z > zmax))
     {
       fchi[i] = 0.;
@@ -1884,8 +1889,8 @@ const int nl, const double zmax)
   }
 }
 
-void f_chi_for_Psi_cluster_cl_Mag(double* chi, const int Nchi, double* fchi, const int ni, 
-const int nl, const double zmax) 
+void f_chi_for_Psi_cluster_cl_Mag(double *const chi, const int Nchi, double *const fchi,
+const int ni, const int nl, const double zmax)
 {
   const double real_coverH0 = cosmology.coverH0 / cosmology.h0;
   {
@@ -1917,7 +1922,7 @@ const int nl, const double zmax)
   }
 }
 
-void C_cc_tomo(int L, const int nl1, const int nl2, const int ni, const int nj, double* Cl, 
+void C_cc_tomo(int L, const int nl1, const int nl2, const int ni, const int nj, double *const Cl,
 double dev, const double tol)
 { // nl{1,2} = lambda_obs bins, n{i,j} = cluster redshift bins
   if (ni != nj)
@@ -2005,28 +2010,28 @@ double dev, const double tol)
   }
   
   config cfg;
-  my_config.nu = 1.;
-  my_config.c_window_width = 0.25;
-  my_config.derivative = 0;
-  my_config.N_pad = 200;
-  my_config.N_extrap_low = 0;
-  my_config.N_extrap_high = 0;
+  cfg.nu = 1.;
+  cfg.c_window_width = 0.25;
+  cfg.derivative = 0;
+  cfg.N_pad = 200;
+  cfg.N_extrap_low = 0;
+  cfg.N_extrap_high = 0;
 
-  config cfg_RSD
-  my_config_RSD.nu = 1.01;
-  my_config_RSD.c_window_width = 0.25;
-  my_config_RSD.derivative = 2;
-  my_config_RSD.N_pad = 500;
-  my_config_RSD.N_extrap_low = 0;
-  my_config_RSD.N_extrap_high = 0;
+  config cfg_RSD;
+  cfg_RSD.nu = 1.01;
+  cfg_RSD.c_window_width = 0.25;
+  cfg_RSD.derivative = 2;
+  cfg_RSD.N_pad = 500;
+  cfg_RSD.N_extrap_low = 0;
+  cfg_RSD.N_extrap_high = 0;
 
   config cfg_Mag;
-  my_config_Mag.nu = 1.;
-  my_config_Mag.c_window_width = 0.25;
-  my_config_Mag.derivative = 0;
-  my_config_Mag.N_pad = 500;
-  my_config_Mag.N_extrap_low = 0;
-  my_config_Mag.N_extrap_high = 0;
+  cfg_Mag.nu = 1.;
+  cfg_Mag.c_window_width = 0.25;
+  cfg_Mag.derivative = 0;
+  cfg_Mag.N_pad = 500;
+  cfg_Mag.N_extrap_low = 0;
+  cfg_Mag.N_extrap_high = 0;
 
   int i_block = 0;
     
@@ -2068,7 +2073,7 @@ double dev, const double tol)
     #pragma omp parallel for
     for (int i=0; i<Nell_block; i++)
     {
-      cl_temp = 0.;
+      double cl_temp = 0.0;
       for (int j=0; j<Nchi; j++)
       {
         if (INCLUDE_MAG_IN_C_CC_NONLIMBER == 1)
@@ -2105,7 +2110,7 @@ double dev, const double tol)
 
 // ------------------------------------------------------------------------------------
 
-void C_cg_tomo(int L, const int nl, const int ni, const int nj, double* Cl, double dev, 
+void C_cg_tomo(int L, const int nl, const int ni, const int nj, double *const Cl, double dev,
 const double tol)
 { // nl = lambda_obs bin, ni = cluster redshift bin, nj = galaxy redshift bin
   if (ni != nj)
@@ -2178,43 +2183,43 @@ const double tol)
   const double zmin = fmax(tomo.cluster_zmin[ni], tomo.clustering_zmin[nj]);
   const double zmax = fmin(tomo.cluster_zmax[ni], tomo.clustering_zmax[nj]);
 
-  f_chi_for_Psi_cluster_cl(chi_ar, Nchi, f1_chi, ni, Nlambda1, zmin, zmax);
-  f_chi_for_Psi_cluster_cl_RSD(chi_ar, Nchi, f1_chi_RSD_ar, ni, Nlambda1, zmin, zmax);
+  f_chi_for_Psi_cluster_cl(chi_ar, Nchi, f1_chi, ni, nl, zmin, zmax);
+  f_chi_for_Psi_cluster_cl_RSD(chi_ar, Nchi, f1_chi_RSD, ni, nl, zmin, zmax);
   if (INCLUDE_MAG_IN_C_CC_NONLIMBER)
   {
-    f_chi_for_Psi_cluster_cl_Mag(chi_ar, Nchi, f1_chi_Mag, ni, Nlambda1, zmin, zmax);
+    f_chi_for_Psi_cluster_cl_Mag(chi_ar, Nchi, f1_chi_Mag, ni, nl, zmax);
   }
   
   f_chi_for_Psi_cl(chi_ar, Nchi, f2_chi, nj, zmin, zmax);
-  f_chi_for_Psi_cl_RSD(chi_ar, Nchi, f2_chi_RSD_ar, nj, zmin, zmax);
+  f_chi_for_Psi_cl_RSD(chi_ar, Nchi, f2_chi_RSD, nj, zmin, zmax);
   if (INCLUDE_MAG_IN_C_CC_NONLIMBER)
   {
-    f_chi_for_Psi_cl_Mag(chi_ar, Nchi, f2_chi_Mag, nj, zmin, zmax);
+    f_chi_for_Psi_cl_Mag(chi_ar, Nchi, f2_chi_Mag, nj, zmax);
   }
 
   config cfg;
-  my_config.nu = 1.;
-  my_config.c_window_width = 0.25;
-  my_config.derivative = 0;
-  my_config.N_pad = 200;
-  my_config.N_extrap_low = 0;
-  my_config.N_extrap_high = 0;
+  cfg.nu = 1.;
+  cfg.c_window_width = 0.25;
+  cfg.derivative = 0;
+  cfg.N_pad = 200;
+  cfg.N_extrap_low = 0;
+  cfg.N_extrap_high = 0;
 
-  config cfg_RSD
-  my_config_RSD.nu = 1.01;
-  my_config_RSD.c_window_width = 0.25;
-  my_config_RSD.derivative = 2;
-  my_config_RSD.N_pad = 500;
-  my_config_RSD.N_extrap_low = 0;
-  my_config_RSD.N_extrap_high = 0;
+  config cfg_RSD;
+  cfg_RSD.nu = 1.01;
+  cfg_RSD.c_window_width = 0.25;
+  cfg_RSD.derivative = 2;
+  cfg_RSD.N_pad = 500;
+  cfg_RSD.N_extrap_low = 0;
+  cfg_RSD.N_extrap_high = 0;
 
   config cfg_Mag;
-  my_config_Mag.nu = 1.;
-  my_config_Mag.c_window_width = 0.25;
-  my_config_Mag.derivative = 0;
-  my_config_Mag.N_pad = 500;
-  my_config_Mag.N_extrap_low = 0;
-  my_config_Mag.N_extrap_high = 0;
+  cfg_Mag.nu = 1.;
+  cfg_Mag.c_window_width = 0.25;
+  cfg_Mag.derivative = 0;
+  cfg_Mag.N_pad = 500;
+  cfg_Mag.N_extrap_low = 0;
+  cfg_Mag.N_extrap_high = 0;
 
   int i_block = 0;
     
@@ -2232,9 +2237,9 @@ const double tol)
     L = i_block*Nell_block - 1;
 
     cfftlog_ells(chi_ar, f1_chi, Nchi, &cfg, ell_ar, Nell_block, k1, Fk1);
-    cfftlog_ells_increment(chi_ar, f1_chi_RSD_ar, Nchi, &cfg_RSD, ell_ar, Nell_block, k1, Fk1);
+    cfftlog_ells_increment(chi_ar, f1_chi_RSD, Nchi, &cfg_RSD, ell_ar, Nell_block, k1, Fk1);
     cfftlog_ells(chi_ar, f2_chi, Nchi, &cfg, ell_ar, Nell_block, k2, Fk2);
-    cfftlog_ells_increment(chi_ar, f2_chi_RSD_ar, Nchi, &cfg_RSD, ell_ar, Nell_block, k2, Fk2);
+    cfftlog_ells_increment(chi_ar, f2_chi_RSD, Nchi, &cfg_RSD, ell_ar, Nell_block, k2, Fk2);
     if (INCLUDE_MAG_IN_C_CC_NONLIMBER)
     {
       cfftlog_ells(chi_ar, f1_chi_Mag, Nchi, &cfg_Mag, ell_ar, Nell_block, k1, Fk1_Mag);
@@ -2292,8 +2297,8 @@ const double tol)
 
 double binned_Ndensity_nointerp(const int nl, const double z, const int init_static_vars_only)
 {
-  const double ln_M_min = limits.cluster_util_log_M_min/LOG10_E;
-  const double ln_M_max = limits.cluster_util_log_M_max/LOG10_E;
+  const double ln_M_min = limits.cluster_util_log_M_min/M_LOG10E;
+  const double ln_M_max = limits.cluster_util_log_M_max/M_LOG10E;
   double params[2] = {(double) nl, z};
   return (init_static_vars_only == 1) ? 
     dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) params) :
@@ -2370,16 +2375,18 @@ double int_for_binned_N(double a, void* params)
   const double z = 1.0/a - 1.0 ;
   const double dzda = 1.0/(a*a); 
   const double norm = get_area(z, interpolate_survey_area);  
-  return dV_cluster(z, nz)*dzda*binned_Ndensity(nl, z)*norm;
+
+  double tmp_param[1] = {(double) nz};
+  return dV_cluster(z, (void*) tmp_param)*dzda*binned_Ndensity(nl, z)*norm;
 }
 
 double binned_N_nointerp(const int nl, const int nz, const int interpolate_survey_area, 
 const int init_static_vars_only)
 {
-  double params[2] = {(double) nl, (double) nz, interpolate_survey_area};
+  double params[3] = {(double) nl, (double) nz, interpolate_survey_area};
   const double tmp = 4.0*M_PI/41253.0;
   const double amin = 1.0/(1.0 + tomo.cluster_zmax[nz]);
-  const double amax = 1.0/(1.0 + tomo.cluster_zmin[nz])
+  const double amax = 1.0/(1.0 + tomo.cluster_zmin[nz]);
   return (init_static_vars_only == 1) ? int_for_binned_N(amin, (void*) params) :
     tmp*int_gsl_integrate_low_precision(int_for_binned_N, (void*) params, amin, amax, NULL, 
       GSL_WORKSPACE_SIZE);
@@ -2431,5 +2438,5 @@ double binned_N(const int nl, const int nz)
     log_fatal("error in selecting bin number");
     exit(1);
   }
-  return table[nl, nz];
+  return table[nl][nz];
 }

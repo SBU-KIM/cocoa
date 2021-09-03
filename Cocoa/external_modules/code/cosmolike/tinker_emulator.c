@@ -713,9 +713,9 @@ void get_cloest_parametes(const double *const target, const double *const curren
 
 double tinker_emulator_massfunc(const double m, const double a) // Neff hardcoded 
 {
-  double cosmo_in[7] = {cosmology.omb*cosmology.h0*cosmology.h0, 
-    (cosmology.Omega_m - cosmology.omb)*cosmology.h0*cosmology.h0, cosmology.w0,
-    cosmology.n_spec, log(pow(10.0, 10)*cosmology.A_s), 100.0*cosmology.h0, 3.04 /* N_eff */};
+  double cosmo_in[7] = {cosmology.Omega_b*cosmology.h0*cosmology.h0,
+    (cosmology.Omega_m - cosmology.Omega_b)*cosmology.h0*cosmology.h0, cosmology.w0,
+    cosmology.n_s, log(pow(10.0, 10)*cosmology.A_s), 100.0*cosmology.h0, 3.04 /* N_eff */};
   
   const int incut = tinkerEmuParam.tinker_hmf_extrapolation_cut_in;
   const int outcut = tinkerEmuParam.tinker_hmf_extrapolation_cut_out;
@@ -755,9 +755,9 @@ double tinker_emulator_B1_emuonly(const double m, const double a, const double *
 
 double tinker_emulator_B1(const double m, const double a)
 {
-  double cosmo_in[7] = {cosmology.omb*cosmology.h0*cosmology.h0, 
-    (cosmology.Omega_m - cosmology.omb)*cosmology.h0*cosmology.h0, cosmology.w0,
-    cosmology.n_spec, log(pow(10.0, 10)*cosmology.A_s), 100.0*cosmology.h0, 3.04 /* N_eff */};
+  double cosmo_in[7] = {cosmology.Omega_b*cosmology.h0*cosmology.h0,
+    (cosmology.Omega_m - cosmology.Omega_b)*cosmology.h0*cosmology.h0, cosmology.w0,
+     cosmology.n_s, log(pow(10.0, 10)*cosmology.A_s), 100.0*cosmology.h0, 3.04 /* N_eff */};
 
   const int incut = tinkerEmuParam.tinker_bias_extrapolation_cut_in;
   const int outcut = tinkerEmuParam.tinker_bias_extrapolation_cut_out;

@@ -41,18 +41,17 @@ double w_ks_tomo(const int nt, const int ni, const int limber);
 // ----------------------------------------------------------------------------
 
 // ss in real space has a special name
-double xi_pm_tomo_flatsky(const int pm, double theta, const int ni, const int nj,
-  const int limber);
+double xi_pm_tomo_flatsky(const int pm, double theta, const int ni, const int nj, const int limber);
 
 // gs in real space has a special name
-double w_gammat_tomo_flatsky(double theta, const int ni, const int nj, const int limber);
+double w_gammat_tomo_flatsky(const double theta, const int ni, const int nj, const int limber);
 
 // WARNING: C_gg beyond linear bias for cross-tomography bins not yet supported
-double w_gg_tomo_flatsky(double theta, const int ni, const int nj, const int limber);
+double w_gg_tomo_flatsky(const double theta, const int ni, const int nj, const int limber);
 
-double w_gk_tomo_flatsky(double theta, const int ni, const int limber);
+double w_gk_tomo_flatsky(const double theta, const int ni, const int limber);
 
-double w_ks_tomo_flatsky(double theta, const int ni, const int limber);
+double w_ks_tomo_flatsky(const double theta, const int ni, const int limber);
 
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
@@ -62,19 +61,24 @@ double w_ks_tomo_flatsky(double theta, const int ni, const int limber);
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 
-void f_chi_for_Psi_sh_IA(double* chi, int Nchi, double* f_chi, const int nj, double zmin, double zmax);
+void f_chi_for_Psi_sh_IA(double *const chi, int Nchi, double *const f_chi, const int nj,
+const double zmin, const double zmax);
 
-void f_chi_for_Psi_sh(double* chi, int Nchi, double* f_chi, const int nj, double zmax);
+void f_chi_for_Psi_sh(double *const chi, int Nchi, double *const f_chi, const int nj,
+const double zmax);
 
-void f_chi_for_Psi_cl(double* chi, int Nchi, double* f_chi, const int ni, double zmin, double zmax);
+void f_chi_for_Psi_cl(double *const chi, int Nchi, double *const f_chi, const int ni,
+const double zmin, const double zmax);
 
-void f_chi_for_Psi_cl_RSD(double* chi, int Nchi, double* f_chi, const int ni, double zmin, double zmax);
+void f_chi_for_Psi_cl_RSD(double *const chi, int Nchi, double *const f_chi, const int ni,
+const double zmin, const double zmax);
 
-void f_chi_for_Psi_cl_Mag(double* chi, int Nchi, double* f_chi, const int ni, double zmax);
+void f_chi_for_Psi_cl_Mag(double *const chi, int Nchi, double *const f_chi, const int ni,
+const double zmax);
 
-void C_gl_tomo(int L, int nl, int ns, double* Cl, double dev, double tolerance);
+void C_gl_tomo(int L, int nl, int ns, double *const Cl, double dev, double tolerance);
 
-void C_cl_tomo(int L, const int ni, const int nj, double* Cl, double dev, double tolerance);
+void C_cl_tomo(int L, const int ni, const int nj, double *const Cl, double dev, double tolerance);
 
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------

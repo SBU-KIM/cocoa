@@ -181,7 +181,7 @@ double W_HOD(double a, int nz, double hoverh0)
   return pf_photoz(z, nz) * hoverh0;
 }
 
-double W_cluster(int nz, double a, double chi, double hoverh0)
+double W_cluster(int nz, double a, double hoverh0)
 {
   if(!(a>0) || !(a<1)) 
   {
@@ -189,7 +189,7 @@ double W_cluster(int nz, double a, double chi, double hoverh0)
     exit(1);
   }
   const double z = 1. / a - 1.;
-  return zdistr_cluster(nz, z, chi, hoverh0)*hoverh0;
+  return zdistr_cluster(nz, z)*hoverh0;
 }
 
 double W_k(double a, double fK) 

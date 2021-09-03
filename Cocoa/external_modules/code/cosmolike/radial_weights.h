@@ -22,7 +22,7 @@ double W_RSD(double l, double a0, double a1, int nz);
 
 double W_HOD(double a, int nz, double hoverh0);
 
-double W_cluster(int nz, double a, double chi, double hoverh0);
+double W_cluster(int nz, double a, double hoverh0);
 
 double W_k(double a, double fK);
 

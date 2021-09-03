@@ -65,21 +65,21 @@ double w_cg_tomo_flatsky(double theta, int nl, int ni, int nj, int limber);
 // -------------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------------
-void f_chi_for_Psi_cluster_cl(double* chi, const int Nchi, double* fchi, const int ni, 
-const int nl, const double zmax);
+void f_chi_for_Psi_cluster_cl(double *const chi, const int Nchi, double *const fchi, const int ni,
+const int nl, const double zmin, const double zmax);
 
-void f_chi_for_Psi_cluster_cl_RSD(double* chi, int Nchi, double* fchi, int ni, int nl, double zmin, 
-double zmax);
+void f_chi_for_Psi_cluster_cl_RSD(double *const chi, int Nchi, double *const fchi, int ni, int nl,
+const double zmin, const double zmax);
 
-void f_chi_for_Psi_cluster_cl_Mag(double* chi, const int Nchi, double* fchi, const int ni, 
-const int nl, const double zmax);
+void f_chi_for_Psi_cluster_cl_Mag(double *const chi, const int Nchi, double *const fchi,
+const int ni, const int nl, const double zmax);
 
 // nl = lambda_obs bin, ni = cluster redshift bin, nj = galaxy redshift bin
-void C_cg_tomo(int L, const int nl, const int ni, const int nj, double* Cl, double dev, 
+void C_cg_tomo(int L, const int nl, const int ni, const int nj, double *const Cl, double dev,
 const double tol);
 
 // nl{1,2} = lambda_obs bins, n{i,j} = cluster redshift bins
-void C_cc_tomo(int L, const int nl1, const int nl2, const int ni, const int nj, double* Cl, 
+void C_cc_tomo(int L, const int nl1, const int nl2, const int ni, const int nj, double *const Cl,
 double dev, const double tol);
 
 // -------------------------------------------------------------------------------------------

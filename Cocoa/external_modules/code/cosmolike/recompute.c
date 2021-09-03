@@ -31,7 +31,8 @@ int recompute_cosmo3D(cosmopara C)
     return (C.Omega_m != cosmology.Omega_m || C.Omega_v != cosmology.Omega_v ||
             C.Omega_nu != cosmology.Omega_nu || C.h0 != cosmology.h0 ||
             C.MGSigma != cosmology.MGSigma || C.MGmu != cosmology.MGmu ||
-            C.random != cosmology.random) ? 1 : 0;
+            C.random != cosmology.random ||  C.w0  != cosmology.w0 ||
+            C.A_s != cosmology.A_s || C.n_s != cosmology.n_s) ? 1 : 0;
   }
 }
 

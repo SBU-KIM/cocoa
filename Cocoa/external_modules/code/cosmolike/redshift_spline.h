@@ -121,10 +121,12 @@ double bias_zphot_clustering(double z, int nz); // compute photo-z bias
 //return pf(z,j) based on redshift file with structure z[i] nz[0][i]..nz[tomo.clustering_Nbin-1][i]
 double pf_cluster_histo_n(double z, void* params); 
 
-double pz_cluster(double zz, int nz, int nN); // int_zmin^zmax dz_obs p(z_obs|z_true)
+double pz_cluster(const double zz, const int nz); // int_zmin^zmax dz_obs p(z_obs|z_true)
+
+double dV_cluster(double z, void* params);
 
 // simplfied selection function, disregards evolution of N-M relation+mass function within z bin
-double zdistr_cluster(int nz,  double z, double chi, double hoverh0) ;
+double zdistr_cluster(const int nz, const double z);
 
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
@@ -135,14 +137,16 @@ double zdistr_cluster(int nz,  double z, double chi, double hoverh0) ;
 // ---------------------------------------------------------------------------------------
 
 // returns n_gal for shear tomography bin j, works only with binned
-double nsource(int j); // distributions; j =-1 -> no tomography; j>= 0 -> tomography bin j
+double nsource(const int ni); // distributions; ni =-1 -> no tomography; ni>= 0 -> tomography bin ni
 
 // returns n_gal for clustering tomography bin j, works only with binned
-double nlens(int j); // distributions; j =-1 -> no tomography; j>= 0 -> tomography bin j
+double nlens(const int ni); // distributions; ni =-1 -> no tomography; ni>= 0 -> tomography bin ni
 
-double zmean(int j); // mean true redshift of (clustering/lens) galaxies within redshift bin j
+// mean true redshift of (clustering/lens) galaxies within redshift bin ni
+double zmean(const int ni);
 
-double zmean_source(int j); // mean true redshift of source galaxies in tomography bin j
+// mean true redshift of source galaxies in tomography bin ni
+double zmean_source(const int ni);
 
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
@@ -164,8 +168,7 @@ double g2_tomo(const double a, const int ni) ;
 // used in magnification calculations
 double g_lens(const double a, const int ni);
 
-// lens efficiency of lens cluster in tomo bin nz, lambda bin nl
-// used in magnification calculations
+// lens efficiency of lens cluster in tomo bin nz, lambda bin nl used in magnification calculations
 double g_lens_cluster(const double a, const int nz, const int nl);
 
 // ---------------------------------------------------------------------------------------
@@ -176,7 +179,7 @@ double g_lens_cluster(const double a, const int nz, const int nl);
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 
-double ggl_efficiency(int zl, int zs);
+double ggl_efficiency(const int ni, const int nj);
 
 
 #ifdef __cplusplus

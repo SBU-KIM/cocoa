@@ -37,7 +37,10 @@ cosmopara cosmology =
   .rho_crit = 7.4775e+21,
   .MGSigma = 0.0,
   .MGmu = 0.0,
-  .is_cached = 0
+  .is_cached = 0,
+  .w0 = -1.0,
+  .A_s = 1.0e-9,
+  .n_s = 0.97
 };
 
 tomopara tomo = 
@@ -112,9 +115,9 @@ barypara bary =
 
 Cmb cmb =
 {
-  .fwhm = 0.0;
-  .sensitivity = 0.0;
-}
+  .fwhm = 0.0,
+  .sensitivity = 0.0
+};
 
 sur survey =
 {
@@ -181,16 +184,16 @@ Ntab Ntable =
   .binned_p_cm_size_a_table = 30
 };
 
-TinkerEmuParam tinkerEmuParam = 
+TinkerEmuParameters tinkerEmuParam =
 {
-  .tinker_bias_ncosmo = 7, // do not change
-  .tinker_bias_nparam = 4, // do not change
+  .tinker_bias_ncosmo = 7,                // do not change
+  .tinker_bias_nparam = 4,                // do not change
   .tinker_bias_nsamp = 40, 
-  .tinker_bias_nparam_redshift = 6, // number of parameters of equation 7 in 1907.13167.; 
-  .tinker_hmf_ncosmo = 7, // do not change
-  .tinker_hmf_nparam = 6, // do not change
+  .tinker_bias_nparam_redshift = 6,       // number of parameters of equation 7 in 1907.13167.;
+  .tinker_hmf_ncosmo = 7,                 // do not change
+  .tinker_hmf_nparam = 6,                 // do not change
   .tinker_hmf_nsamp = 40, 
-  .tinker_hmf_nparam_redshift = 4, // number of parameters of eq 2 in 1804.05866; 
+  .tinker_hmf_nparam_redshift = 4,        // number of parameters of eq 2 in 1804.05866;
   .tinker_bias_extrapolation_cut_in = 40,
   .tinker_bias_extrapolation_cut_out = 45,
   .tinker_hmf_extrapolation_cut_in = 40,
@@ -391,9 +394,6 @@ void reset_cluster_struct()
     Cluster.N_min[i] = 0.0;
     Cluster.N_max[i] = 0.0;
   }
-  Cluster.lbin = 0;
-  Cluster.l_min = 0.0;
-  Cluster.l_min = 0.0;
   sprintf(Cluster.model, "%s", "default");
 }
 
@@ -436,13 +436,16 @@ void reset_bary_struct()
 
 void update_cosmopara(cosmopara *C) 
 {
-  C->Omega_m = cosmology.Omega_m;
-  C->Omega_v = cosmology.Omega_v;
+  C->Omega_m  = cosmology.Omega_m;
+  C->Omega_v  = cosmology.Omega_v;
   C->Omega_nu = cosmology.Omega_nu;
-  C->h0 = cosmology.h0;
-  C->MGSigma = cosmology.MGSigma;
-  C->MGmu = cosmology.MGmu;
-  C->random = cosmology.random;
+  C->h0       = cosmology.h0;
+  C->MGSigma  = cosmology.MGSigma;
+  C->MGmu     = cosmology.MGmu;
+  C->random   = cosmology.random;
+  C->w0       = cosmology.w0;
+  C->A_s      = cosmology.A_s;
+  C->n_s      = cosmology.n_s;
 }
 
 void update_galpara(galpara *G) 

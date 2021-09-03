@@ -89,6 +89,7 @@ typedef struct
 
 typedef struct
 {
+  double Omega_b;  // baryon density
   double Omega_m;  // matter density parameter
   double Omega_v;  // cosmogical constant parameter
   double h0;       // Hubble constant
@@ -98,6 +99,9 @@ typedef struct
   double MGSigma;
   double MGmu;
   double random; // Random number between zero and 1 - see interface.cpp
+  double w0;
+  double A_s;
+  double n_s;
   int is_cached;
 } cosmopara;
 
@@ -157,7 +161,6 @@ typedef struct
 
   int N_MOR;                      // Mass observable relation (number of nuisance params)
   int N_SF;                       // selection function (number of nuisance params)
-
 
   int halo_exclusion_model;
   double delta_exclusion;  // delta for exclusion radius (halo_exclusion) according to Baldauf 2013
