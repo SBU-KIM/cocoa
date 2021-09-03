@@ -173,10 +173,10 @@ double xi_pm_tomo(const int pm, const int nt, const int ni, const int nj, const 
     }
     for (int i=0; i<ntheta; i++)
     {
-      Pmin[i];
-      Pmax[i];
-      dPmin[i];
-      dPmax[i];
+      free(Pmin[i]);
+      free(Pmax[i]);
+      free(dPmin[i]);
+      free(dPmax[i]);
     }
     free(Pmin);
     free(Pmax);
@@ -197,7 +197,9 @@ double xi_pm_tomo(const int pm, const int nt, const int ni, const int nj, const 
           Cl_BB[i] = calloc(nell, sizeof(double));
         }
         #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wunused-variable"     
+        #pragma GCC diagnostic ignored "-Wunused-variable"
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
         { // init the functions C_ss_tomo_TATT_EE/BB_limber
           // only compute BB if the TATT parameters allow for B-mode terms
           const int nz = 0;
@@ -210,6 +212,7 @@ double xi_pm_tomo(const int pm, const int nt, const int ni, const int nj, const 
           double x = C_ss_tomo_TATT_EE_limber(limits.LMIN_tab + 1, Z1(0), Z2(0)); 
           x = (BM == 1) ? C_ss_tomo_TATT_BB_limber(limits.LMIN_tab + 1, Z1(0), Z2(0)) : 0.0;
         }
+        #pragma GCC diagnostic pop
         #pragma GCC diagnostic pop
         #pragma omp parallel for collapse(2)
         for (int nz=0; nz<NSIZE; nz++) 
@@ -320,7 +323,7 @@ double xi_pm_tomo(const int pm, const int nt, const int ni, const int nj, const 
     exit(1);
   }
   const int ntomo = N_shear(ni, nj);
-  if (!(ntomo)>0)
+  if (!(ntomo>0))
   {
     return 0.0;
   }
@@ -964,149 +967,157 @@ double xi_pm_tomo_flatsky(const int pm, double theta, const int ni, const int nj
   {
     typedef fftw_complex fftwZ;
 
-    fftwZ** flP = (fftwZ**) malloc(sizeof(fftwZ*)*NSIZE);
-    for (int j=0; j<NSIZE; j++)
+    if (limber != 1)
     {
-      flP[j] = (fftwZ*) fftw_malloc((Ntable.N_thetaH/2+1)*sizeof(fftwZ));
+      log_fatal("NonLimber not implemented");
+      exit(1);
     }
+    else
     {
-      double** lP = (double**) malloc(sizeof(double*)*NSIZE);
-      fftw_plan* plan = (fftw_plan*) malloc(sizeof(fftw_plan)*NSIZE);
+      fftwZ** flP = (fftwZ**) malloc(sizeof(fftwZ*)*NSIZE);
       for (int j=0; j<NSIZE; j++)
       {
-        lP[j] = (double*) malloc(ntheta*sizeof(double));
-        plan[j] = fftw_plan_dft_r2c_1d(ntheta,lP[j],flP[j],FFTW_ESTIMATE);
+        flP[j] = (fftwZ*) fftw_malloc((Ntable.N_thetaH/2+1)*sizeof(fftwZ));
       }
-      // --------------------------------------------------------------------------------
-      // Power spectrum on logarithmic bins (begins) 
-      // --------------------------------------------------------------------------------       
-      if (like.IA == 5 || like.IA == 6)
-      { // NEW TATT MODELING
-        log_fatal("Limber && TATT not implemented");
-        exit(1);
-      }
-      else
       {
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wunused-variable"
+        double** lP = (double**) malloc(sizeof(double*)*NSIZE);
+        fftw_plan* plan = (fftw_plan*) malloc(sizeof(fftw_plan)*NSIZE);
+        for (int j=0; j<NSIZE; j++)
         {
-          double init_static_vars_only = C_ss_tomo_limber(limits.LMIN_tab + 1, Z1(0), Z2(0));
+          lP[j] = (double*) malloc(ntheta*sizeof(double));
+          plan[j] = fftw_plan_dft_r2c_1d(ntheta,lP[j],flP[j],FFTW_ESTIMATE);
         }
-        #pragma GCC diagnostic pop
-        #pragma omp parallel for collapse(2)
-        for (int k=0; k<NSIZE; k++)
+        // --------------------------------------------------------------------------------
+        // Power spectrum on logarithmic bins (begins)
+        // --------------------------------------------------------------------------------
+        if (like.IA == 5 || like.IA == 6)
+        { // NEW TATT MODELING
+          log_fatal("Limber && TATT not implemented");
+          exit(1);
+        }
+        else
         {
-          for (int p=0; p<ntheta; p++)
+          #pragma GCC diagnostic push
+          #pragma GCC diagnostic ignored "-Wunused-variable"
           {
-            const int Z1NZ = Z1(k);
-            const int Z2NZ = Z2(k);
-            const double l = exp(lnrc+(p - nc)*dlnl);
-            lP[k][p] = (l > limits.LMIN_tab) ? l*C_ss_tomo_limber(l, Z1NZ, Z2NZ) :
-              l*C_ss_tomo_limber_nointerp(l, Z1NZ, Z2NZ, use_linear_ps_limber, 0);
+            double init_static_vars_only = C_ss_tomo_limber(limits.LMIN_tab + 1, Z1(0), Z2(0));
+          }
+          #pragma GCC diagnostic pop
+          #pragma omp parallel for collapse(2)
+          for (int k=0; k<NSIZE; k++)
+          {
+            for (int p=0; p<ntheta; p++)
+            {
+              const int Z1NZ = Z1(k);
+              const int Z2NZ = Z2(k);
+              const double l = exp(lnrc+(p - nc)*dlnl);
+              lP[k][p] = (l > limits.LMIN_tab) ? l*C_ss_tomo_limber(l, Z1NZ, Z2NZ) :
+                l*C_ss_tomo_limber_nointerp(l, Z1NZ, Z2NZ, use_linear_ps_limber, 0);
+            }
           }
         }
+        // --------------------------------------------------------------------------------
+        // Power spectrum on logarithmic bins (ends)
+        // --------------------------------------------------------------------------------
+        #pragma omp parallel for
+        for (int j=0; j<NSIZE; j++)
+        {
+          fftw_execute(plan[j]); // Execute FFTW in parallel (thread-safe)
+        }
+        for (int j = 0; j < NSIZE; j++)
+        {
+          fftw_free(lP[j]);
+          fftw_destroy_plan(plan[j]);
+        }
+        free(lP);
+        free(plan);
       }
-      // --------------------------------------------------------------------------------
-      // Power spectrum on logarithmic bins (ends) 
-      // --------------------------------------------------------------------------------
+
+      double*** lP = (double***) malloc(sizeof(double**)*NSIZE);
+      fftwZ*** kernel = (fftwZ***) malloc(sizeof(fftwZ**)*NSIZE);
+      fftwZ*** conv = (fftwZ***) malloc(sizeof(fftwZ**)*NSIZE);
+      fftw_plan** plan = (fftw_plan**) malloc(sizeof(fftw_plan*)*NSIZE);
+      double*** tab = (double***) malloc(sizeof(double**)*NSIZE);
+      for (int j=0; j<NSIZE; j++)
+      {
+        lP[j] = (double**) malloc(sizeof(double*)*2);
+        kernel[j] = (fftwZ**) malloc(sizeof(fftwZ*)*2);
+        conv[j] = (fftwZ**) malloc(sizeof(fftwZ*)*2);
+        plan[j] = (fftw_plan*) malloc(sizeof(fftw_plan)*2);
+        tab[j] = (double**) malloc(sizeof(double*)*1);
+        for (int i=0; i<1; i++)
+        {
+          tab[j][i] = (double*) malloc(sizeof(double)*ntheta);
+        }
+        for (int m=0; m<2; m++)
+        {
+          const int COVSZ = (ntheta/2+1);
+          lP[j][m] = (double*) malloc(ntheta*sizeof(double));
+          kernel[j][m] = (fftwZ*) fftw_malloc(sizeof(fftwZ));
+          conv[j][m] = (fftwZ*) fftw_malloc(COVSZ*sizeof(fftwZ));
+          plan[j][m] = fftw_plan_dft_c2r_1d(ntheta,conv[j][m],lP[j][m],FFTW_ESTIMATE);
+        }
+      }
+
       #pragma omp parallel for
       for (int j=0; j<NSIZE; j++)
       {
-        fftw_execute(plan[j]); // Execute FFTW in parallel (thread-safe)
-      }   
-      for (int j = 0; j < NSIZE; j++)
-      {
-        fftw_free(lP[j]);
-        fftw_destroy_plan(plan[j]);
-      }
-      free(lP);
-      free(plan);
-    }
-    
-    double*** lP = (double***) malloc(sizeof(double**)*NSIZE);
-    fftwZ*** kernel = (fftwZ***) malloc(sizeof(fftwZ**)*NSIZE);
-    fftwZ*** conv = (fftwZ***) malloc(sizeof(fftwZ**)*NSIZE);
-    fftw_plan** plan = (fftw_plan**) malloc(sizeof(fftw_plan*)*NSIZE);
-    double*** tab = (double***) malloc(sizeof(double**)*NSIZE);
-    for (int j=0; j<NSIZE; j++)
-    {
-      lP[j] = (double**) malloc(sizeof(double*)*2);
-      kernel[j] = (fftwZ**) malloc(sizeof(fftwZ*)*2);
-      conv[j] = (fftwZ**) malloc(sizeof(fftwZ*)*2);
-      plan[j] = (fftw_plan*) malloc(sizeof(fftw_plan)*2);
-      tab[j] = (double**) malloc(sizeof(double*)*1);
-      for (int i=0; i<1; i++) 
-      {
-        tab[j][i] = (double*) malloc(sizeof(double)*ntheta);
-      }
-      for (int m=0; m<2; m++)
-      {
-        const int COVSZ = (ntheta/2+1);
-        lP[j][m] = (double*) malloc(ntheta*sizeof(double));
-        kernel[j][m] = (fftwZ*) fftw_malloc(sizeof(fftwZ));
-        conv[j][m] = (fftwZ*) fftw_malloc(COVSZ*sizeof(fftwZ));
-        plan[j][m] = fftw_plan_dft_c2r_1d(ntheta,conv[j][m],lP[j][m],FFTW_ESTIMATE);
-      }
-    }
-    
-    #pragma omp parallel for
-    for (int j=0; j<NSIZE; j++)
-    {
-      for (int m=0; m<2; m++)
-      {
-        double arg[2];
-        arg[0] = 0; // bias
-        arg[1] = (m == 0 ? 0 : 4); // order of Bessel function
-
-        // perform the convolution, negative sign for kernel (complex conj.)
-        for (int i=0; i<(ntheta/2+1); i++)
+        for (int m=0; m<2; m++)
         {
-          const double k = 2*M_PI*i/(dlnl*ntheta);
-          hankel_kernel_FT(k, kernel[j][m], arg, 2);
-          conv[j][m][i][0] = flP[j][i][0]*(kernel[j][m][0][0])-flP[j][i][1]*(kernel[j][m][0][1]);
-          conv[j][m][i][1] = flP[j][i][1]*(kernel[j][m][0][0])+flP[j][i][0]*(kernel[j][m][0][1]);
+          double arg[2];
+          arg[0] = 0; // bias
+          arg[1] = (m == 0 ? 0 : 4); // order of Bessel function
+
+          // perform the convolution, negative sign for kernel (complex conj.)
+          for (int i=0; i<(ntheta/2+1); i++)
+          {
+            const double k = 2*M_PI*i/(dlnl*ntheta);
+            hankel_kernel_FT(k, kernel[j][m], arg, 2);
+            conv[j][m][i][0] = flP[j][i][0]*(kernel[j][m][0][0])-flP[j][i][1]*(kernel[j][m][0][1]);
+            conv[j][m][i][1] = flP[j][i][1]*(kernel[j][m][0][0])+flP[j][i][0]*(kernel[j][m][0][1]);
+          }
+
+          // force Nyquist- and 0-frequency-components to be double
+          conv[j][m][0][1] = 0;
+          conv[j][m][ntheta/2][1] = 0;
+
+          fftw_execute(plan[j][m]);
+
+          for (int k=0; k<ntheta; k++)
+          {
+            const double t = exp((nc - k)*dlnl - lnrc); // theta=1/l
+            tab[j][m][ntheta-k-1] = lP[j][m][k]/(t*2*M_PI*ntheta);
+          }
         }
-
-        // force Nyquist- and 0-frequency-components to be double
-        conv[j][m][0][1] = 0;
-        conv[j][m][ntheta/2][1] = 0;
-
-        fftw_execute(plan[j][m]);
-
         for (int k=0; k<ntheta; k++)
         {
-          const double t = exp((nc - k)*dlnl - lnrc); // theta=1/l
-          tab[j][m][ntheta-k-1] = lP[j][m][k]/(t*2*M_PI*ntheta);
+          table[2*j][k] = tab[j][0][k];
+          table[2*j+1][k] = tab[j][1][k];
         }
       }
-      for (int k=0; k<ntheta; k++)
+      for (int j=0; j<NSIZE; j++)
       {
-        table[2*j][k] = tab[j][0][k];
-        table[2*j+1][k] = tab[j][1][k];
+        for (int m=0; m<2; m++)
+        {
+          fftw_free(lP[j][m]);
+          fftw_free(kernel[j][m]);
+          fftw_free(conv[j][m]);
+          fftw_destroy_plan(plan[j][m]);
+        }
+        fftw_free(flP[j]);
+        free(lP[j]);
+        free(kernel[j]);
+        free(conv[j]);
+        free(plan[j]);
+        free(tab[j]);
       }
+      free(flP);
+      free(lP);
+      free(kernel);
+      free(conv);
+      free(plan);
+      free(tab);
     }
-    for (int j=0; j<NSIZE; j++)
-    {
-      for (int m=0; m<2; m++)
-      {
-        fftw_free(lP[j][m]);
-        fftw_free(kernel[j][m]);
-        fftw_free(conv[j][m]);
-        fftw_destroy_plan(plan[j][m]);
-      }
-      fftw_free(flP[j]);
-      free(lP[j]);
-      free(kernel[j]);
-      free(conv[j]);
-      free(plan[j]);
-      free(tab[j]);
-    }
-    free(flP);
-    free(lP);
-    free(kernel);
-    free(conv);
-    free(plan);
-    free(tab);
     // --------------------------------------------------------------------
     // Cocoa: code extracted (& adapted) from xipm_via_hankel (ends)
     // --------------------------------------------------------------------
@@ -1474,7 +1485,7 @@ double w_gg_tomo_flatsky(const double theta, const int ni, const int nj, const i
           { // Cocoa: no threading allowed here - (fftw allocation @C_gl_tomo)
             const int ZCL1 = k; // cross redshift bin not supported so not using ZCL1(k)
             const int ZCL2 = k; // cross redshift bin not supported so not using ZCL2(k) 
-            C_cl_tomo(L, ZCL1, ZCL1, Cl_NL[k], dev, tolerance);
+            C_cl_tomo(L, ZCL1, ZCL2, Cl_NL[k], dev, tolerance);
 
             const gsl_interp_type* T = gsl_interp_linear;
             fCL_NL[k] = gsl_spline_alloc(T, limits.LMAX_NOLIMBER);
@@ -2537,8 +2548,11 @@ double C_ss_tomo_limber(const double l, const int ni, const int nj)
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
     {
+      const int k = 0;
+      const int Z1NZ = Z1(k);
+      const int Z2NZ = Z2(k);
       double init_static_vars_only = 
-        C_ss_tomo_limber_nointerp(exp(lnlmin), Z1(0), Z2(0), use_linear_ps_limber, 1);
+        C_ss_tomo_limber_nointerp(exp(lnlmin), Z1NZ, Z2NZ, use_linear_ps_limber, 1);
     }
     #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(2)
@@ -4040,10 +4054,13 @@ void C_cl_tomo(int L, const int ni, const int nj, double *const Cl, double dev, 
 
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     {
       double init_static_vars_only = p_lin(k1[0][0]*real_coverH0, 1.0);
       init_static_vars_only = C_gg_tomo_limber_nointerp((double) ell_ar[0], ni, nj, 0, 1);
     }
+    #pragma GCC diagnostic pop
     #pragma GCC diagnostic pop
     #pragma omp parallel for
     for (int i=0; i<Nell_block; i++)
@@ -4160,7 +4177,6 @@ const double zmin, const double zmax)
       nuisance.A_ia*pow(1./(a*nuisance.oneplusz0_ia),nuisance.eta_ia);
     const double tmp1 = W_source(a, (double) nj, hoverh0);
     const double wsource = (tmp1 > 0.) ? tmp1 : 0.;
-    const double window_ia = -wsource*norm/fK/(real_coverH0*real_coverH0);
     fchi[i] = -wsource*norm/fK/(real_coverH0*real_coverH0)*growfac(a); // unit [Mpc^-2]
     if ((z<zmin) || (z>zmax))
     {
@@ -4310,10 +4326,13 @@ void C_gl_tomo(int L, int nl, int ns, double *const Cl, double dev, double toler
 
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     {
       double init_static_vars_only = p_lin(k1[0][0]*real_coverH0, 1.0);
       init_static_vars_only = C_gs_tomo_limber_nointerp((double) ell_ar[0], nl, ns, 1, 1);
     }
+    #pragma GCC diagnostic pop
     #pragma GCC diagnostic pop
     #pragma omp parallel for
     for (int i=0; i<Nell_block; i++)

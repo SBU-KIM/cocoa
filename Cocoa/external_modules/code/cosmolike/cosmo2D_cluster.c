@@ -103,11 +103,14 @@ const int limber)
     }
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     {
       const int ZC = ZCL(0);
       const int ZSC = ZCS(0);
       double init_static_vars_only = C_cs_tomo_limber(limits.LMIN_tab + 1, 0, ZC, ZSC);
     }
+    #pragma GCC diagnostic pop
     #pragma GCC diagnostic pop
     if (limber == 1)
     { 
@@ -274,6 +277,8 @@ const int limber)
     }
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     {
       const int i = 0;
       const int j = 0;
@@ -281,6 +286,7 @@ const int limber)
       const int ZCCL2 = 0;
       double init_static_vars_only = C_cc_tomo_limber(limits.LMIN_tab + 1, i, j, ZCCL1, ZCCL2);
     }
+    #pragma GCC diagnostic pop
     #pragma GCC diagnostic pop
     if (limber == 1)
     { 
@@ -505,11 +511,14 @@ double w_cg_tomo(const int nt, const int nl, const int ni, const int nj, const i
     {
       #pragma GCC diagnostic push
       #pragma GCC diagnostic ignored "-Wunused-variable"
+      #pragma GCC diagnostic push
+      #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
       {
         const double Z1 = ZCGCL1(0);
         const double Z2 = ZCGCL2(0);
         double init_static_vars_only = C_cg_tomo_limber(limits.LMIN_tab + 1, 0, Z1, Z2);
       }
+      #pragma GCC diagnostic pop
       #pragma GCC diagnostic pop
       #pragma omp parallel for collapse(3)
       for (int i=0; i<nlsize; i++)
@@ -657,6 +666,8 @@ const int limber)
       // ------------------------------------------------------------------------
       #pragma GCC diagnostic push
       #pragma GCC diagnostic ignored "-Wunused-variable"
+      #pragma GCC diagnostic push
+      #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
       {
         const int i = 0;
         const int j = 0;
@@ -664,6 +675,7 @@ const int limber)
         const int ZSC = ZCS(j);
         double init_static_vars_only = C_cs_tomo_limber(limits.LMIN_tab + 1, i, ZC, ZSC);
       }
+      #pragma GCC diagnostic pop
       #pragma GCC diagnostic pop
       if (limber == 1)
       { 
@@ -878,11 +890,14 @@ const int nj, const int limber)
       }
       #pragma GCC diagnostic push
       #pragma GCC diagnostic ignored "-Wunused-variable"
+      #pragma GCC diagnostic push
+      #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
       {
         const int i = 0;
         const int j = 0;
         double init_static_vars_only = C_cc_tomo_limber(limits.LMIN_tab + 1, i, j, 0, 0);
       }
+      #pragma GCC diagnostic pop
       #pragma GCC diagnostic pop
       for (int i=0; i<nlsize; i++) 
       { 
@@ -1582,10 +1597,13 @@ const int nj)
   {
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     {
       double init_static_vars_only =
         C_cc_tomo_limber_nointerp(exp(lnlmin), 0, 0, 0, 0, use_linear_ps_limber, 1);
     }
+    #pragma GCC diagnostic pop
     #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(3)
     for (int i=0; i<nlsize; i++)
@@ -1747,6 +1765,8 @@ double C_cg_tomo_limber(const double l, const int nl, const int ni, const int nj
   {
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     {
       const double Z1 = ZCGCL1(0);
       const double Z2 = ZCGCL2(0);
@@ -1855,7 +1875,7 @@ const int nl, const double zmin, const double zmax)
 }
 
 void f_chi_for_Psi_cluster_cl_RSD(double *const chi, const int Nchi, double *const fchi,
-const int ni, const int nl, const double zmin, const double zmax)
+const int ni, const int nl __attribute__((unused)), const double zmin, const double zmax)
 {
   const double real_coverH0 = cosmology.coverH0 / cosmology.h0;
   {
@@ -2065,10 +2085,13 @@ double dev, const double tol)
     }
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     {
       double init_static_vars_only = p_lin(k1[0][0]*real_coverH0, 1.0);
       init_static_vars_only = C_cc_tomo_limber_nointerp((double) ell_ar[0], nl1, nl2, ni, ni, 0, 1);
     }
+    #pragma GCC diagnostic pop
     #pragma GCC diagnostic pop
     #pragma omp parallel for
     for (int i=0; i<Nell_block; i++)
@@ -2185,14 +2208,14 @@ const double tol)
 
   f_chi_for_Psi_cluster_cl(chi_ar, Nchi, f1_chi, ni, nl, zmin, zmax);
   f_chi_for_Psi_cluster_cl_RSD(chi_ar, Nchi, f1_chi_RSD, ni, nl, zmin, zmax);
-  if (INCLUDE_MAG_IN_C_CC_NONLIMBER)
+  if (INCLUDE_MAG_IN_C_CG_NONLIMBER)
   {
     f_chi_for_Psi_cluster_cl_Mag(chi_ar, Nchi, f1_chi_Mag, ni, nl, zmax);
   }
   
   f_chi_for_Psi_cl(chi_ar, Nchi, f2_chi, nj, zmin, zmax);
   f_chi_for_Psi_cl_RSD(chi_ar, Nchi, f2_chi_RSD, nj, zmin, zmax);
-  if (INCLUDE_MAG_IN_C_CC_NONLIMBER)
+  if (INCLUDE_MAG_IN_C_CG_NONLIMBER)
   {
     f_chi_for_Psi_cl_Mag(chi_ar, Nchi, f2_chi_Mag, nj, zmax);
   }
@@ -2240,7 +2263,7 @@ const double tol)
     cfftlog_ells_increment(chi_ar, f1_chi_RSD, Nchi, &cfg_RSD, ell_ar, Nell_block, k1, Fk1);
     cfftlog_ells(chi_ar, f2_chi, Nchi, &cfg, ell_ar, Nell_block, k2, Fk2);
     cfftlog_ells_increment(chi_ar, f2_chi_RSD, Nchi, &cfg_RSD, ell_ar, Nell_block, k2, Fk2);
-    if (INCLUDE_MAG_IN_C_CC_NONLIMBER)
+    if (INCLUDE_MAG_IN_C_CG_NONLIMBER)
     {
       cfftlog_ells(chi_ar, f1_chi_Mag, Nchi, &cfg_Mag, ell_ar, Nell_block, k1, Fk1_Mag);
       cfftlog_ells(chi_ar, f2_chi_Mag, Nchi, &cfg_Mag, ell_ar, Nell_block, k2, Fk2_Mag);
@@ -2248,10 +2271,13 @@ const double tol)
 
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     {
       double init_static_vars_only = p_lin(k1[0][0]*real_coverH0, 1.0);
       init_static_vars_only = C_cg_tomo_limber_nointerp((double) ell_ar[0], nl, ni, nj, 0, 1);
     }
+    #pragma GCC diagnostic pop
     #pragma GCC diagnostic pop
     #pragma omp parallel for
     for (int i=0; i<Nell_block; i++)
@@ -2259,7 +2285,7 @@ const double tol)
       double cl_temp = 0.;
       for (int j=0; j<Nchi; j++)
       {
-        if (INCLUDE_MAG_IN_C_CC_NONLIMBER)
+        if (INCLUDE_MAG_IN_C_CG_NONLIMBER)
         {
           const double ell_prefactor = ell_ar[i]*(ell_ar[i]+1.);
           Fk1[i][j] += (ell_prefactor/(k1[i][j]*k1[i][j])*Fk1_Mag[i][j]);
@@ -2294,72 +2320,6 @@ const double tol)
 // --------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------
 // nl = lambda_obs bin, ni = cluster redshift bin
-
-double binned_Ndensity_nointerp(const int nl, const double z, const int init_static_vars_only)
-{
-  const double ln_M_min = limits.cluster_util_log_M_min/M_LOG10E;
-  const double ln_M_max = limits.cluster_util_log_M_max/M_LOG10E;
-  double params[2] = {(double) nl, z};
-  return (init_static_vars_only == 1) ? 
-    dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) params) :
-    int_gsl_integrate_low_precision(dndlnM_times_binned_P_lambda_obs_given_M, (void*) params, 
-      ln_M_min, ln_M_max, NULL, GSL_WORKSPACE_SIZE);
-}
-
-double binned_Ndensity(const int nl, const double z)
-{
-  static cosmopara C;
-  static nuisancepara N;
-  static double** table;
-
-  const int N_l = Cluster.N200_Nbin;
-  const int N_a = Ntable.N_a;
-  const double zmin = fmax(tomo.cluster_zmin[0] - 0.05, 0.01); 
-  const double zmax = tomo.cluster_zmax[tomo.cluster_Nbin - 1] + 0.05;
-  const double amin = 1.0/(1.0 + zmax);
-  const double amax = 1.0/(1.0 + zmin);
-  const double da = (amax - amin)/((double) N_a - 1.0);
-
-  if (table == 0)
-  {
-    table = (double**) malloc(sizeof(double*)*N_l);
-    for (int i=0; i<N_l; i++)
-    {
-      table[i] = (double*) malloc(sizeof(double)*N_a);
-    }
-  }
-  if (recompute_clusters(C, N))
-  {
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wunused-variable"
-    {
-      double init_static_vars_only = binned_Ndensity_nointerp(0, 1.0/amin - 1.0, 1);
-    }
-    #pragma GCC diagnostic pop
-    #pragma omp parallel for collapse(2)
-    for (int i=0; i<N_l; i++)
-    {
-      for (int j=0; j<N_a; j++)
-      {
-        const double aa = amin + j*da;
-        table[i][j] = binned_Ndensity_nointerp(i, 1.0/aa - 1.0, 0);
-      }
-    }
-    update_cosmopara(&C);
-    update_nuisance(&N);
-  }
-  if (nl < 0 || nl > N_l - 1)
-  {
-    log_fatal("error in selecting bin number");
-    exit(1);
-  }
-  if (z < zmin || z > zmax)
-  {
-    log_fatal("z = %e outside look-up table range [%e,%e]", z, zmin, zmax);
-    exit(1);
-  }
-  return interpol(table[nl], N_a, amin, amax, da, 1.0/(z + 1.0), 0., 0.);
-}
 
 double int_for_binned_N(double a, void* params)
 {
@@ -2413,9 +2373,12 @@ double binned_N(const int nl, const int nz)
   {
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     {
       double init_static_vars_only = binned_N_nointerp(0, 0, Cluster.interpolate_survey_area, 1);
     }
+    #pragma GCC diagnostic pop
     #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(2)
     for (int i=0; i<N_l; i++)

@@ -26,7 +26,6 @@
 
 #include "log.c/src/log.h"
 
-static double low =  1e-2/2;
 static double medium = 1e-3/2;
 static double high = 1e-5/2;
 
@@ -452,7 +451,7 @@ void cdgamma(fftw_complex x, fftw_complex* res)
   (*res)[1] = yi;
 }
 
-void hankel_kernel_FT_3D(double x, fftw_complex *res, double *arg, int argc)
+void hankel_kernel_FT_3D(double x, fftw_complex *res, double *arg, int argc __attribute__((unused)))
 {
       fftw_complex a1, a2, g1, g2;
       double           mu;

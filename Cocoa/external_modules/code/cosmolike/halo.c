@@ -326,11 +326,14 @@ double bias_norm(const double a)
   {
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     {
       double ar[1] = {amin}; 
       double init_static_vars_only = int_for_bias_norm(limits.M_min, (void*) ar); // init
       init_static_vars_only = nu(limits.M_min, amin); // init
     }
+    #pragma GCC diagnostic pop
     #pragma GCC diagnostic pop
     #pragma omp parallel for
     for (int i=0; i<na; i++)
@@ -434,7 +437,6 @@ double u_nfw_c(const double c, const double k, const double m, const double a)
 double int_for_I02(double logm, void* params) 
 {
   double* ar = (double*) params;
-  const int j = (int) ar[5];
   const double a = ar[0];
   const double k1 = ar[1];
   const double k2 = ar[2];
@@ -640,28 +642,29 @@ double b_ngmatched(double a, double n_cmv)
 
 double b_source(double a) // lookup table for b1 of source galaxies
 { 
-  static double* table_b;
-  
+  static cosmopara C;
+  static double* table;
+
   const double amin = limits.a_min;
   const double amax = 1.0 / (1.0 + redshift.shear_zdistrpar_zmin);
   const double da = (amax - amin) / ((double) Ntable.N_a - 1.0);
-  const double ngal = survey.n_gal;
-  const double mag_lim = survey.m_lim;
-  
-  if (table_b == 0) 
-  { // if survey/redshift distribution changes, hopefully one of these will change too uncertainty
-    // in abundance matching is larger than change with cosmology, so save time and don't 
-    // recompute if only cosmology changes
-    table_b = (double*) malloc(sizeof(double)*Ntable.N_a);
+
+  if (table == 0)
+  {
+    table = (double*) malloc(sizeof(double)*Ntable.N_a);
+  }
+  if (recompute_cosmo3D(C))
+  {
     {
       const int i = 0;
-      table_b[i] = b_ngmatched(amin + i*da, n_s_cmv(amin + i*da));
+      table[i] = b_ngmatched(amin + i*da, n_s_cmv(amin + i*da));
     }
     #pragma omp parallel for
     for (int i=1; i<Ntable.N_a; i++) 
     {
-      table_b[i] = b_ngmatched(amin + i*da, n_s_cmv(amin + i*da));
+      table[i] = b_ngmatched(amin + i*da, n_s_cmv(amin + i*da));
     }
+    update_cosmopara(&C);
   }
-  return interpol(table_b, Ntable.N_a, amin, amax, da, a, 1.0, 1.0);
+  return interpol(table, Ntable.N_a, amin, amax, da, a, 1.0, 1.0);
 }

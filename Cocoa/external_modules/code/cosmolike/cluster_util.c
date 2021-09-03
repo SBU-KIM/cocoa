@@ -28,7 +28,6 @@
 
 #include "log.c/src/log.h"
 
-static int ASSUME_CONSTANT_LAMBD_HALO_EXCLUSION = 1;
 static int GSL_WORKSPACE_SIZE = 250;
 static double M_PIVOT = 5E14; // Msun/h
 
@@ -850,10 +849,8 @@ double binned_P_lambda_obs_given_M(const int nl, const double M, const double z)
   const int N_l = Cluster.N200_Nbin;
   
   const int N_M  = Ntable.binned_P_lambda_obs_given_M_size_M_table;
-  const double Mmin = pow(10.0, limits.cluster_util_log_M_min);
-  const double Mmax = pow(10.0, limits.cluster_util_log_M_max);
-  const double log_M_max = limits.cluster_util_log_M_max;
   const double log_M_min = limits.cluster_util_log_M_min;
+  const double log_M_max = limits.cluster_util_log_M_max;
   const double dlogM = (log_M_max - log_M_min)/((double) N_M - 1.0);
   
   const int N_z = Ntable.binned_P_lambda_obs_given_M_size_z_table;
@@ -1070,9 +1067,14 @@ double weighted_B1_nointerp(const int nl, const double z, const int init_static_
 
   if (init_static_vars_only == 1)
   {
-    const double r1 = int_for_weighted_B1(ln_M_min, (void*) param);
-    const double r2 = dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) param);
-    return 0.0;
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      const double r1 = int_for_weighted_B1(ln_M_min, (void*) param);
+      const double r2 = dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) param);
+      return 0.0;
+    }
+    #pragma GCC diagnostic pop
   }
   else
   {
@@ -1165,9 +1167,14 @@ double weighted_B2_nointerp(const int nl, const double z, const int init_static_
 
   if (init_static_vars_only == 1)
   {
-    const double r1 = int_for_weighted_B2(ln_M_min, (void*) param);
-    const double r2 = dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) param);
-    return 0.0;
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      const double r1 = int_for_weighted_B2(ln_M_min, (void*) param);
+      const double r2 = dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) param);
+      return 0.0;
+    }
+    #pragma GCC diagnostic pop
   }
   else
   {
@@ -1261,9 +1268,14 @@ double weighted_B1M1_nointerp(const int nl, const double z, const int init_stati
 
   if (init_static_vars_only == 1)
   {
-    const double r1 = int_for_weighted_B1M1(ln_M_min, (void*) params);
-    const double r2 = dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) params);
-    return 0.0;
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+    {
+      const double r1 = int_for_weighted_B1M1(ln_M_min, (void*) params);
+      const double r2 = dndlnM_times_binned_P_lambda_obs_given_M(ln_M_min, (void*) params);
+      return 0.0;
+    }
+    #pragma GCC diagnostic pop
   }
   else
   {
@@ -1313,7 +1325,7 @@ double weighted_B1M1(const int nl, const double z)
       for (int i=0; i<N_a; i++)
       {
         const double a = amin + i*da;
-        table[n][i] = weighted_B1M1_nointerp(n, 1./a - 1.0, 0);
+        table[n][i] = weighted_B1M1_nointerp(n, 1.0/a - 1.0, 0);
       }
     }
     update_cosmopara(&C);
@@ -1362,7 +1374,7 @@ double binned_p_cc(const double k, const double a, const int nl1, const int nl2,
   const double PK = use_linear_ps == 1 ? p_lin(k, a) : Pdelta(k, a);
 
   double P_1loop = 0;
-  if (has_b2_galaxies() || (Cluster.nonlinear_bias > 0) && use_linear_ps != 1)
+  if (has_b2_galaxies() || (Cluster.nonlinear_bias > 0 && use_linear_ps != 1))
   {
     const double g = growfac(a);
     const double g4 = g*g*g*g;
@@ -2433,6 +2445,7 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
 
               const double tmp = interpol(lP[i][j][l], N_k_hankel, ln_k_min_hankel, 
                 ln_k_max_hankel, dlnk_hankel, log(kk_CO), 1.0, 1.0);
+
               const double PK_HALO_EXCL_CO = (exp(tmp) - 1.0E5)/(kk_CO*kk_CO*kk_CO);
 
               const double P_EXCL_CO = (PK_HALO_EXCL_CO + V_EXCL_CO)*B1B2 - V_EXCL_CO;
@@ -2448,8 +2461,6 @@ double binned_p_cc_incl_halo_exclusion_with_constant_lambd(const double k, const
             }
             else
             {
-              const double ln_kk = kk;
- 
               const double tmp = interpol(lP[i][j][l], N_k_hankel, ln_k_min_hankel, ln_k_max_hankel,
                 dlnk_hankel, log(kk), 1.0, 1.0);
               
