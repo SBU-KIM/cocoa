@@ -1883,7 +1883,7 @@ double int_for_int_for_binned_p_cc_incl_halo_exclusion(double lnM1, void* params
     log_fatal("R = %e outside look-up table range [%e,%e]", R, R_min, R_max);
     exit(1);
   } 
-  if(kk*R > 1)
+  if (kk*R > 1)
   {
     return 0.0;
   }

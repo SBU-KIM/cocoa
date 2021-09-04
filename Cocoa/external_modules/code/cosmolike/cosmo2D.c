@@ -227,7 +227,8 @@ double xi_pm_tomo(const int pm, const int nt, const int ni, const int nj, const 
                           nuisance.b_ta_z[Z2NZ] || nuisance.A2_ia ||
                           nuisance.A2_z[Z1NZ] || nuisance.A2_z[Z2NZ]) ? 1 : 0;
 
-            Cl_EE[nz][l] = (l > limits.LMIN_tab) ? C_ss_tomo_TATT_EE_limber((double) l,Z1NZ, Z2NZ) :
+            Cl_EE[nz][l] = (l > limits.LMIN_tab) ?
+              C_ss_tomo_TATT_EE_limber((double) l, Z1NZ, Z2NZ) :
               C_ss_tomo_TATT_EE_limber_nointerp((double) l, Z1NZ, Z2NZ, 0);
         
             Cl_BB[nz][l] = (BM == 1) ? (l > limits.LMIN_tab) ? 
@@ -278,7 +279,8 @@ double xi_pm_tomo(const int pm, const int nt, const int ni, const int nj, const 
           {
             const int Z1NZ = Z1(nz);
             const int Z2NZ = Z2(nz);
-            Cl[nz][l] = (l > limits.LMIN_tab) ? C_ss_tomo_limber((double) l, Z1NZ, Z2NZ) :
+            Cl[nz][l] = (l > limits.LMIN_tab) ?
+              C_ss_tomo_limber((double) l, Z1NZ, Z2NZ) :
               C_ss_tomo_limber_nointerp((double) l, Z1NZ, Z2NZ, use_linear_ps_limber, 0);
           }
         }
@@ -292,7 +294,7 @@ double xi_pm_tomo(const int pm, const int nt, const int ni, const int nj, const 
             xi_vec_minus[q] = 0;
             for (int l=2; l<nell; l++)
             {
-              xi_vec_plus[q]  += Glplus[i][l]*Cl[nz][l];
+              xi_vec_plus[q] += Glplus[i][l]*Cl[nz][l];
               xi_vec_minus[q] += Glminus[i][l]*Cl[nz][l];
             }
           }
@@ -329,20 +331,13 @@ double xi_pm_tomo(const int pm, const int nt, const int ni, const int nj, const 
   }
   else
   {
-    const int q = N_shear(ni, nj)*ntheta + nt;
-    if (q > NSIZE*ntheta - 1)
+    const int q = ntomo*ntheta + nt;
+    if (q < 0 || q > NSIZE*ntheta - 1)
     {
       log_fatal("internal logic error in selecting bin number");
       exit(1);
     }
-    if (pm > 0)
-    {
-      return xi_vec_plus[q];
-    }
-    else
-    {
-      return xi_vec_minus[q];
-    }
+    return (pm > 0) ? xi_vec_plus[q] : xi_vec_minus[q];
   }
 }
 
@@ -383,27 +378,42 @@ double w_gammat_tomo(const int nt, const int ni, const int nj, const int limber)
       xmin[i] = r.xmin;
       xmax[i] = r.xmax;
     }
-    #pragma omp parallel for
+
+    double** Pmin = (double**) malloc(sizeof(double)*ntheta);
+    double** Pmax = (double**) malloc(sizeof(double)*ntheta);
     for (int i=0; i<ntheta; i++)
     {
-      double* Pmin = (double*) malloc(sizeof(double)*(nell + 1));
-      double* Pmax = (double*) malloc(sizeof(double)*(nell + 1));
+      Pmin[i] = (double*) malloc(sizeof(double)*(nell + 1));
+      Pmax[i] = (double*) malloc(sizeof(double)*(nell + 1));
+    }
+    #pragma omp parallel for collapse(2)
+    for (int i=0; i<ntheta; i ++)
+    {
       for (int l=0; l<nell; l++)
       {
-        bin_avg r = set_bin_average(i,l);
-        Pmin[l] = r.Pmin;
-        Pmax[l] = r.Pmax;
+        bin_avg r = set_bin_average(i, l);
+        Pmin[i][l] = r.Pmin;
+        Pmax[i][l] = r.Pmax;
       }
+    }
+    #pragma omp parallel for collapse(2)
+    for (int i=0; i<ntheta; i++)
+    {
       for (int l=1; l<nell; l++)
       {
         Pl[i][l] = (2.*l+1)/(4.*M_PI*l*(l+1)*(xmin[i]-xmax[i]))
-          *((l+2./(2*l+1.))*(Pmin[l-1]-Pmax[l-1])
-          +(2-l)*(xmin[i]*Pmin[l]-xmax[i]*Pmax[l])
-          -2./(2*l+1.)*(Pmin[l+1]-Pmax[l+1]));
+          *((l+2./(2*l+1.))*(Pmin[i][l-1]-Pmax[i][l-1])
+          +(2-l)*(xmin[i]*Pmin[i][l]-xmax[i]*Pmax[i][l])
+          -2./(2*l+1.)*(Pmin[i][l+1]-Pmax[i][l+1]));
       }
-      free(Pmin);
-      free(Pmax);
     }
+    for (int i=0; i<ntheta; i++)
+    {
+      free(Pmin[i]);
+      free(Pmax[i]);
+    }
+    free(Pmin);
+    free(Pmax);
   }
   if (recompute_gs(C, G, N))
   {
@@ -427,8 +437,9 @@ double w_gammat_tomo(const int nt, const int ni, const int nj, const int limber)
         {
           const int ZLNZ = ZL(nz);
           const int ZSNZ = ZS(nz);
-          Cl[nz][l] = (l > limits.LMIN_tab) ? C_gs_tomo_limber((double) l, ZLNZ, ZSNZ) :
-           C_gs_tomo_limber_nointerp((double) l, ZLNZ, ZSNZ, use_linear_ps_limber, 0);
+          Cl[nz][l] = (l > limits.LMIN_tab) ?
+            C_gs_tomo_limber((double) l, ZLNZ, ZSNZ) :
+            C_gs_tomo_limber_nointerp((double) l, ZLNZ, ZSNZ, use_linear_ps_limber, 0);
         }
       }
     }
@@ -494,8 +505,8 @@ double w_gammat_tomo(const int nt, const int ni, const int nj, const int limber)
   }
   else
   {
-    const int q = N_ggl(ni, nj)*ntheta + nt;
-    if (q > NSIZE*ntheta - 1)
+    const int q = ntomo*ntheta + nt;
+    if (q < 0 || q > NSIZE*ntheta - 1)
     {
       log_fatal("internal logic error in selecting bin number");
       exit(1);
@@ -596,7 +607,8 @@ double w_gg_tomo(const int nt, const int ni, const int nj, const int limber)
           const int q = nz;
           const int Z1 = nz; // cross redshift bin not supported so not using ZCL1(k)
           const int Z2 = nz; // cross redshift bin not supported so not using ZCL2(k)
-          Cl[q][l] = (l > limits.LMIN_tab) ? C_gg_tomo_limber((double) l, Z1, Z2) :
+          Cl[q][l] = (l > limits.LMIN_tab) ?
+            C_gg_tomo_limber((double) l, Z1, Z2) :
             C_gg_tomo_limber_nointerp((double) l, Z1, Z2, use_linear_ps_limber, 0);
         }
       }
@@ -606,7 +618,7 @@ double w_gg_tomo(const int nt, const int ni, const int nj, const int limber)
       for (int nz=0; nz<NSIZE; nz++) // NONLIMBER PART
       { 
         const int L = 1;
-        const double tolerance = 0.0075;    // required fractional accuracy in C(l)
+        const double tolerance = 0.01;    // required fractional accuracy in C(l)
         const double dev = 10. * tolerance; // will be diff  exact vs Limber init to
                                             // large value in order to start while loop
         const int Z1 = nz; // cross redshift bin not supported so not using ZCL1(k)
@@ -663,7 +675,7 @@ double w_gg_tomo(const int nt, const int ni, const int nj, const int limber)
     exit(1);
   }
   const int q = ni * ntheta + nt;
-  if (q > NSIZE*ntheta - 1)
+  if (q  < 0 || q > NSIZE*ntheta - 1)
   {
     log_fatal("internal logic error in selecting bin number");
     exit(1);
@@ -708,25 +720,35 @@ double w_gk_tomo(const int nt, const int ni, const int limber)
       xmin[i] = r.xmin;
       xmax[i] = r.xmax;
     }
+    double** Pmin = (double**) malloc(sizeof(double)*ntheta);
+    double** Pmax = (double**) malloc(sizeof(double)*ntheta);
+    for (int i=0; i<ntheta; i ++)
+    {
+      Pmin[i] = (double*) malloc(sizeof(double)*(nell + 1));
+      Pmax[i] = (double*) malloc(sizeof(double)*(nell + 1));
+    }
     #pragma omp parallel for
     for (int i=0; i<ntheta; i++)
     {
-      double* Pmin = (double*) malloc(sizeof(double)*(nell + 1));
-      double* Pmax = (double*) malloc(sizeof(double)*(nell + 1));
       for (int l=0; l<nell; l++)
       {
         bin_avg r = set_bin_average(i,l);
-        Pmin[l] = r.Pmin;
-        Pmax[l] = r.Pmax;
+        Pmin[i][l] = r.Pmin;
+        Pmax[i][l] = r.Pmax;
       }
+      const double tmp = (1.0/(xmin[i] - xmax[i]))*(1.0 / (4.0 * M_PI));
       for (int l=1; l<nell; l++)
       {
-        Pl[i][l] = 1./(4.*M_PI)*(Pmin[l+1]-Pmax[l+1]-Pmin[l-1]+Pmax[l-1])/
-          (xmin[i]-xmax[i]);
+        Pl[i][l] = tmp*(Pmin[i][l + 1] - Pmax[i][l + 1] - Pmin[i][l - 1] + Pmax[i][l - 1]);
       }
-      free(Pmin);
-      free(Pmax);
     }
+    for (int i=0; i<ntheta; i++)
+    {
+      free(Pmin[i]);
+      free(Pmax[i]);
+    }
+    free(Pmin);
+    free(Pmax);
   }
   if (recompute_gk(C, G, N))
   {
@@ -748,7 +770,8 @@ double w_gk_tomo(const int nt, const int ni, const int limber)
       {
         for (int l=1; l<nell; l++)
         {
-          Cl[nz][l] = (l > limits.LMIN_tab) ? C_gk_tomo_limber_wrapper((double) l, nz) :
+          Cl[nz][l] = (l > limits.LMIN_tab) ?
+            C_gk_tomo_limber_wrapper((double) l, nz) :
             C_gk_tomo_limber_nointerp_wrapper((double) l, nz, use_linear_ps_limber, 0);
         }
       }
@@ -790,7 +813,7 @@ double w_gk_tomo(const int nt, const int ni, const int limber)
     exit(1); 
   } 
   const int q = ni * ntheta + nt;
-  if (q > NSIZE*ntheta - 1)
+  if (q < 0 || q > NSIZE*ntheta - 1)
   {
     log_fatal("internal logic error in selecting bin number");
     exit(1);
@@ -877,7 +900,8 @@ double w_ks_tomo(const int nt, const int ni, const int limber)
       {
         for (int l=1; l<nell; l++)
         {
-          Cl[nz][l] = (l > limits.LMIN_tab) ? C_ks_tomo_limber_wrapper(l, nz) :
+          Cl[nz][l] = (l > limits.LMIN_tab) ?
+            C_ks_tomo_limber_wrapper(l, nz) :
             C_ks_tomo_limber_nointerp_wrapper(l, nz, use_linear_ps_limber, 0);
         }
       }
@@ -919,7 +943,7 @@ double w_ks_tomo(const int nt, const int ni, const int limber)
     exit(1);
   }
   const int q = ni * ntheta + nt;
-  if (q > NSIZE*ntheta - 1)
+  if (q  < 0 || q > NSIZE*ntheta - 1)
   {
     log_fatal("internal logic error in selecting bin number");
     exit(1);
@@ -1011,7 +1035,8 @@ double xi_pm_tomo_flatsky(const int pm, double theta, const int ni, const int nj
               const int Z1NZ = Z1(k);
               const int Z2NZ = Z2(k);
               const double l = exp(lnrc+(p - nc)*dlnl);
-              lP[k][p] = (l > limits.LMIN_tab) ? l*C_ss_tomo_limber(l, Z1NZ, Z2NZ) :
+              lP[k][p] = (l > limits.LMIN_tab) ?
+                l*C_ss_tomo_limber(l, Z1NZ, Z2NZ) :
                 l*C_ss_tomo_limber_nointerp(l, Z1NZ, Z2NZ, use_linear_ps_limber, 0);
             }
           }
@@ -1044,11 +1069,9 @@ double xi_pm_tomo_flatsky(const int pm, double theta, const int ni, const int nj
         kernel[j] = (fftwZ**) malloc(sizeof(fftwZ*)*2);
         conv[j] = (fftwZ**) malloc(sizeof(fftwZ*)*2);
         plan[j] = (fftw_plan*) malloc(sizeof(fftw_plan)*2);
-        tab[j] = (double**) malloc(sizeof(double*)*1);
-        for (int i=0; i<1; i++)
-        {
-          tab[j][i] = (double*) malloc(sizeof(double)*ntheta);
-        }
+        tab[j] = (double**) malloc(sizeof(double*)*2);
+        tab[j][0] = (double*) malloc(sizeof(double)*ntheta);
+        tab[j][1] = (double*) malloc(sizeof(double)*ntheta);
         for (int m=0; m<2; m++)
         {
           const int COVSZ = (ntheta/2+1);
@@ -1109,6 +1132,8 @@ double xi_pm_tomo_flatsky(const int pm, double theta, const int ni, const int nj
         free(kernel[j]);
         free(conv[j]);
         free(plan[j]);
+        free(tab[j][0]);
+        free(tab[j][1]);
         free(tab[j]);
       }
       free(flP);
@@ -1140,7 +1165,7 @@ double xi_pm_tomo_flatsky(const int pm, double theta, const int ni, const int nj
     exit(1);
   }
   const int q = 2*N_shear(ni, nj) + (1 - pm)/2;
-  if (q > NSIZE - 1)
+  if (q < 0 || q > NSIZE - 1)
   {
     log_fatal("internal logic error in selecting bin number");
     exit(1);
@@ -1243,10 +1268,10 @@ double w_gammat_tomo_flatsky(const double theta, const int ni, const int nj, con
         }
         for (int i=0; i<NSIZE; i++)
         {
-          free(Cl_NL[i]);
+          free(Cl_NL[i]);   // gsl_spline_init copies the data
         }
-        free(Cl_NL);
-        free(ll);
+        free(Cl_NL);        // gsl_spline_init copies the data
+        free(ll);           // gsl_spline_init copies the data
       }
       #pragma GCC diagnostic push
       #pragma GCC diagnostic ignored "-Wunused-variable"
@@ -1264,7 +1289,8 @@ double w_gammat_tomo_flatsky(const double theta, const int ni, const int nj, con
           const double l = exp(lnrc + (p - nc)*dlnl);
           if (limber == 1 || (limber != 1 && l > limits.LMAX_NOLIMBER - 1))
           {
-            lP[k][p] = (l > limits.LMIN_tab) ? l*C_gs_tomo_limber(l, ZLNZ, ZSNZ) :
+            lP[k][p] = (l > limits.LMIN_tab) ?
+              l*C_gs_tomo_limber(l, ZLNZ, ZSNZ) :
               l*C_gs_tomo_limber_nointerp(l, ZLNZ, ZSNZ, use_linear_ps_limber, 0);
           }
           else
@@ -1318,10 +1344,7 @@ double w_gammat_tomo_flatsky(const double theta, const int ni, const int nj, con
       conv[j] = (fftwZ*) fftw_malloc(COVSZ*sizeof(fftwZ));
       plan[j] = fftw_plan_dft_c2r_1d(ntheta, conv[j], lP[j], FFTW_ESTIMATE);
       tab[j] = (double**) malloc(sizeof(double*)*1);
-      for (int i=0; i<1; i++) 
-      {
-        tab[j][i] = (double*) malloc(sizeof(double)*ntheta);
-      }
+      tab[j][0] = (double*) malloc(sizeof(double)*ntheta);
     }
     #pragma omp parallel for
     for (int j=0; j<NSIZE; j++)
@@ -1362,6 +1385,7 @@ double w_gammat_tomo_flatsky(const double theta, const int ni, const int nj, con
       fftw_free(conv[j]);
       fftw_free(kernel[j]);
       fftw_destroy_plan(plan[j]);
+      free(tab[j][0]);
       free(tab[j]);
     }
     free(flP);
@@ -1397,7 +1421,7 @@ double w_gammat_tomo_flatsky(const double theta, const int ni, const int nj, con
   else if (test_zoverlap(ni, nj))
   {
     const int q = ntomo;
-    if (q > NSIZE - 1)
+    if (q  < 0 || q > NSIZE - 1)
     {
       log_fatal("internal logic error in selecting bin number");
       exit(1);
@@ -1528,7 +1552,8 @@ double w_gg_tomo_flatsky(const double theta, const int ni, const int nj, const i
             const double l = exp(lnrc + (p - nc)*dlnl);
             if (limber == 1 || (limber != 1 && l > limits.LMAX_NOLIMBER - 1))
             {
-              lP[k][p] = (l > limits.LMIN_tab) ? l*C_gg_tomo_limber(l, ZCL1, ZCL2) :
+              lP[k][p] = (l > limits.LMIN_tab) ?
+                l*C_gg_tomo_limber(l, ZCL1, ZCL2) :
                 l*C_gg_tomo_limber_nointerp(l, ZCL1, ZCL2, use_linear_ps_limber, 0);
             }
             else
@@ -1584,10 +1609,7 @@ double w_gg_tomo_flatsky(const double theta, const int ni, const int nj, const i
       conv[j] = (fftwZ*) fftw_malloc(COVSZ*sizeof(fftwZ));
       plan[j] = fftw_plan_dft_c2r_1d(ARRAYSZ, conv[j], lP[j], FFTW_ESTIMATE);
       tab[j] = (double**) malloc(sizeof(double*)*1);
-      for (int i=0; i<1; i++) 
-      {
-        tab[j][i] = (double*) malloc(sizeof(double)*ntheta);
-      }
+      tab[j][0] = (double*) malloc(sizeof(double)*ntheta);
     }
     #pragma omp parallel for
     for (int j=0; j<NSIZE; j++)
@@ -1627,7 +1649,9 @@ double w_gg_tomo_flatsky(const double theta, const int ni, const int nj, const i
       fftw_free(conv[j]);
       fftw_free(kernel[j]);
       fftw_destroy_plan(plan[j]);
+      free(tab[j][0]);
       free(tab[j]);
+
     }
     free(flP);
     free(lP);
@@ -1660,7 +1684,7 @@ double w_gg_tomo_flatsky(const double theta, const int ni, const int nj, const i
     exit(1);
   }
   const int q = ni; // cross redshift bin not supported so not using N_CL(ni, nj) instead of ni
-  if (q > NSIZE - 1)
+  if (q < 0 || q > NSIZE - 1)
   {
     log_fatal("internal logic error in selecting bin number");
     exit(1);
@@ -1734,7 +1758,8 @@ double w_gk_tomo_flatsky(const double theta, const int ni, const int limber)
           for (int p=0; p<ntheta; p++)
           {
             const double l = exp(lnrc + (p - nc)*dlnl);
-            lP[i][p] = (l > limits.LMIN_tab) ? l*C_gk_tomo_limber_wrapper(l, i) :
+            lP[i][p] = (l > limits.LMIN_tab) ?
+              l*C_gk_tomo_limber_wrapper(l, i) :
               l*C_gk_tomo_limber_nointerp_wrapper(l, i, use_linear_ps_limber, 0);
           }
         }
@@ -1767,10 +1792,7 @@ double w_gk_tomo_flatsky(const double theta, const int ni, const int limber)
         conv[i] = (fftwZ*) fftw_malloc((ntheta/2 + 1)*sizeof(fftwZ));
         plan[i] = fftw_plan_dft_c2r_1d(ntheta, conv[i], lP[i], FFTW_ESTIMATE);
         tab[i] = (double**) malloc(sizeof(double*)*1);
-        for (int p=0; p<1; p++) 
-        {
-          tab[i][p] = (double*) malloc(sizeof(double)*ntheta);
-        }
+        tab[i][0] = (double*) malloc(sizeof(double)*ntheta);
       }
       #pragma omp parallel for
       for (int i=0; i<NSIZE; i++)
@@ -1811,6 +1833,7 @@ double w_gk_tomo_flatsky(const double theta, const int ni, const int limber)
         fftw_free(kernel[i]);
         fftw_free(conv[i]);
         fftw_destroy_plan(plan[i]);
+        free(tab[i][0]);
         free(tab[i]);
       }
       free(flP);
@@ -1917,7 +1940,8 @@ double w_ks_tomo_flatsky(const double theta, const int ni, const int limber)
           for (int p=0; p<ntheta; p++)
           {
             const double l = exp(lnrc + (p - nc)*dlnl);
-            lP[i][p] = (l > limits.LMIN_tab) ? l*C_ks_tomo_limber_wrapper(l, i) :
+            lP[i][p] = (l > limits.LMIN_tab) ?
+              l*C_ks_tomo_limber_wrapper(l, i) :
               l*C_ks_tomo_limber_nointerp_wrapper(l, i, use_linear_ps_limber, 0);
           }
         }
@@ -1950,10 +1974,7 @@ double w_ks_tomo_flatsky(const double theta, const int ni, const int limber)
         conv[i] = (fftwZ*) fftw_malloc((ntheta/2 + 1)*sizeof(fftwZ));
         plan[i] = fftw_plan_dft_c2r_1d(ntheta, conv[i], lP[i], FFTW_ESTIMATE);
         tab[i] = (double**) malloc(sizeof(double*)*1);
-        for (int p=0; p<1; p++) 
-        {
-          tab[i][p] = (double*) malloc(sizeof(double)*ntheta);
-        }
+        tab[i][0] = (double*) malloc(sizeof(double)*ntheta);
       }
       
       #pragma omp parallel for
@@ -1994,6 +2015,7 @@ double w_ks_tomo_flatsky(const double theta, const int ni, const int limber)
         fftw_free(kernel[i]);
         fftw_free(conv[i]);
         fftw_destroy_plan(plan[i]);
+        free(tab[i][0]);
         free(tab[i]);
       }  
       free(flP);
@@ -2051,7 +2073,7 @@ double C1_TA(double a, int nz, double growfac_a)
   // per-bin IA parameters
   if (like.IA == 3 || like.IA == 5)
   {
-    return (-cosmology.Omega_m*nuisance.c1rhocrit_ia/ growfac_a)*nuisance.A_z[nz];
+    return (-cosmology.Omega_m*nuisance.c1rhocrit_ia/growfac_a)*nuisance.A_z[nz];
   }
   else 
   { // power law evolution
@@ -2237,9 +2259,11 @@ double C_ss_tomo_TATT_EE_limber(const double l, const int ni, const int nj)
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
     {
-      const int Z1NZ = Z1(0);
-      const int Z2NZ = Z2(0);
-      double init_static_vars_only = C_ss_tomo_TATT_EE_limber_nointerp(exp(lnlmin), Z1NZ, Z2NZ, 1);
+      const int k = 0;
+      const int Z1NZ = Z1(k);
+      const int Z2NZ = Z2(k);
+      const double lnl = lnlmin;
+      double init_static_vars_only = C_ss_tomo_TATT_EE_limber_nointerp(exp(lnl), Z1NZ, Z2NZ, 1);
     }
     #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(2)
@@ -2293,7 +2317,7 @@ double C_ss_tomo_TATT_EE_limber(const double l, const int ni, const int nj)
     log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int ntomo = N_shear(ni, nj);
-  if(!(ntomo>0))
+  if (!(ntomo>0))
   {
     return 0.0;
   }
@@ -2346,9 +2370,11 @@ double C_ss_tomo_TATT_BB_limber(const double l, const int ni, const int nj)
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"
     {
-      const int Z1NZ = Z1(0);
-      const int Z2NZ = Z2(0);
-      double init_static_vars_only = C_ss_tomo_TATT_BB_limber_nointerp(exp(lnlmin), Z1NZ, Z2NZ, 1);
+      const int k = 0;
+      const int Z1NZ = Z1(k);
+      const int Z2NZ = Z2(k);
+      const double lnl = lnlmin;
+      double init_static_vars_only = C_ss_tomo_TATT_BB_limber_nointerp(exp(lnl), Z1NZ, Z2NZ, 1);
     }
     #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(2)
@@ -2403,14 +2429,14 @@ double C_ss_tomo_TATT_BB_limber(const double l, const int ni, const int nj)
     log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int ntomo = N_shear(ni, nj);
-  if(!(ntomo>0))
+  if (!(ntomo>0))
   {
     return 0.0;
   }
   else
   {
     const int q = ntomo;
-    if (q > NSIZE - 1)
+    if (q < 0 || q > NSIZE - 1)
     {
       log_fatal("internal logic error in selecting bin number");
       exit(1);
@@ -2551,8 +2577,9 @@ double C_ss_tomo_limber(const double l, const int ni, const int nj)
       const int k = 0;
       const int Z1NZ = Z1(k);
       const int Z2NZ = Z2(k);
+      const double lnl = lnlmin;
       double init_static_vars_only = 
-        C_ss_tomo_limber_nointerp(exp(lnlmin), Z1NZ, Z2NZ, use_linear_ps_limber, 1);
+        C_ss_tomo_limber_nointerp(exp(lnl), Z1NZ, Z2NZ, use_linear_ps_limber, 1);
     }
     #pragma GCC diagnostic pop
     #pragma omp parallel for collapse(2)
@@ -2580,7 +2607,7 @@ double C_ss_tomo_limber(const double l, const int ni, const int nj)
     log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int ntomo = N_shear(ni, nj);
-  if(!(ntomo>0))
+  if (!(ntomo>0))
   {
     return 0.0;
   }
@@ -2644,6 +2671,7 @@ double int_for_C_gs_tomo_limber_TATT(double a, void* params)
   const double b_ta = b_TA(a, nj);
   const double C2 = C2_TT(a, nj, growfac_a);
   
+  // TODO: SUPER SLOW PT TERMS - THERE MUST BE A BETTER WAY
   const double tmp1 = 0.5*g4*(b2 * PT_d1d2(k) + bs2 * PT_d1s2(k) + b3nl_from_b1(b1) * PT_d1d3(k));
   const double P_1loop = (w_density*b2 != 0) ? tmp1 : 0.0;  
   const double tmp2 = TATT_GI_E(k, a, C1, C2, b_ta, growfac_a, PK);
@@ -2876,13 +2904,15 @@ const int init_static_vars_only)
   {
     if (has_b2_galaxies() && use_linear_ps == 0)
     {
-      res = (init_static_vars_only == 1) ? int_for_C_gs_tomo_limber_withb2(amin, (void*) ar) :
+      res = (init_static_vars_only == 1) ?
+        int_for_C_gs_tomo_limber_withb2(amin, (void*) ar) :
         int_gsl_integrate_low_precision(int_for_C_gs_tomo_limber_withb2, (void*) ar, amin, amax, 
           NULL, GSL_WORKSPACE_SIZE);
     }
     else 
     {
-      res =  (init_static_vars_only == 1) ? int_for_C_gs_tomo_limber(amin, (void*) ar) :
+      res =  (init_static_vars_only == 1) ?
+        int_for_C_gs_tomo_limber(amin, (void*) ar) :
         int_gsl_integrate_medium_precision(int_for_C_gs_tomo_limber, (void*) ar, amin, amax, NULL, 
           GSL_WORKSPACE_SIZE);
     }
@@ -2896,7 +2926,8 @@ const int init_static_vars_only)
     }
     else
     {
-      res = (init_static_vars_only == 1) ? int_for_C_gs_tomo_limber_TATT(amin, (void*) ar) :
+      res = (init_static_vars_only == 1) ?
+        int_for_C_gs_tomo_limber_TATT(amin, (void*) ar) :
         int_gsl_integrate_low_precision(int_for_C_gs_tomo_limber_TATT, (void*) ar, amin, amax, 
           NULL, GSL_WORKSPACE_SIZE);
     }
@@ -3288,7 +3319,7 @@ double C_gg_tomo_limber(const double l, const int ni, const int nj)
     log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int q = ni; // cross redshift bin not supported so not using N_CL(ni, nj) instead of ni
-  if (q > NSIZE - 1)
+  if (q < 0 || q > NSIZE - 1)
   {
     log_fatal("internal logic error in selecting bin number");
     exit(1);
@@ -3417,7 +3448,7 @@ double C_gk_tomo_limber_nointerp(const double l, const int ni, const int use_lin
       log_fatal("0 < amin/amax < 1 not true");
       exit(1);
     }
-    if(!(amin < amax))
+    if (!(amin < amax))
     {
       log_fatal("amin < amax not true");
       exit(1);
@@ -3435,7 +3466,7 @@ double C_gk_tomo_limber_nointerp(const double l, const int ni, const int use_lin
       log_fatal("0 < amin/amax < 1 not true");
       exit(1);
     }
-    if(!(amin < amax))
+    if (!(amin < amax))
     {
       log_fatal("amin < amax not true");
       exit(1);
@@ -3501,7 +3532,7 @@ double C_gk_tomo_limber(const double l, const int ni)
     log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int q =  ni; 
-  if (q > NSIZE - 1)
+  if (q < 0 || q > NSIZE - 1)
   {
     log_fatal("internal logic error in selecting bin number");
     exit(1);
@@ -3693,7 +3724,7 @@ double C_ks_tomo_limber(const double l, const int ni)
     log_warn("l = %e < l_min = %e. Extrapolation adopted", l, exp(lnlmin));
   }
   const int q =  ni; 
-  if (q > NSIZE - 1)
+  if (q < 0 || q > NSIZE - 1)
   {
     log_fatal("internal logic error in selecting bin number");
     exit(1);
