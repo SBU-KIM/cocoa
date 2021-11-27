@@ -147,25 +147,27 @@ We welcome contributions to make Cocoa work with these packages, compilers, and 
 
 We assume the user adopts [Homebrew](https://brew.sh) as the OS package manager, and [BASH](https://www.howtogeek.com/444596/how-to-change-the-default-shell-to-bash-in-macos-catalina/) as the default shell. While alternatives, such as [MacPorts](https://www.macports.org) and [Fink](http://www.finkproject.org), may provide all the requirements, we don't  present instructions for them. We also don't provide documentation for installation on [zsh](https://www.howtogeek.com/444596/how-to-change-the-default-shell-to-bash-in-macos-catalina/) shell, the default shell on macOS Catalina. Finally, we also assume all contributors have added their ssh-keys to Cocoa's private submodules.
 
+**Warning for Mac Arm users**: cocoa requires users to run terminal under [rosetta2](https://support.apple.com/en-us/HT211861), This [link](https://osxdaily.com/2020/11/18/how-run-homebrew-x86-terminal-apple-silicon-mac/) has instructions on how to create a terminal app that always runs under x86 emulation.
+
 Here is a list of Homebrew and pip commands that install most dependencies
 
-    brew install gcc@9
-    alias brew='HOMEBREW_CC=gcc-9 HOMEBREW_CXX=g++-9 brew'
-    brew install open-mpi || (brew upgrade open-mpi && brew cleanup open-mpi)
-    brew install git || (brew upgrade git && brew cleanup git)
-    brew install git-lfs || (brew upgrade git-lfs && brew cleanup git-lfs)
+    brew install gcc@10
+    alias brew='HOMEBREW_CC=gcc-10 HOMEBREW_CXX=g++-10 brew'
+    brew install open-mpi
+    brew install git
+    brew install git-lfs
     git lfs install
     git lfs install --system
     brew install gmp --build-from-source
     brew install hdf5 --build-from-source
-    brew install python@3.7 || (brew upgrade python@3.7 && brew cleanup python@3.7)
+    brew install python@3.7
     brew install cmake || (brew upgrade cmake && brew cleanup cmake)
     brew install armadillo --build-from-source
     brew install boost --build-from-source
-    brew install gsl || (brew upgrade gsl && brew cleanup gsl)
-    brew install fftw || (brew upgrade fftw && brew cleanup fftw)
-    brew install cfitsio || (brew upgrade cfitsio && brew cleanup cfitsio)
-    brew install lapack || (brew upgrade lapack && brew cleanup lapack)
+    brew install gsl --build-from-source
+    brew install fftw --build-from-source
+    brew install cfitsio --build-from-source
+    brew install lapack --build-from-source
     brew install findutils || (brew upgrade findutils && brew cleanup findutils)
     brew install xz || (brew upgrade xz && brew cleanup xz)
     export PATH="/usr/local/opt/python@3.7/bin:$PATH"
@@ -197,7 +199,6 @@ Here is a list of Homebrew and pip commands that install most dependencies
     pip3.7 install pybind11 --upgrade
     pip3.7 install GetDist --upgrade
     pip3.7 install astropy --upgrade
-    pip3.7 install pyfits --upgrade
 
 **It is also necessary to update `$PATH`** so the OS can detect the [Homebrew](https://brew.sh) python installation. Adding to `~/.bash_profile` code similar to the lines below should be enough (don't forget to replace `XXX` by the user's home folder):
 
