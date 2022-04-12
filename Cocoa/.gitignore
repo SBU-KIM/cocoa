@@ -19,6 +19,7 @@ external_modules/data/bao_data/
 external_modules/data/bicep_keck_2015/
 external_modules/data/des_data/
 external_modules/data/sn_data/
+external_modules/data/simons_observatory/
 
 set_installation_options
 compile_external_modules

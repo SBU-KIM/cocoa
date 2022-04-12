@@ -334,4 +334,28 @@ if [ -z "${IGNORE_ALL_PIP_INSTALLATION}" ]; then
   fi
 fi
 
+env CXX=$CXX_COMPILER CC=$C_COMPILER $PIP3 install sacc --upgrade --prefix=$ROOTDIR/.local --find-links file:$ROOTDIR/../cocoa_installation_libraries/pip_cache --no-index
+if [ $? -ne 0 ]; then
+  echo "PROBLEM PIP sacc"
+  return 1
+fi
+
+env CXX=$CXX_COMPILER CC=$C_COMPILER $PIP3 install iminuit --upgrade --prefix=$ROOTDIR/.local --find-links file:$ROOTDIR/../cocoa_installation_libraries/pip_cache --no-index
+if [ $? -ne 0 ]; then
+  echo "PROBLEM PIP iminuit"
+  return 1
+fi
+
+env CXX=$CXX_COMPILER CC=$C_COMPILER  $PIP3 install $ROOTDIR/../cocoa_installation_libraries/pip_cache/fgspectra --upgrade  --prefix=$ROOTDIR/.local --no-index   
+if [ $? -ne 0 ]; then
+  echo "PROBLEM PIP fgspectra"
+  return 1
+fi
+
+env CXX=$CXX_COMPILER CC=$C_COMPILER  $PIP3 install $ROOTDIR/../cocoa_installation_libraries/pip_cache/syslibrary --upgrade  --prefix=$ROOTDIR/.local --no-index   
+if [ $? -ne 0 ]; then
+  echo "PROBLEM PIP syslibrary"
+  return 1
+fi
+
 # PS: --no-index option prevent pip from using internet (forces to use our local cache)
