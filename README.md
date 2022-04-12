@@ -181,13 +181,13 @@ The user also needs to set the following self-explanatory environmental keys on 
 
 Type:
 
-    $(cocoa) $CONDA_PREFIX/bin/git-lfs clone https://github.com/CosmoLike/cocoa.git
+    $(cocoa) $CONDA_PREFIX/bin/git-lfs clone https://github.com/SBU-KIM/c/cocoa.git
 
 to clone the repository. 
 
 (**expert**) Cocoa developers with set ssh keys  in GitHub may find more convenient to use the command
 
-    $(cocoa) $CONDA_PREFIX/bin/git-lfs clone git@github.com:CosmoLike/cocoa.git
+    $(cocoa) $CONDA_PREFIX/bin/git-lfs clone git@github.com:SBU-KIM/cocoa.git
     $(cocoa) cd ./cocoa/Cocoa
     
 (**Warning**) We assumed in the command above users have installed the pre-requisite packages (including git-lfs) via the recommended **Conda installation method**. With other installation method, `$CONDA_PREFIX/bin/git-lfs` should be replaced with `git-lfs`. 
