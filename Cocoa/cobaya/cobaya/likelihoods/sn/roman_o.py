@@ -1,4 +1,4 @@
-from cobaya.likelihoods.base_classes import SN
+from cobaya.likelihoods._base_classes import _sn_prototype
 
 
 class roman_o(SN):
