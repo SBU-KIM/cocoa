@@ -17,40 +17,81 @@ function addvar () {
 }
 
 if [ -n "${OMP_NUM_THREADS}" ]; then
-  export OLD_OMP_NUM_THREADS=$OMP_NUM_THREADS
+    export OLD_OMP_NUM_THREADS=$OMP_NUM_THREADS
 fi
 
 if [ -n "${LD_LIBRARY_PATH}" ]; then
-  export OLD_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
+    export OLD_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 fi
 
 if [ -n "${PYTHONPATH}" ]; then
-  export OLD_PYTHONPATH=$PYTHONPATH
+    export OLD_PYTHONPATH=$PYTHONPATH
 fi
 
 if [ -n "${PATH}" ]; then
-  export OLD_PATH=$PATH
+    export OLD_PATH=$PATH
 fi
 
 if [ -n "${C_INCLUDE_PATH}" ]; then
-  export OLD_C_INCLUDE_PATH=$C_INCLUDE_PATH
+    export OLD_C_INCLUDE_PATH=$C_INCLUDE_PATH
 fi
 
 if [ -n "${CPLUS_INCLUDE_PATH}" ]; then
-  export OLD_CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH
+    export OLD_CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH
 fi
 
 if [ -n "${LDFLAGS}" ]; then
-  export OLD_LDFLAGS=$LDFLAGS
+    export OLD_LDFLAGS=$LDFLAGS
 fi
 
 if [ -n "${CPATH}" ]; then
-  export OLD_CPATH=$CPATH
+    export OLD_CPATH=$CPATH
+fi
+
+if [ -n "${LD_RUN_PATH}" ]; then
+    export OLD_LD_RUN_PATH=$LD_RUN_PATH
+fi
+
+if [ -n "${CMAKE_LIBRARY_PATH}" ]; then
+    export OLD_CMAKE_LIBRARY_PATH=$CMAKE_LIBRARY_PATH
+fi
+
+if [ -n "${CMAKE_INCLUDE_PATH}" ]; then
+    export OLD_CMAKE_INCLUDE_PATH=$CMAKE_INCLUDE_PATH
+fi
+
+if [ -n "${LIBRARY_PATH}" ]; then
+    export OLD_LIBRARY_PATH=$LIBRARY_PATH
+fi
+
+if [ -n "${INCLUDEPATH}" ]; then
+    export OLD_INCLUDEPATH=$INCLUDEPATH
+fi
+
+if [ -n "${INCLUDE}" ]; then
+    export OLD_INCLUDE=$INCLUDE
+fi
+
+if [ -n "${CPATH}" ]; then
+    export OLD_CPATH=$CPATH
 fi
 
 if [ -n "${NUMPY_HEADERS}" ]; then
-  export OLD_NUMPY_HEADERS=$NUMPY_HEADERS
+    export OLD_NUMPY_HEADERS=$NUMPY_HEADERS
 fi
+
+if [ -n "${OBJC_INCLUDE_PATH}" ]; then
+    export OLD_OBJC_INCLUDE_PATH=$OBJC_INCLUDE_PATH
+fi
+
+if [ -n "${OBJC_PATH}" ]; then
+    export OLD_OBJC_PATH=$OBJC_PATH
+fi
+
+# ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 if [ -n "${SET_INSTALLATION_OPTIONS}" ]; then
   source $SET_INSTALLATION_OPTIONS
@@ -66,29 +107,40 @@ fi
 
 source $ROOTDIR/.local/bin/activate
 
-if [ -n "${GLOBAL_PACKAGES_LOCATION}" ]; then
-  addvar PYTHONPATH $GLOBAL_PACKAGES_LOCATION/lib/python$PYTHON_VERSION/site-packages
+export PATH=$ROOTDIR/.local/bin:$PATH
 
-  addvar LD_LIBRARY_PATH $GLOBAL_PACKAGES_LOCATION/lib
-fi
-
-addvar LD_LIBRARY_PATH $ROOTDIR/.local/lib
-
-addvar PYTHONPATH $ROOTDIR/.local/lib/python$PYTHON_VERSION/site-packages
-
-addvar PYTHONPATH $ROOTDIR/.local/lib
-
-addvar PATH $ROOTDIR/.local/bin
-
-export NUMPY_HEADERS=$ROOTDIR/.local/lib/python$PYTHON_VERSION/site-packages/numpy/core/include
-
-addvar LD_LIBRARY_PATH $ROOTDIR/.local/lib/python$PYTHON_VERSION/site-packages/numpy/core/lib
-
-export CPATH=$CPATH:$ROOTDIR/.local/lib/python$PYTHON_VERSION/site-packages/numpy/core/include
+export PYTHONPATH=$ROOTDIR/.local/lib/python$PYTHON_VERSION/site-packages:$PYTHONPATH
+export PYTHONPATH=$ROOTDIR/.local/lib:$PYTHONPATH
 
 export C_INCLUDE_PATH=$C_INCLUDE_PATH:$ROOTDIR/.local/lib/python$PYTHON_VERSION/site-packages/numpy/core/include
-
 export CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$ROOTDIR/.local/lib/python$PYTHON_VERSION/site-packages/numpy/core/include
+
+export NUMPY_HEADERS=$ROOTDIR/.local/lib/python$PYTHON_VERSION/site-packages/numpy/core/include
+export LD_LIBRARY_PATH=$ROOTDIR/.local/lib/python$PYTHON_VERSION/site-packages/numpy/core/lib:$LD_LIBRARY_PATH
+export CPATH=$CPATH:$ROOTDIR/.local/lib/python$PYTHON_VERSION/site-packages/numpy/core/include
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ROOTDIR/.local/lib
+export LDFLAGS="-L$ROOTDIR/.local/lib":$LDFLAGS
+export LD_RUN_PATH=$ROOTDIR/.local/lib:$LD_RUN_PATH
+export LD_RUN_PATH=$ROOTDIR/.local/lib:$LD_RUN_PATH
+export LIBRARY_PATH=$ROOTDIR/.local/lib:$LIBRARY_PATH
+export LIBRARY_PATH=$ROOTDIR/.local/lib:$LIBRARY_PATH
+
+export CMAKE_INCLUDE_PATH=$ROOTDIR/.local/include/python${PYTHON_VERSION}m/:$CMAKE_INCLUDE_PATH
+export CMAKE_INCLUDE_PATH=$ROOTDIR/.local/include/:$CMAKE_INCLUDE_PATH    
+export CMAKE_LIBRARY_PATH=$ROOTDIR/.local/lib/python$PYTHON_VERSION/site-packages:$CMAKE_LIBRARY_PATH
+export CMAKE_LIBRARY_PATH=$ROOTDIR/.local/lib:$CMAKE_LIBRARY_PATH
+
+export INCLUDE_PATH=$ROOTDIR/.local/include/:$INCLUDE_PATH
+export INCLUDEPATH=$ROOTDIR/.local/include/:$INCLUDEPATH
+export INCLUDE=$ROOTDIR/.local/include/:$INCLUDE
+export CPATH=$ROOTDIR/.local/include/:$CPATH
+
+export OBJC_INCLUDE_PATH=$ROOTDIR/.local/:OBJC_INCLUDE_PATH
+export OBJC_PATH=$ROOTDIR/.local/:OBJC_PATH
+
+export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/lib/python${PYTHON_VERSION}/site-packages/numpy/core/include/:$CPLUS_INCLUDE_PATH
+export C_INCLUDE_PATH=$CONDA_PREFIX/lib/python${PYTHON_VERSION}/site-packages/numpy/core/include:$C_INCLUDE_PATH
 
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
@@ -109,8 +161,8 @@ if [ -z "${IGNORE_PLANCK_COMPILATION}" ]; then
     export OLD_CLIK_PLUGIN=$CLIK_PLUGIN
   fi
 
-  addvar PYTHONPATH $ROOTDIR/.local/lib/python/site-packages
-
+  export PYTHONPATH=$ROOTDIR/.local/lib/python/site-packages:$PYTHONPATH
+  
   export CLIK_PATH=$ROOTDIR/.local
 
   export CLIK_DATA=$ROOTDIR/.local/share/clik
@@ -130,4 +182,5 @@ source $ROOTDIR/projects/start_all.sh
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
+
 export START_COCOA_DONE=1

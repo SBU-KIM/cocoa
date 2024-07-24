@@ -456,10 +456,12 @@ class camb(BoltzmannBase):
         c = self.collectors.get(k, None)
         if c:
             return np.sort(
-                np.unique(np.concatenate((c.kwargs['z'], np.atleast_1d(v['z'])))))
+                #np.unique(np.concatenate((c.kwargs['z'], np.atleast_1d(v["z"])))))
+                np.unique(np.concatenate((c.kwargs['z'], np.atleast_1d(np.append(np.append(np.append(np.append(v["z"],0.3),1.49),0.295),1.491))))))
         else:
-            return np.sort(np.atleast_1d(v['z']))
-
+            #return np.sort(np.atleast_1d(v["z"]))
+            return np.sort(np.atleast_1d(np.append(np.append(np.append(np.append(v["z"],0.3),1.49),0.295),1.491)))
+            
     def calculate(self, state, want_derived=True, **params_values_dict):
         try:
             params, results = self.provider.get_CAMB_transfers()

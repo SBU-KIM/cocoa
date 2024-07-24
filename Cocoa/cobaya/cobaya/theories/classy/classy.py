@@ -216,22 +216,23 @@ class classy(BoltzmannBase):
                 if 'T_cmb' not in self.derived_extra:
                     self.derived_extra += ['T_cmb']
             elif k == "Hubble":
+                # VM NASTY BUG HERE WHEN RUNNING WITH CLASS
                 self.collectors[k] = Collector(
                     method="Hubble",
-                    args=[np.atleast_1d(v["z"])],
-                    args_names=["z"],
+                    args=[np.atleast_1d(np.unique(np.append(np.append(np.append(np.append(v["z"],0.3),1.49),0.295),1.491)))],
+                    args_names=["z"], 
                     arg_array=0)
             elif k == "angular_diameter_distance":
                 self.collectors[k] = Collector(
                     method="angular_distance",
-                    args=[np.atleast_1d(v["z"])],
+                    args=[np.atleast_1d(np.unique(np.append(np.append(np.append(np.append(v["z"],0.3),1.49),0.295),1.491)))],
                     args_names=["z"],
                     arg_array=0)
             elif k == "comoving_radial_distance":
                 self.collectors[k] = Collector(
                     method="z_of_r",
                     args_names=["z"],
-                    args=[np.atleast_1d(v["z"])])
+                    args=[np.atleast_1d(np.unique(np.append(np.append(np.append(np.append(v["z"],0.3),1.49),0.295),1.491)))])
             elif isinstance(k, tuple) and k[0] == "Pk_grid":
                 self.extra_args["output"] += " mPk"
                 v = deepcopy(v)
@@ -264,6 +265,8 @@ class classy(BoltzmannBase):
                     self.derived_extra += [k_translated]
             else:
                 raise LoggedError(self.log, "Requested product not known: %r", {k: v})
+        
+
         # Derived parameters (if some need some additional computations)
         if any(("sigma8" in s) for s in self.output_params or requirements):
             self.extra_args["output"] += " mPk"
@@ -377,8 +380,11 @@ class classy(BoltzmannBase):
                         *self.collectors[product].args, **kwargs)
             if collector.post:
                 state[product] = collector.post(*state[product])
+        
         # Prepare derived parameters
+
         d, d_extra = self._get_derived_all(derived_requested=want_derived)
+
         if want_derived:
             state["derived"] = {p: d.get(p) for p in self.output_params}
             # Prepare necessary extra derived parameters
@@ -454,6 +460,7 @@ class classy(BoltzmannBase):
         values = np.array(deepcopy(self._current_state[quantity]))
         if quantity == "comoving_radial_distance":
             values = values[0]
+
         return values[i_kwarg_z]
 
     def close(self):

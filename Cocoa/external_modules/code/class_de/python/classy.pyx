@@ -1422,7 +1422,6 @@ cdef class Class:
         Om_m = pvecback[self.ba.index_bg_Omega_m]
 
         free(pvecback)
-
         return Om_m
 
 
@@ -1825,6 +1824,9 @@ cdef class Class:
             elif name == 'Neff':
                 value = self.ba.Neff
             elif name == 'Omega_m':
+                #VM BEGINS
+                #print("Derived (self.ba.Omega0_m): ", self.ba.Omega0_m)
+                #VM ENDS
                 value = self.ba.Omega0_m
             elif name == 'omega_m':
                 value = self.ba.Omega0_m*self.ba.h**2

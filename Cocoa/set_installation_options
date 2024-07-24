@@ -13,10 +13,10 @@ export ROOTDIR=$PWD
 #export DOCKER_INSTALLATION=1
 export MINICONDA_INSTALLATION=1
 #export MANUAL_INSTALLATION=1
+#export SBU_SUPERCOMPUTER_INSTALLATION=1
 
-# deprecated Keys - will be deleted in the future
-#export AMYPOND_SUPERCOMPUTER_INSTALLATION=1
-#export PUMA_SUPERCOMPUTER_INSTALLATION=1
+#IF TRUE USES CLIK FROM https://github.com/benabed/clik
+export USE_SPT_CLIK_PLANCK=1
 
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
@@ -28,7 +28,7 @@ export MINICONDA_INSTALLATION=1
 # SETUP_REQUIRED_PACKAGES SCRIPT MAY TAKE A LONG TIME - THREADING W/ 8 CORES
 
 export THREAD_UNXZ=1
-export MAKE_NUM_THREADS=12
+export MAKE_NUM_THREADS=7
 
 # ----------------------------------------------------------------------------
 # CONTROL OVER EXTERNAL CODES ON SETUP_COCOA SCRIPT -------------------------
@@ -38,6 +38,7 @@ export MAKE_NUM_THREADS=12
 #export IGNORE_COSMOLIKE_COMPILATION=1
 #export IGNORE_POLYCHORD_COMPILATION=1
 #export IGNORE_PLANCK_COMPILATION=1
+#export IGNORE_ACT_COMPILATION=1
 
 # ----------------------------------------------------------------------------
 # IF DEFINED, COSMOLIKE WILL BE COMPILED WITH DEBUG FLAG
@@ -82,6 +83,12 @@ if [ -n "${MANUAL_INSTALLATION}" ]; then
     #export IGNORE_OPENBLAS_INSTALLATION=1
     #export IGNORE_FORTRAN_LAPACK_INSTALLATION=1
 
+    if [ -z "${IGNORE_CMAKE_INSTALLATION}" ]; then
+        export CMAKE_ROOT=$ROOTDIR/.local/bin/cmake
+        export CMAKE=$ROOTDIR/.local/bin/cmake
+    else
+        export CMAKE=cmake
+    fi
 elif [ -n "${DOCKER_INSTALLATION}" ]; then
 
     export GLOBAL_PACKAGES_LOCATION=/usr/local
@@ -105,18 +112,25 @@ elif [ -n "${DOCKER_INSTALLATION}" ]; then
     export IGNORE_CPP_SPDLOG_INSTALLATION=1
     export IGNORE_C_INSTALLATION=1
     export IGNORE_FORTRAN_INSTALLATION=1
-    
+
+    if [ -z "${IGNORE_CMAKE_INSTALLATION}" ]; then
+        export CMAKE_ROOT=$ROOTDIR/.local/bin/cmake
+        export CMAKE=$ROOTDIR/.local/bin/cmake
+    else
+        export CMAKE=cmake
+    fi   
 elif [ -n "${MINICONDA_INSTALLATION}" ]; then
 
     export PATH=$CONDA_PREFIX/bin:$PATH
-    export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+    
     export LDFLAGS="-L$CONDA_PREFIX/lib":$LDFLAGS
-    
-    export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/include/python3.7m/:$CPLUS_INCLUDE_PATH
-    export C_INCLUDE_PATH=$CONDA_PREFIX/include/python3.7m/:$C_INCLUDE_PATH
-    
-    export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/lib/python3.7/site-packages/numpy/core/include/:$CPLUS_INCLUDE_PATH
-    export C_INCLUDE_PATH=$CONDA_PREFIX/lib/python3.7/site-packages/numpy/core/include:$C_INCLUDE_PATH
+
+    export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/include/python${PYTHON_VERSION}m/:$CPLUS_INCLUDE_PATH
+    export C_INCLUDE_PATH=$CONDA_PREFIX/include/python${PYTHON_VERSION}m/:$C_INCLUDE_PATH
+    export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/lib/python${PYTHON_VERSION}/site-packages/numpy/core/include/:$CPLUS_INCLUDE_PATH
+    export C_INCLUDE_PATH=$CONDA_PREFIX/lib/python${PYTHON_VERSION}/site-packages/numpy/core/include:$C_INCLUDE_PATH
+    export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/include:$CPLUS_INCLUDE_PATH
+    export C_INCLUDE_PATH=$CONDA_PREFIX/include:$C_INCLUDE_PATH
 
     export GLOBALPYTHON3=$CONDA_PREFIX/bin/python3.7
     export GLOBAL_PACKAGES_LOCATION=$CONDA_PREFIX
@@ -124,6 +138,28 @@ elif [ -n "${MINICONDA_INSTALLATION}" ]; then
     export PYTHON_VERSION=3.7
     export PYTHONPATH=$CONDA_PREFIX/lib/python$PYTHON_VERSION/site-packages:$PYTHONPATH
     export PYTHONPATH=$CONDA_PREFIX/lib:$PYTHONPATH
+    
+    # This causes errors on SeaWulf
+    #export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib
+
+    export LD_RUN_PATH=$CONDA_PREFIX/lib/python$PYTHON_VERSION/site-packages:$LD_RUN_PATH
+    export LD_RUN_PATH=$CONDA_PREFIX/lib:$LD_RUN_PATH
+    
+    export LIBRARY_PATH=$LIBRARY_PATH:$CONDA_PREFIX/lib/python$PYTHON_VERSION/site-packages
+    export LIBRARY_PATH=$LIBRARY_PATH:$CONDA_PREFIX/lib
+
+    export CMAKE_INCLUDE_PATH=$CONDA_PREFIX/include/python${PYTHON_VERSION}m/:$CMAKE_INCLUDE_PATH
+    export CMAKE_INCLUDE_PATH=$CONDA_PREFIX/include/:$CMAKE_INCLUDE_PATH    
+    export CMAKE_LIBRARY_PATH=$CONDA_PREFIX/lib/python$PYTHON_VERSION/site-packages:$CMAKE_LIBRARY_PATH
+    export CMAKE_LIBRARY_PATH=$CONDA_PREFIX/lib:$CMAKE_LIBRARY_PATH
+
+    export INCLUDE_PATH=$CONDA_PREFIX/include/:$INCLUDE_PATH
+    export INCLUDEPATH=$CONDA_PREFIX/include/:$INCLUDEPATH
+    export INCLUDE=$CONDA_PREFIX/include/:$INCLUDE
+    export CPATH=$CONDA_PREFIX/include/:$CPATH
+
+    export OBJC_INCLUDE_PATH=$CONDA_PREFIX/include/:OBJC_INCLUDE_PATH
+    export OBJC_PATH=$CONDA_PREFIX/include/:OBJC_PATH
 
     ulimit -s unlimited
 
@@ -145,13 +181,49 @@ elif [ -n "${MINICONDA_INSTALLATION}" ]; then
     export IGNORE_OPENBLAS_INSTALLATION=1
     export IGNORE_FORTRAN_LAPACK_INSTALLATION=1
     export IGNORE_CPP_ARMA_INSTALLATION=1
-fi
 
-if [ -z "${IGNORE_CMAKE_INSTALLATION}" ]; then
-    export CMAKE_ROOT=$ROOTDIR/.local/bin/cmake
-    export CMAKE=$ROOTDIR/.local/bin/cmake
-else
-    export CMAKE=cmake
+    if [ -z "${IGNORE_CMAKE_INSTALLATION}" ]; then
+        export CMAKE_ROOT=$ROOTDIR/.local/bin/cmake
+        export CMAKE=$ROOTDIR/.local/bin/cmake
+    else
+        export CMAKE=cmake
+    fi
+
+elif [ -n "${SBU_SUPERCOMPUTER_INSTALLATION}" ]; then    
+    export PYTHON_VERSION=3.7
+    
+    # module python is a conda environment
+    export PATH=$CONDA_PREFIX/bin:$PATH
+    export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+    export LDFLAGS="-L$CONDA_PREFIX/lib":$LDFLAGS
+
+    export PYTHON_VERSION=3.7
+    export PYTHONPATH=$CONDA_PREFIX/lib/python$PYTHON_VERSION/site-packages:$PYTHONPATH
+    export PYTHONPATH=$CONDA_PREFIX/lib:$PYTHONPATH
+
+    export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/include/python${PYTHON_VERSION}m/:$CPLUS_INCLUDE_PATH
+    export C_INCLUDE_PATH=$CONDA_PREFIX/include/python${PYTHON_VERSION}m/:$C_INCLUDE_PATH
+
+    export GLOBALPYTHON3=$CONDA_PREFIX/bin/python$PYTHON_VERSION
+    export GLOBAL_PACKAGES_LOCATION=$CONDA_PREFIX
+
+    export FORTRAN_COMPILER=gfortran
+    export C_COMPILER=gcc
+    export CXX_COMPILER=g++
+    export MPI_FORTRAN_COMPILER=mpif90
+    export MPI_CXX_COMPILER=mpicc
+    export MPI_CC_COMPILER=mpicxx
+
+    export CMAKE=$CONDA_PREFIX/bin/cmake
+
+    export CPLUS_INCLUDE_PATH=$ROOTDIR/.local/include:$CPLUS_INCLUDE_PATH
+    export C_INCLUDE_PATH=$ROOTDIR/.local/include:$C_INCLUDE_PATH
+
+    export IGNORE_DISTUTILS_INSTALLATION=1
+    export IGNORE_XZ_INSTALLATION=1
+    export IGNORE_CMAKE_INSTALLATION=1
+
+    ulimit -s unlimited
 fi
 
 if [ -n "${IGNORE_CPP_INSTALLATION}" ]; then

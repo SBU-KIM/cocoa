@@ -243,6 +243,7 @@ class _bao_prototype(_InstallableLikelihood):
                 "rdrag": None},
             "DM_over_rs": {
                 "angular_diameter_distance": {"z": zs.get("DM_over_rs", None)},
+                "Hubble": {"z": zs.get("DV_over_rs", None)},
                 "rdrag": None},
             "DA_over_rs": {
                 "angular_diameter_distance": {"z": zs.get("DA_over_rs", None)},
@@ -279,7 +280,7 @@ class _bao_prototype(_InstallableLikelihood):
         if observable == "DV_over_rs":
             return np.cbrt(
                 ((1 + z) * self.provider.get_angular_diameter_distance(z)) ** 2 *
-                _c_km_s * z / self.provider.get_Hubble(z, units="km/s/Mpc")) / self.rs()
+                _c_km_s * z / self.provider.get_Hubble(z, units="km/s/Mpc")) / self.rs()            
         # Idem, inverse
         elif observable == "rs_over_DV":
             return np.cbrt(
@@ -315,6 +316,6 @@ class _bao_prototype(_InstallableLikelihood):
         if self.log.getEffectiveLevel() == logging.DEBUG:
             for i, (z, obs, theo) in enumerate(
                     zip(self.data["z"], self.data["observable"], theory)):
-                self.log.debug("%s at z=%g : %g (theo) ; %g (data)",
+                self.log.info("%s at z=%g : %g (theo) ; %g (data)",
                                obs, z, theo, self.data.iloc[i, 1])
         return self.logpdf(theory)

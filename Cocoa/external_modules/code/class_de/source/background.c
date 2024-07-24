@@ -431,7 +431,7 @@ int background_functions(
   /* baryons */
   pvecback[pba->index_bg_rho_b] = pba->Omega0_b * pow(pba->H0,2) / pow(a,3);
   rho_tot += pvecback[pba->index_bg_rho_b];
-  p_tot += 0;
+  p_tot += 0; 
   rho_m += pvecback[pba->index_bg_rho_b];
 
   /* cdm */
@@ -476,16 +476,22 @@ int background_functions(
     p_tot += pvecback[pba->index_bg_p_scf];
     dp_dloga += 0.0; /** <-- This depends on a_prime_over_a, so we cannot add it now! */
     //divide relativistic & nonrelativistic (not very meaningful for oscillatory models)
+    //VM: BEGINS
+    //printf("CLASS: rho_r (no DR) = %e, rho_r (DR) = %e \n", rho_r, pvecback[pba->index_bg_p_scf]);
+    //VM: ENDS
     rho_r += 3.*pvecback[pba->index_bg_p_scf]; //field pressure contributes radiation
     rho_m += pvecback[pba->index_bg_rho_scf] - 3.* pvecback[pba->index_bg_p_scf]; //the rest contributes matter
     //printf(" a= %e, Omega_scf = %f, \n ",a, pvecback[pba->index_bg_rho_scf]/rho_tot );
-    if (pba->scf_parameterisation == da_de){
+    if (pba->scf_parameterisation == da_de)
+    {
       pvecback[pba->index_bg_rho_da_dr] = pvecback_B[pba->index_bi_rho_da_dr];
       rho_tot += pvecback[pba->index_bg_rho_da_dr];
       p_tot += (1./3.)*pvecback[pba->index_bg_rho_da_dr];
       dp_dloga += -(4./3.) * pvecback[pba->index_bg_rho_da_dr];
+
       rho_r += pvecback[pba->index_bg_rho_da_dr];
-      switch (pba->scf_da_friction) {
+      switch (pba->scf_da_friction) 
+      {
         case constant:
         pvecback[pba->index_bg_da_friction] = pba->scf_Y_da;
         break;
@@ -494,7 +500,7 @@ int background_functions(
           pvecback[pba->index_bg_da_friction] = 0.;
         }
         else {
-        pvecback[pba->index_bg_da_friction] = pba->scf_c_n_da * pow(pvecback[pba->index_bg_rho_da_dr],pba->scf_n_da/4.);
+        pvecback[pba->index_bg_da_friction] = pba->scf_c_n_da * pow(pvecback[pba->index_bg_rho_da_dr], pba->scf_n_da/4.);
         //printf("a =%g \t friction = %g \t rho^n/4 = %g \n rho = %g \n n =%g \n", a, pvecback[pba->index_bg_da_friction], pow(pvecback[pba->index_bg_rho_da_dr],pba->scf_n_da/4.),pvecback[pba->index_bg_rho_da_dr],pba->scf_n_da );
         // This is kept simple shifting the units to c_n
         }
@@ -551,6 +557,12 @@ int background_functions(
     rho_tot += pvecback[pba->index_bg_rho_lambda];
     p_tot -= pvecback[pba->index_bg_rho_lambda];
   }
+
+  //VM: BEGINS
+  //printf("WHAT??? %e \n", pba->Omega0_lambda);
+  //printf("WHAT??? %e \n", pba->Omega0_cdm );
+  //printf("WHAT??? %e \n\n", pba->Omega0_b);
+  //VM: ENDS
 
   /* fluid with w(a) and constant cs2 */
   if (pba->has_fld == _TRUE_) {
@@ -629,6 +641,11 @@ int background_functions(
   /** - compute relativistic density to total density ratio */
   pvecback[pba->index_bg_Omega_r] = rho_r / rho_crit;
 
+  //VM: BEGINS
+  //printf("CLASS: rho_m / rho_crit = %e \n", rho_m / rho_crit);
+  //printf("CLASS: rho_r / rho_crit = %e \n", rho_r / rho_crit);
+  //VM: ENDS
+
   /** - compute other quantities in the exhaustive, redundant format */
   if (return_format == long_info) {
 
@@ -636,8 +653,9 @@ int background_functions(
     pvecback[pba->index_bg_rho_crit] = rho_crit;
 
     /** - compute Omega_m */
+    
     pvecback[pba->index_bg_Omega_m] = rho_m / rho_crit;
-
+    
     /** - cosmological time */
     pvecback[pba->index_bg_time] = pvecback_B[pba->index_bi_time];
 
@@ -2124,6 +2142,10 @@ int background_solve(
                           /2./pba->background_table[(pba->bt_size-1)*pba->bg_size+pba->index_bg_rho_crit];
   }
 
+  //VM: BEGINS
+  //pba->background_verbose = 3;
+  //VM: ENDS
+
   /** - send information to standard output */
   if (pba->background_verbose > 0) {
     printf(" -> age = %f Gyr\n",pba->age);
@@ -2198,10 +2220,15 @@ int background_solve(
   }
 
   /**  - store information in the background structure */
+  
   pba->Omega0_m = pba->background_table[(pba->bt_size-1)*pba->bg_size+pba->index_bg_Omega_m];
   pba->Omega0_r = pba->background_table[(pba->bt_size-1)*pba->bg_size+pba->index_bg_Omega_r];
   pba->Omega0_de = 1. - (pba->Omega0_m + pba->Omega0_r + pba->Omega0_k);
-
+  //VM BEGINS
+  //printf("CLASS Omega0_m = %e \n", pba->Omega0_m);
+  //printf("CLASS Omega0_de = %e \n", pba->Omega0_de);
+  //printf("CLASS Omega0_r = %e \n", pba->Omega0_r);
+  //VM ENDS
   free(pvecback);
   free(pvecback_integration);
   free(used_in_output);
@@ -2391,7 +2418,7 @@ int background_initial_conditions(
       pvecback_integration[pba->index_bi_rho_da_dr] = 0.0;
       break;
       case temp_dep:
-      printf("has_da_dr = %d\n",pba->has_da_dr);
+      //printf("has_da_dr = %d\n",pba->has_da_dr);
       pvecback_integration[pba->index_bi_rho_da_dr] =  pow(10,-90.);  /**small number to allow friction to grow; this will redshift until it hits attractor solution */
       break;
     }
